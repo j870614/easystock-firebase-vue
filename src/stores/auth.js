@@ -6,7 +6,7 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
 import { auth, googleProvider, db } from '@/firebase'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -25,6 +25,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isStaff   = computed(() => ['owner', 'admin', 'staff'].includes(role.value))
   const isPending = computed(() => role.value === 'pending')
 
+  const assignedLocationId = computed(() => profile.value?.assignedLocationId ?? null)
+
   // ── Actions ──────────────────────────────────────────
 
   /** 監聽 Firebase Auth 狀態（在 main.js 初始化時呼叫） */
@@ -33,9 +35,10 @@ export const useAuthStore = defineStore('auth', () => {
       onAuthStateChanged(auth, async (firebaseUser) => {
         user.value = firebaseUser
         if (firebaseUser) {
-          await loadProfile(firebaseUser)
+          await loadProfile(firebaseUser) // 這裡必須 await，確保角色資料回來才放行路由
         } else {
           profile.value = null
+          stopProfileListener()
         }
         loading.value = false
         resolve()
@@ -43,15 +46,23 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
-  /** 讀取或建立 Firestore 使用者文件 */
-  async function loadProfile(firebaseUser) {
-    const ref = doc(db, 'users', firebaseUser.uid)
-    const snap = await getDoc(ref)
+  let unsubscribeProfile = null
 
-    if (snap.exists()) {
-      profile.value = snap.data()
-    } else {
-      // 首次登入：建立 pending 帳號
+  function stopProfileListener() {
+    if (unsubscribeProfile) {
+      unsubscribeProfile()
+      unsubscribeProfile = null
+    }
+  }
+
+  /** 讀取或建立 Firestore 使用者文件並持續監聽 */
+  async function loadProfile(firebaseUser) {
+    stopProfileListener()
+    const userRef = doc(db, 'users', firebaseUser.uid)
+    
+    // 第一次先試著抓，如果不存在就建立
+    const initialSnap = await getDoc(userRef)
+    if (!initialSnap.exists()) {
       const newProfile = {
         uid:         firebaseUser.uid,
         displayName: firebaseUser.displayName ?? '未命名',
@@ -61,9 +72,15 @@ export const useAuthStore = defineStore('auth', () => {
         provider:    firebaseUser.providerData?.[0]?.providerId ?? 'unknown',
         createdAt:   serverTimestamp(),
       }
-      await setDoc(ref, newProfile)
-      profile.value = newProfile
+      await setDoc(userRef, newProfile)
     }
+
+    // 開始持續監聽
+    unsubscribeProfile = onSnapshot(userRef, (snap) => {
+      if (snap.exists()) {
+        profile.value = snap.data()
+      }
+    })
   }
 
   /** Google 登入 */
@@ -98,6 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** 登出 */
   async function signOut() {
+    stopProfileListener()
     await firebaseSignOut(auth)
     user.value = null
     profile.value = null
@@ -114,6 +132,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     isStaff,
     isPending,
+    assignedLocationId,
     init,
     loginWithGoogle,
     loginWithLine,

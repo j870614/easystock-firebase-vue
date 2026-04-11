@@ -32,7 +32,18 @@
 </template>
 
 <script setup>
+import { watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Clock, LogOut } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+
+const router = useRouter()
 const authStore = useAuthStore()
+
+// 即時監控：如果角色變更為非 pending，自動導回首頁
+watch(() => authStore.isPending, (isPending) => {
+  if (!isPending && authStore.isAuthenticated) {
+    router.push('/')
+  }
+}, { immediate: true })
 </script>

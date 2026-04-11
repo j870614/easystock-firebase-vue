@@ -68,8 +68,8 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore'
 import { Building2, History, ArrowDownCircle, ArrowUpCircle } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
@@ -79,6 +79,7 @@ const appStore = useAppStore()
 const loading = ref(false)
 const transactions = ref([])
 const activeFilter = ref('all')
+let unsubscribe = null
 
 const filters = [
   { value: 'all', label: '全部' },
@@ -86,26 +87,40 @@ const filters = [
   { value: 'out', label: '出庫' },
 ]
 
-async function load() {
-  if (!appStore.selectedLocationId) return
-  loading.value = true
-  try {
-    const constraints = [
-      where('locationId', '==', appStore.selectedLocationId),
-      orderBy('timestamp', 'desc'),
-      limit(50),
-    ]
-    if (activeFilter.value !== 'all') {
-      constraints.unshift(where('type', '==', activeFilter.value))
-    }
-    const q = query(collection(db, 'transactions'), ...constraints)
-    const snap = await getDocs(q)
-    transactions.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-  } finally {
-    loading.value = false
+function stopListener() {
+  if (unsubscribe) {
+    unsubscribe()
+    unsubscribe = null
   }
 }
 
-watch(() => appStore.selectedLocationId, load)
-onMounted(load)
+function listen() {
+  stopListener()
+  if (!appStore.selectedLocationId) return
+  
+  loading.value = true
+  const constraints = [
+    where('locationId', '==', appStore.selectedLocationId),
+    orderBy('timestamp', 'desc'),
+    limit(10), // 使用者要求的最近10筆
+  ]
+  
+  if (activeFilter.value !== 'all') {
+    constraints.unshift(where('type', '==', activeFilter.value))
+  }
+  
+  const q = query(collection(db, 'transactions'), ...constraints)
+  
+  unsubscribe = onSnapshot(q, (snap) => {
+    transactions.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    loading.value = false
+  }, (err) => {
+    console.error('Transactions listener error:', err)
+    loading.value = false
+  })
+}
+
+watch(() => [appStore.selectedLocationId, activeFilter.value], listen)
+onMounted(listen)
+onUnmounted(stopListener)
 </script>

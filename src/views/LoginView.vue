@@ -91,7 +91,7 @@ async function handleGoogle() {
   loading.value = true
   try {
     await authStore.loginWithGoogle()
-    router.push('/dashboard')
+    router.push('/')
   } catch (e) {
     errorMsg.value = '登入失敗，請稍後再試。'
   } finally {

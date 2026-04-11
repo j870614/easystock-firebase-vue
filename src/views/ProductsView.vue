@@ -6,29 +6,62 @@
       </button>
     </div>
 
+    <!-- 骨架屏 / Loading -->
     <div v-if="loading" class="flex justify-center py-12">
       <div class="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
     </div>
 
-    <div v-else class="space-y-2">
-      <div
-        v-for="p in products"
-        :key="p.id"
-        class="card flex items-center gap-3"
-        :class="!p.isActive ? 'opacity-50' : ''"
+    <div v-else class="space-y-2 pb-24">
+      <!-- 拖拽列表 (以群組顯示) -->
+      <VueDraggable
+        v-model="draggableGroups"
+        item-key="name"
+        handle=".drag-handle"
+        @end="onDragEnd"
+        class="space-y-4"
+        ghost-class="opacity-50"
       >
-        <div class="flex-1 min-w-0">
-          <div class="font-semibold text-gray-800">
-            {{ p.name }}
-            <span v-if="p.spec" class="text-gray-500 font-normal ml-1">{{ p.spec }}</span>
+        <template #item="{ element: group }">
+          <div class="card p-0 overflow-hidden border-2" :class="group.items.some(i => i.isActive) ? 'border-transparent' : 'opacity-50 border-gray-200'">
+            <!-- 群組標頭 -->
+            <div class="flex items-center gap-3 p-3 bg-gray-50 border-b">
+              <button class="drag-handle p-2 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0">
+                <GripVertical class="w-5 h-5" />
+              </button>
+              <div class="font-bold text-gray-800 flex-1">{{ group.name }}</div>
+              
+              <div class="flex items-center gap-2">
+                <div class="text-sm text-gray-500 bg-white px-2 py-1 rounded-lg border shadow-sm">
+                  {{ group.items.length }} 個規格
+                </div>
+                <button class="p-2 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click="openForm(group)">
+                  <Pencil class="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <!-- 群組內品項 -->
+            <div class="divide-y opacity-70">
+              <div
+                v-for="p in group.items"
+                :key="p.id"
+                class="flex items-center gap-3 p-3 pl-12 bg-white transition-colors"
+                :class="!p.isActive ? 'opacity-50' : ''"
+              >
+                <!-- 品項資訊 -->
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold text-gray-800 truncate">
+                    {{ p.spec || '預設規格' }}
+                  </div>
+                  <div class="text-sm text-gray-400">單價: {{ p.price || 0 }} | 安全庫存: {{ p.minStock || 0 }}</div>
+                </div>
+                
+                <el-switch :model-value="p.isActive" @change="(val) => toggleActive(p, val)" />
+              </div>
+            </div>
           </div>
-          <div class="text-sm text-gray-400">排序 {{ p.order }} ・ HK$ {{ p.price }}</div>
-        </div>
-        <el-switch v-model="p.isActive" @change="toggleActive(p)" />
-        <button class="p-2 rounded-xl hover:bg-gray-100" @click="openForm(p)">
-          <Pencil class="w-5 h-5 text-gray-500" />
-        </button>
-      </div>
+        </template>
+      </VueDraggable>
     </div>
 
     <!-- 新增/編輯 Dialog -->
@@ -37,24 +70,67 @@
         <div>
           <label class="label">品項名稱 *</label>
           <input v-model="form.name" type="text" class="input" placeholder="例如：背心" />
+          <p class="text-xs text-brand-600 mt-1">變更名稱後，下方所有規格將同步更新品名。</p>
         </div>
-        <div>
-          <label class="label">規格</label>
-          <input v-model="form.spec" type="text" class="input" placeholder="例如：M、L、薄、厚" />
-        </div>
-        <div>
-          <label class="label">單價 (HK$)</label>
-          <input v-model.number="form.price" type="number" class="input" placeholder="0" />
-        </div>
-        <div>
-          <label class="label">排序序號</label>
-          <input v-model.number="form.order" type="number" class="input" />
+
+        <div class="border-t pt-4">
+          <div class="flex justify-between items-center mb-2">
+            <label class="label mb-0">規格管理 *</label>
+            <button class="text-brand-600 font-semibold text-sm flex items-center gap-1 hover:text-brand-700" @click="addSpecLine">
+              <Plus class="w-4 h-4"/> 新增規格
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            <div v-for="(item, idx) in form.specs" :key="idx" 
+              class="p-3 bg-gray-50 rounded-xl border relative transition-all"
+              :class="item.isMarkedForDeletion ? 'opacity-30 grayscale pointer-events-none' : ''">
+              
+              <!-- 刪除/移除按鈕 -->
+              <div class="absolute -top-2 -right-2 flex gap-1">
+                <!-- 管理員只能停用，總管可以刪除 -->
+                <button v-if="item.id && authStore.isOwner" 
+                  class="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-sm"
+                  title="徹底刪除"
+                  @click="item.isMarkedForDeletion = true">
+                  <Trash2 class="w-3 h-3"/>
+                </button>
+                <button v-if="!item.id" 
+                  class="bg-gray-400 text-white p-1.5 rounded-full hover:bg-gray-500 shadow-sm"
+                  @click="removeSpecLine(idx)">
+                  <X class="w-3 h-3"/>
+                </button>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 mb-2">
+                <div>
+                  <label class="text-xs text-gray-500 mb-1 block">規格名稱</label>
+                  <input v-model="item.spec" type="text" class="input py-1.5 text-sm" placeholder="如: M、薄 (可留空)" />
+                </div>
+                <div>
+                  <label class="text-xs text-gray-500 mb-1 block">單價</label>
+                  <input v-model.number="item.price" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 items-end">
+                <div>
+                  <label class="text-xs text-gray-500 mb-1 block">安全庫存</label>
+                  <input v-model.number="item.minStock" type="number" class="input py-1.5 text-sm" placeholder="預設: 0" min="0" />
+                </div>
+                <div class="flex items-center justify-end h-10 px-1">
+                   <span class="text-xs text-gray-400 mr-2">啟用狀態</span>
+                   <el-switch v-model="item.isActive" size="small" />
+                </div>
+              </div>
+              <div v-if="item.isMarkedForDeletion" class="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded absolute top-2 left-2 font-bold">待刪除</div>
+            </div>
+          </div>
         </div>
       </div>
       <template #footer>
         <button class="btn-ghost mr-2" @click="dialogVisible = false">取消</button>
-        <button class="btn-primary" :disabled="!form.name || saving" @click="save">
-          {{ saving ? '儲存中…' : '儲存' }}
+        <button class="btn-primary" :disabled="!form.name || form.specs.filter(s => !s.isMarkedForDeletion).length === 0 || saving" @click="save">
+          {{ saving ? '儲存中…' : '確認儲存' }}
         </button>
       </template>
     </el-dialog>
@@ -62,58 +138,172 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import {
-  collection, getDocs, addDoc, updateDoc, doc, query, orderBy
+  collection, addDoc, updateDoc, doc, writeBatch, deleteDoc
 } from 'firebase/firestore'
-import { Plus, Pencil } from 'lucide-vue-next'
+import { Plus, Pencil, GripVertical, X, Trash2 } from 'lucide-vue-next'
 import { db } from '@/firebase'
+import { useAuthStore } from '@/stores/auth'
+import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
+import VueDraggable from 'vuedraggable'
 
-const products = ref([])
+const authStore = useAuthStore()
+const appStore = useAppStore()
 const loading  = ref(false)
 const saving   = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref(null)
-const form = ref({ name: '', spec: '', price: 0, order: 1, isActive: true })
 
-async function load() {
-  loading.value = true
-  const q = query(collection(db, 'products'), orderBy('order'))
-  const snap = await getDocs(q)
-  products.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-  loading.value = false
+const draggableGroups = ref([])
+
+watch(() => appStore.products, (newVal) => {
+  // 分組邏輯
+  const map = new Map()
+  
+  // 保持依照 appStore.products 原本的 order 順序，依序放入分組
+  newVal.forEach(p => {
+    if (!map.has(p.name)) {
+      map.set(p.name, {
+        name: p.name,
+        order: p.order || 999999,
+        items: []
+      })
+    }
+    map.get(p.name).items.push(p)
+  })
+
+  // 將 Map 轉為 Array 並依照每個 group 原本的 order 排序
+  draggableGroups.value = Array.from(map.values()).sort((a, b) => a.order - b.order)
+
+}, { immediate: true })
+
+const form = ref({ name: '', specs: [], originalName: '' })
+
+function addSpecLine() {
+  form.value.specs.push({ id: null, spec: '', price: 0, minStock: 0, isActive: true, isMarkedForDeletion: false })
 }
 
-function openForm(product = null) {
-  editingId.value = product?.id ?? null
-  form.value = product
-    ? { name: product.name, spec: product.spec ?? '', price: product.price ?? 0, order: product.order ?? 1, isActive: product.isActive }
-    : { name: '', spec: '', price: 0, order: (products.value.length + 1) * 10, isActive: true }
+function removeSpecLine(idx) {
+  form.value.specs.splice(idx, 1)
+}
+
+function openForm(group = null) {
+  editingId.value = group ? 'GROUP' : null // 使用 'GROUP' 標記編輯中
+  
+  if (group) {
+    form.value = {
+      originalName: group.name,
+      name: group.name,
+      specs: group.items.map(p => ({
+        id: p.id,
+        spec: p.spec ?? '',
+        price: p.price ?? 0,
+        minStock: p.minStock ?? 0,
+        isActive: p.isActive,
+        isMarkedForDeletion: false
+      }))
+    }
+  } else {
+    form.value = {
+      originalName: '',
+      name: '',
+      specs: [
+        { id: null, spec: '', price: 0, minStock: 0, isActive: true, isMarkedForDeletion: false }
+      ]
+    }
+  }
   dialogVisible.value = true
 }
 
 async function save() {
   saving.value = true
   try {
-    const data = { ...form.value }
-    if (editingId.value) {
-      await updateDoc(doc(db, 'products', editingId.value), data)
-      const idx = products.value.findIndex(p => p.id === editingId.value)
-      if (idx !== -1) products.value[idx] = { id: editingId.value, ...data }
+    const baseName = form.value.name.trim()
+    const batch = writeBatch(db)
+
+    if (editingId.value === 'GROUP') {
+      // 1. 處理現有規格的更新與標記刪除
+      form.value.specs.forEach(s => {
+        if (s.id) {
+          const pRef = doc(db, 'products', s.id)
+          if (s.isMarkedForDeletion) {
+             batch.delete(pRef)
+          } else {
+             batch.update(pRef, {
+               name: baseName,
+               spec: s.spec.trim(),
+               price: s.price,
+               minStock: s.minStock,
+               isActive: s.isActive
+             })
+          }
+        } else if (!s.isMarkedForDeletion) {
+          // 2. 處理編輯視窗中新增的規格
+          const newRef = doc(collection(db, 'products'))
+          // 繼承同品名中現有的 order，若無則預設
+          const existingOrder = draggableGroups.value.find(g => g.name === form.value.originalName)?.order || 10
+          batch.set(newRef, {
+            name: baseName,
+            spec: s.spec.trim(),
+            price: s.price,
+            minStock: s.minStock,
+            isActive: s.isActive,
+            order: existingOrder
+          })
+        }
+      })
     } else {
-      const ref = await addDoc(collection(db, 'products'), data)
-      products.value.push({ id: ref.id, ...data })
+      // 全新新增模式
+      const nextOrder = (draggableGroups.value.length > 0) 
+        ? Math.max(...draggableGroups.value.map(g => g.order)) + 10 
+        : 10
+
+      form.value.specs.forEach(s => {
+        if (!s.isMarkedForDeletion) {
+          const newRef = doc(collection(db, 'products'))
+          batch.set(newRef, {
+            name: baseName,
+            spec: s.spec.trim(),
+            price: s.price,
+            minStock: s.minStock,
+            isActive: true, // 新建預設啟用
+            order: nextOrder
+          })
+        }
+      })
     }
+    await batch.commit()
     dialogVisible.value = false
+  } catch (e) {
+    console.error('儲存失敗', e)
+    alert('儲存失敗：' + e.message)
   } finally {
     saving.value = false
   }
 }
 
-async function toggleActive(product) {
-  await updateDoc(doc(db, 'products', product.id), { isActive: product.isActive })
+async function toggleActive(product, val) {
+  await updateDoc(doc(db, 'products', product.id), { isActive: val })
 }
 
-onMounted(load)
+async function onDragEnd() {
+  try {
+    const batch = writeBatch(db)
+    draggableGroups.value.forEach((group, index) => {
+      const newOrder = (index + 1) * 10
+      if (group.order !== newOrder) {
+        // 更新該群組下的所有 items
+        group.items.forEach(p => {
+          const pRef = doc(db, 'products', p.id)
+          batch.update(pRef, { order: newOrder })
+        })
+      }
+    })
+    await batch.commit()
+  } catch(e) {
+    console.error('更新排序失敗', e)
+  }
+}
 </script>

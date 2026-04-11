@@ -23,18 +23,14 @@ const routes = [
   },
   {
     path: '/',
-    redirect: '/dashboard',
+    name: 'offering',
+    component: () => import('@/views/InventoryView.vue'),
+    meta: { requiresAuth: true, requiredRole: 'staff' },
   },
   {
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/views/DashboardView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'staff' },
-  },
-  {
-    path: '/inventory',
-    name: 'inventory',
-    component: () => import('@/views/InventoryView.vue'),
     meta: { requiresAuth: true, requiredRole: 'staff' },
   },
   {
@@ -75,7 +71,7 @@ const routes = [
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/dashboard',
+    redirect: '/',
   },
 ]
 
@@ -109,7 +105,7 @@ router.beforeEach(async (to) => {
 
   // 已登入要去登入頁 → 導向首頁
   if (isPublic && authStore.isAuthenticated && to.name === 'login') {
-    return { name: 'dashboard' }
+    return { path: '/' }
   }
 
   // 角色不足 → 導向首頁
@@ -118,7 +114,7 @@ router.beforeEach(async (to) => {
     const userWeight = ROLE_WEIGHT[authStore.role] ?? 0
     const required   = ROLE_WEIGHT[requiredRole] ?? 0
     if (userWeight < required) {
-      return { name: 'dashboard' }
+      return { path: '/' }
     }
   }
 })

@@ -40,6 +40,33 @@
       </div>
 
       <template v-else>
+        <!-- 庫存預警 -->
+        <div v-if="lowStockItems.length > 0" class="mb-6">
+          <h2 class="text-base font-semibold text-red-500 mb-3 flex items-center gap-2">
+            <AlertTriangle class="w-5 h-5 flex-shrink-0" /> 急需補貨
+          </h2>
+          <div class="grid grid-cols-2 gap-3">
+            <div
+              v-for="item in lowStockItems"
+              :key="item.id"
+              class="card bg-red-50 border-l-4 border-l-red-500 !p-3 flex flex-col gap-1"
+            >
+              <div class="text-sm text-red-900 leading-snug truncate">
+                {{ item.name }}
+                <span v-if="item.spec" class="font-medium">・{{ item.spec }}</span>
+              </div>
+              <div class="flex items-end justify-between mt-1">
+                <div class="text-2xl font-bold text-red-600 leading-none">
+                  {{ item.currentStock }}
+                </div>
+                <div class="text-xs text-red-400">
+                  安全: {{ item.minStock || 0 }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <h2 class="text-base font-semibold text-gray-500 mb-3">各品項庫存</h2>
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div
@@ -82,9 +109,9 @@
 </template>
 
 <script setup>
-import { ref, watch, computed, onMounted } from 'vue'
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'
-import { Building2, MapPin } from 'lucide-vue-next'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore'
+import { Building2, MapPin, AlertTriangle } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -94,9 +121,11 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 
 const loading = ref(false)
-const stockItems = ref([])
+const stockMap = ref({})
 const todayIn = ref(0)
 const todayOut = ref(0)
+let unsubscribeStocks = null
+let unsubscribeTx = null
 
 const today = computed(() =>
   new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
@@ -108,57 +137,66 @@ const roleLabel = computed(() => ({
   staff: '一般人員',
 }[authStore.role] ?? '待審核'))
 
-async function loadData() {
-  if (!appStore.selectedLocationId) return
-  loading.value = true
-  try {
-    const locId = appStore.selectedLocationId
+const stockItems = computed(() => {
+  return appStore.activeProducts.map(p => ({
+    ...p,
+    currentStock: stockMap.value[p.id] ?? 0,
+  }))
+})
 
-    // 讀取所有 stocks (此道場)
-    const stockQ = query(
-      collection(db, 'stocks'),
-      where('locationId', '==', locId)
-    )
-    const stockSnap = await getDocs(stockQ)
+const lowStockItems = computed(() => {
+  return stockItems.value.filter(item => item.currentStock <= (item.minStock || 0))
+})
 
-    // 讀取所有啟用產品（用於名稱對照）
-    const productQ = query(
-      collection(db, 'products'),
-      where('isActive', '==', true),
-      orderBy('order')
-    )
-    const productSnap = await getDocs(productQ)
-    const productMap = Object.fromEntries(
-      productSnap.docs.map(d => [d.id, { id: d.id, ...d.data() }])
-    )
-
-    const stockMap = Object.fromEntries(
-      stockSnap.docs.map(d => [d.data().productId, d.data().currentStock])
-    )
-
-    stockItems.value = productSnap.docs.map(d => ({
-      ...productMap[d.id],
-      currentStock: stockMap[d.id] ?? 0,
-    }))
-
-    // 今日交易數
-    const todayStr = new Date().toISOString().slice(0, 10)
-    const txQ = query(
-      collection(db, 'transactions'),
-      where('locationId', '==', locId),
-      where('date', '==', todayStr)
-    )
-    const txSnap = await getDocs(txQ)
-    todayIn.value  = txSnap.docs.filter(d => d.data().type === 'in').length
-    todayOut.value = txSnap.docs.filter(d => d.data().type === 'out').length
-  } finally {
-    loading.value = false
+function stopListeners() {
+  if (unsubscribeStocks) {
+    unsubscribeStocks()
+    unsubscribeStocks = null
+  }
+  if (unsubscribeTx) {
+    unsubscribeTx()
+    unsubscribeTx = null
   }
 }
 
-watch(() => appStore.selectedLocationId, loadData)
-onMounted(async () => {
-  await appStore.fetchLocations()
-  await loadData()
-})
+function listenData() {
+  stopListeners()
+  if (!appStore.selectedLocationId) return
+  
+  loading.value = true
+  const locId = appStore.selectedLocationId
+
+  // 1. 監聽庫存
+  const stockQ = query(
+    collection(db, 'stocks'),
+    where('locationId', '==', locId)
+  )
+  unsubscribeStocks = onSnapshot(stockQ, (snap) => {
+    stockMap.value = Object.fromEntries(
+      snap.docs.map(d => [d.data().productId, d.data().currentStock])
+    )
+    loading.value = false
+  }, (err) => {
+    console.error('Dashboard stocks error:', err)
+    loading.value = false
+  })
+
+  // 2. 監聽今日交易
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const txQ = query(
+    collection(db, 'transactions'),
+    where('locationId', '==', locId),
+    where('date', '==', todayStr)
+  )
+  unsubscribeTx = onSnapshot(txQ, (snap) => {
+    todayIn.value  = snap.docs.filter(d => d.data().type === 'in').length
+    todayOut.value = snap.docs.filter(d => d.data().type === 'out').length
+  }, (err) => {
+    console.error('Dashboard tx error:', err)
+  })
+}
+
+watch(() => appStore.selectedLocationId, listenData)
+onMounted(listenData)
+onUnmounted(stopListeners)
 </script>

@@ -42,7 +42,7 @@ onMounted(async () => {
     })
 
     await signInWithCustomToken(auth, data.token)
-    router.replace('/dashboard')
+    router.replace('/')
   } catch (e) {
     console.error(e)
     ElMessage.error('LINE 登入失敗，請重試')

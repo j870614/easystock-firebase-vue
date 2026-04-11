@@ -12,7 +12,7 @@
 
     <div v-else class="space-y-2">
       <div
-        v-for="loc in locations"
+        v-for="loc in appStore.locations"
         :key="loc.id"
         class="card flex items-center gap-3"
         :class="!loc.isActive ? 'opacity-50' : ''"
@@ -51,25 +51,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { collection, getDocs, addDoc, updateDoc, doc, query, orderBy } from 'firebase/firestore'
+import { ref } from 'vue'
+import { collection, addDoc, updateDoc, doc } from 'firebase/firestore'
 import { Plus, Pencil, Building2 } from 'lucide-vue-next'
 import { db } from '@/firebase'
+import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
 
-const locations = ref([])
+const appStore = useAppStore()
 const loading    = ref(false)
 const saving     = ref(false)
 const dialogVisible = ref(false)
 const editingId  = ref(null)
 const form = ref({ name: '', address: '', isActive: true })
-
-async function load() {
-  loading.value = true
-  const snap = await getDocs(query(collection(db, 'locations'), orderBy('name')))
-  locations.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-  loading.value = false
-}
 
 function openForm(loc = null) {
   editingId.value = loc?.id ?? null
@@ -85,11 +79,8 @@ async function save() {
     const data = { ...form.value }
     if (editingId.value) {
       await updateDoc(doc(db, 'locations', editingId.value), data)
-      const idx = locations.value.findIndex(l => l.id === editingId.value)
-      if (idx !== -1) locations.value[idx] = { id: editingId.value, ...data }
     } else {
-      const ref = await addDoc(collection(db, 'locations'), data)
-      locations.value.push({ id: ref.id, ...data })
+      await addDoc(collection(db, 'locations'), data)
     }
     dialogVisible.value = false
   } finally {
@@ -100,6 +91,4 @@ async function save() {
 async function toggleActive(loc) {
   await updateDoc(doc(db, 'locations', loc.id), { isActive: loc.isActive })
 }
-
-onMounted(load)
 </script>
