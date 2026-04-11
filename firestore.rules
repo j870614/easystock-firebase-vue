@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── 共用函式 ──────────────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isOwner() {
+      return isAuth() && myRole() == 'owner';
+    }
+
+    function isAdmin() {
+      return isAuth() && myRole() in ['owner', 'admin'];
+    }
+
+    function isStaff() {
+      return isAuth() && myRole() in ['owner', 'admin', 'staff'];
+    }
+
+    // ── users 集合 ────────────────────────────────────────────
+    // - 任何已登入使用者可讀取自己的文件
+    // - 只有 owner 可以寫入或變更 role 欄位
+    match /users/{uid} {
+      allow read: if isAuth() && (request.auth.uid == uid || isAdmin());
+
+      // 自己新增自己（首次登入）
+      allow create: if isAuth() && request.auth.uid == uid
+                    && request.resource.data.role == 'pending';
+
+      // owner 可更新任何欄位（包含 role）
+      allow update: if isOwner();
+
+      // 禁止任何人刪除使用者文件
+      allow delete: if false;
+    }
+
+    // ── locations 集合 ────────────────────────────────────────
+    match /locations/{locationId} {
+      allow read:   if isStaff();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isOwner();
+    }
+
+    // ── products 集合 ─────────────────────────────────────────
+    match /products/{productId} {
+      allow read:   if isStaff();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isOwner();
+    }
+
+    // ── stocks 集合（庫存快取）────────────────────────────────
+    // 寫入只透過 Firestore Transaction（Client SDK）或 Cloud Function
+    match /stocks/{stockId} {
+      allow read:   if isStaff();
+      // Staff 可以寫（因為入出庫使用 Client SDK runTransaction）
+      allow write:  if isStaff();
+    }
+
+    // ── transactions 集合 ─────────────────────────────────────
+    match /transactions/{txId} {
+      allow read:   if isStaff();
+      // Staff 只能新增，不能更新/刪除
+      allow create: if isStaff()
+                    && request.resource.data.operator.uid == request.auth.uid;
+      // Admin 可以更新和刪除（補帳/正帳）
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+  }
+}

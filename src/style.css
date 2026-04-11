@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── 全域排版基底 ─────────────────────────────────────── */
+@layer base {
+  html {
+    font-size: 18px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-stock-bg text-gray-800 font-sans antialiased;
+  }
+
+  h1 { @apply text-3xl font-bold; }
+  h2 { @apply text-2xl font-semibold; }
+  h3 { @apply text-xl font-semibold; }
+}
+
+/* ── 可重用元件 ──────────────────────────────────────── */
+@layer components {
+  /* 大型觸控按鈕 */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2
+           min-h-touch px-6 rounded-2xl font-semibold
+           transition-all duration-200 active:scale-95 select-none;
+  }
+
+  .btn-in {
+    @apply btn bg-stock-in text-white shadow-lg shadow-green-200;
+  }
+  .btn-in:hover  { background-color: #15803d; }
+  .btn-in:active { background-color: #166534; }
+
+  .btn-out {
+    @apply btn bg-stock-out text-white shadow-lg shadow-red-200;
+  }
+  .btn-out:hover  { background-color: #b91c1c; }
+  .btn-out:active { background-color: #991b1b; }
+
+  .btn-primary {
+    @apply btn bg-brand-600 text-white shadow-lg shadow-blue-200;
+  }
+  .btn-primary:hover  { background-color: #1d4ed8; }
+  .btn-primary:active { background-color: #1e40af; }
+
+  .btn-ghost {
+    @apply btn bg-white text-gray-700 border border-gray-200 shadow-sm;
+  }
+  .btn-ghost:hover  { background-color: #f9fafb; }
+
+  /* 卡片 */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-4;
+  }
+
+  /* 輸入框 */
+  .input {
+    @apply w-full min-h-touch px-4 py-3 rounded-xl border border-gray-200
+           text-gray-800 bg-white
+           focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent
+           placeholder:text-gray-400;
+  }
+
+  /* 標籤文字 */
+  .label {
+    @apply block text-sm font-medium text-gray-600 mb-1;
+  }
+
+  /* 徽章 */
+  .badge-in  { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800; }
+  .badge-out { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-red-100 text-red-800; }
+  .badge-role-owner { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800; }
+  .badge-role-admin { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800; }
+  .badge-role-staff { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-gray-100 text-gray-700; }
+  .badge-role-pending { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-amber-100 text-amber-800; }
+
+  /* 頂部導航列 */
+  .top-nav {
+    @apply fixed top-0 left-0 right-0 z-50
+           bg-white/90 backdrop-blur-md
+           border-b border-gray-100
+           flex items-center px-4 h-14;
+  }
+
+  /* 底部導航列 */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 z-50
+           bg-white/95 backdrop-blur-md
+           border-t border-gray-100
+           grid h-16 safe-pb;
+  }
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center justify-center gap-0.5
+           text-gray-400 transition-colors duration-200;
+  }
+
+  .bottom-nav-item.active {
+    @apply text-brand-600;
+  }
+}
+
+/* ── 工具類 ──────────────────────────────────────────── */
+@layer utilities {
+  /* iOS 安全區域 bottom padding */
+  .safe-pb { padding-bottom: env(safe-area-inset-bottom); }
+
+  /* 頁面主內容區域（避開頂底導航）*/
+  .page-content {
+    padding-top: 3.5rem; /* top-nav height */
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+    min-height: 100dvh;
+  }
+
+  /* 動畫 */
+  .fade-enter-active,
+  .fade-leave-active {
+    transition: opacity 0.2s ease;
+  }
+  .fade-enter-from,
+  .fade-leave-to {
+    opacity: 0;
+  }
+
+  .slide-up-enter-active,
+  .slide-up-leave-active {
+    transition: all 0.25s ease;
+  }
+  .slide-up-enter-from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  .slide-up-leave-to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* ── Element Plus 客製化 ─────────────────────────────── */
+:root {
+  --el-color-primary: #2563eb;
+  --el-font-size-base: 18px;
+  --el-border-radius-base: 12px;
+}
+
+.el-button {
+  min-height: 48px !important;
+  font-size: 16px !important;
+}
+
+.el-input__inner {
+  min-height: 48px !important;
+  font-size: 16px !important;
+}
