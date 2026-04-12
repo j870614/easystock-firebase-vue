@@ -42,7 +42,7 @@
           <!-- 圓形字首 Icon -->
           <div
             class="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-sm"
-            :class="appStore.isReplenishMode ? 'bg-green-400' : 'bg-brand-400'"
+            :class="appStore.isReplenishMode ? 'bg-green-400' : 'bg-brand-500'"
           >
             {{ String(name).charAt(0) }}
           </div>

@@ -24,7 +24,7 @@
           <div class="flex items-center gap-2">
             <!-- 補貨模式開關 -->
             <div
-              v-if="$route.path.startsWith('/offering')"
+              v-if="$route.name === 'offering'"
               class="flex items-center gap-1.5 mr-1"
             >
               <span class="text-xs font-bold transition-colors" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-gray-400'">補貨<br>開關</span>
