@@ -2,17 +2,41 @@
   <AppLayout title="報表匯出" :show-location-picker="true">
     <div class="space-y-4">
       <div class="card no-print">
-        <h2 class="font-semibold text-gray-700 mb-3">選擇年份與道場</h2>
+        <h2 class="font-semibold text-gray-700 mb-3">報表類型與時段</h2>
         <div class="space-y-3">
+          <div class="flex gap-2">
+             <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="exportType === 'year' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="exportType = 'year'">年度</button>
+             <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="exportType === 'month' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="exportType = 'month'">月份</button>
+             <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="exportType === 'custom' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="exportType = 'custom'">自訂區間</button>
+          </div>
           <div>
-            <label class="label">年份</label>
             <el-date-picker
+              v-if="exportType === 'year'"
               v-model="selectedYear"
               type="year"
               placeholder="選擇年份"
               value-format="YYYY"
               class="w-full"
             />
+            <el-date-picker
+              v-else-if="exportType === 'month'"
+              v-model="selectedMonth"
+              type="month"
+              placeholder="選擇月份"
+              value-format="YYYY-MM"
+              class="w-full"
+            />
+            <el-config-provider v-else-if="exportType === 'custom'" :locale="zhTwLocale">
+              <el-date-picker
+                v-model="selectedRange"
+                type="daterange"
+                range-separator="-"
+                start-placeholder="開始日期"
+                end-placeholder="結束日期"
+                value-format="YYYY-MM-DD"
+                class="w-full"
+              />
+            </el-config-provider>
           </div>
         </div>
       </div>
@@ -20,7 +44,7 @@
       <div class="flex gap-2 no-print">
         <button
           class="btn-primary flex-1 text-lg py-4 gap-2"
-          :disabled="!selectedYear || !appStore.selectedLocationId || exporting"
+          :disabled="!isDataReady || exporting"
           @click="exportExcel"
         >
           <FileDown class="w-5 h-5" />
@@ -36,7 +60,7 @@
           <thead>
             <tr>
               <th colspan="2" class="text-center font-bold text-lg py-2 border bg-gray-50" :colspan="2 + appStore.activeProducts.length * 3">
-                {{ appStore.selectedLocation?.name }} {{ selectedYear }}年 出入庫明細表
+                {{ reportTitle }}
               </th>
             </tr>
             <tr class="bg-gray-100">
@@ -81,8 +105,9 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'
+import zhTw from 'element-plus/es/locale/lang/zh-tw'
 import ExcelJS from 'exceljs'
 import { FileDown, Upload } from 'lucide-vue-next'
 import { db } from '@/firebase'
@@ -90,23 +115,47 @@ import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/components/AppLayout.vue'
 
+const zhTwLocale = zhTw
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const exportType = ref('year')
 const selectedYear = ref(String(new Date().getFullYear()))
+const selectedMonth = ref(`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}`)
+const selectedRange = ref([
+  `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}-01`, 
+  `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}-28`
+])
+
 const exporting = ref(false)
 const loadingPreview = ref(false)
 const previewData = ref([])
 const groupedProducts = ref([])
 
+const isDataReady = computed(() => {
+  if (!appStore.selectedLocationId) return false
+  if (exportType.value === 'year') return !!selectedYear.value
+  if (exportType.value === 'month') return !!selectedMonth.value
+  if (exportType.value === 'custom') return !!(selectedRange.value && selectedRange.value.length === 2)
+  return false
+})
+
+const reportTitle = computed(() => {
+  const loc = appStore.selectedLocation?.name ?? '道場'
+  if (exportType.value === 'year') return `${loc} ${selectedYear.value}年 出入庫明細表`
+  if (exportType.value === 'month') return `${loc} ${selectedMonth.value} 出入庫明細表`
+  if (exportType.value === 'custom') return `${loc} ${selectedRange.value[0]}至${selectedRange.value[1]} 出入庫明細表`
+  return ''
+})
+
 async function loadPreview() {
-  if (!appStore.selectedLocationId || !selectedYear.value) {
+  if (!isDataReady.value) {
     previewData.value = []
     return
   }
   
   loadingPreview.value = true
   try {
-    const data = await buildReportData(appStore.selectedLocationId, selectedYear.value)
+    const data = await buildReportData(appStore.selectedLocationId)
     groupedProducts.value = data.products
     previewData.value = data.rows
   } catch (err) {
@@ -116,7 +165,7 @@ async function loadPreview() {
   }
 }
 
-watch(() => [appStore.selectedLocationId, selectedYear.value], loadPreview)
+watch(() => [appStore.selectedLocationId, exportType.value, selectedYear.value, selectedMonth.value, selectedRange.value], loadPreview)
 onMounted(() => {
   if (appStore.activeProducts.length > 0) {
     loadPreview()
@@ -131,7 +180,7 @@ onMounted(() => {
   }
 })
 
-async function buildReportData(locId, year) {
+async function buildReportData(locId) {
   // 1. 取得所有產品並在本地排序
   const productQ = query(collection(db, 'products'), where('isActive', '==', true))
   const productSnap = await getDocs(productQ)
@@ -167,7 +216,15 @@ async function buildReportData(locId, year) {
   // 按日期依序計算
   for (const date of Object.keys(dateGroups).sort()) {
     const txList = dateGroups[date]
-    const isTargetYear = date.startsWith(year)
+    let isTargetYear = false
+
+    if (exportType.value === 'year') {
+      isTargetYear = date.startsWith(selectedYear.value)
+    } else if (exportType.value === 'month') {
+      isTargetYear = date.startsWith(selectedMonth.value)
+    } else if (exportType.value === 'custom') {
+      isTargetYear = date >= selectedRange.value[0] && date <= selectedRange.value[1]
+    }
     
     // 如果是該年份的資料，準備一列 row
     let row = null
@@ -205,15 +262,17 @@ async function buildReportData(locId, year) {
 async function exportExcel() {
   exporting.value = true
   try {
-    const { products, rows } = await buildReportData(appStore.selectedLocationId, selectedYear.value)
+    const { products, rows } = await buildReportData(appStore.selectedLocationId)
     
     if (rows.length === 0) {
-      alert('該年份無交易紀錄可導出')
+      alert('該時段無交易紀錄可導出')
       return
     }
 
     const locName = appStore.selectedLocation?.name ?? '道場'
-    const year = selectedYear.value
+    let timeLabel = selectedYear.value + '年'
+    if (exportType.value === 'month') timeLabel = selectedMonth.value
+    if (exportType.value === 'custom') timeLabel = selectedRange.value[0] + '至' + selectedRange.value[1]
 
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('出入庫明細', { views: [{ state: 'frozen', xSplit: 2, ySplit: 3 }] })
@@ -222,7 +281,7 @@ async function exportExcel() {
     const totalCols = 2 + products.length * 3
     ws.mergeCells(1, 1, 1, totalCols)
     const titleCell = ws.getCell('A1')
-    titleCell.value = `${locName} ${year}年 出入庫明細表`
+    titleCell.value = reportTitle.value
     titleCell.font  = { bold: true, size: 16, name: 'Microsoft JhengHei' }
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' }
     ws.getRow(1).height = 30
@@ -312,7 +371,7 @@ async function exportExcel() {
     const url    = URL.createObjectURL(blob)
     const a      = document.createElement('a')
     a.href = url
-    a.download = `${locName}_${year}年_出入庫明細.xlsx`
+    a.download = `${locName}_${timeLabel}_出入庫明細.xlsx`
     a.click()
     URL.revokeObjectURL(url)
   } catch (e) {

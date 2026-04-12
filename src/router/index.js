@@ -58,6 +58,12 @@ const routes = [
     meta: { requiresAuth: true, requiredRole: 'admin' },
   },
   {
+    path: '/settings',
+    name: 'settings',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { requiresAuth: true, requiredRole: 'owner' },
+  },
+  {
     path: '/import',
     name: 'import',
     component: () => import('@/views/ImportView.vue'),

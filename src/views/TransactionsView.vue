@@ -1,5 +1,5 @@
 <template>
-  <AppLayout title="交易紀錄" show-location-picker>
+  <AppLayout title="出入庫紀錄" show-location-picker>
     <div v-if="!appStore.selectedLocation" class="flex flex-col items-center justify-center py-20 text-center">
       <Building2 class="w-16 h-16 text-gray-300 mb-4" />
       <p class="text-gray-500">請先選擇道場</p>
@@ -14,7 +14,7 @@
           :class="activeFilter === f.value
             ? 'border-brand-500 bg-brand-50 text-brand-700'
             : 'border-gray-200 bg-white text-gray-600'"
-          @click="activeFilter = f.value; load()"
+          @click="activeFilter = f.value; listen()"
         >{{ f.label }}</button>
       </div>
 

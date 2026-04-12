@@ -14,6 +14,7 @@ export const useAppStore = defineStore('app', () => {
     localStorage.getItem('selectedLocationId') ?? null
   )
   const isReplenishMode = ref(false)    // 是否開啟補貨模式
+  const systemMode = ref('development') // 系統執行模式
 
   // ── Getters ───────────────────────────────────────────
   const activeProducts = computed(() =>
@@ -45,6 +46,16 @@ export const useAppStore = defineStore('app', () => {
 
   function init() {
     if (unsubscribeLocs) return
+
+    // 監聽系統設定
+    const sysRef = doc(db, 'settings', 'system')
+    onSnapshot(sysRef, (snap) => {
+      if (snap.exists()) {
+        systemMode.value = snap.data().mode || 'development'
+      } else {
+        systemMode.value = 'development'
+      }
+    })
 
     // 監聽道場
     const qLoc = query(collection(db, 'locations'), orderBy('name'))
@@ -91,6 +102,7 @@ export const useAppStore = defineStore('app', () => {
     activeLocations,
     activeProducts,
     isReplenishMode,
+    systemMode,
     init,
     stop,
     selectLocation,

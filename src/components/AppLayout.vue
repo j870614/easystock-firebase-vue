@@ -97,7 +97,7 @@
           @click="selectAndClose(loc.id)"
         >
           <div class="flex items-center gap-3">
-            <BuildingStorefront class="w-5 h-5 flex-shrink-0" />
+            <Store class="w-5 h-5 flex-shrink-0" />
             <div>
               <div class="font-semibold">{{ loc.name }}</div>
               <div v-if="loc.address" class="text-sm text-gray-500">{{ loc.address }}</div>
@@ -111,7 +111,7 @@
       </div>
       
       <!-- 新增：管理入口 -->
-      <div v-if="authStore.isOwner" class="mt-6 pt-4 border-t border-gray-100">
+      <div v-if="authStore.isOwner" class="mt-6 pt-4 border-t border-gray-100 flex flex-col gap-2">
         <button 
           class="w-full py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-brand-300 hover:text-brand-600 transition-all flex items-center justify-center gap-2"
           @click="showLocationDialog = false; $router.push('/locations')"
@@ -119,18 +119,46 @@
           <Building2 class="w-5 h-5" />
           <span>管理道場設定</span>
         </button>
+        <button 
+          class="w-full py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-brand-300 hover:text-brand-600 transition-all flex items-center justify-center gap-2"
+          @click="showLocationDialog = false; $router.push('/settings')"
+        >
+          <Settings class="w-5 h-5" />
+          <span>系統環境管理</span>
+        </button>
       </div>
     </el-dialog>
+
+    <!-- 地理鎖定遮罩 -->
+    <div v-if="isLocationLocked" class="fixed inset-0 bg-white/95 z-[9999] flex flex-col items-center justify-center p-6 text-center">
+      <MapPin class="w-20 h-20 text-red-500 mb-6 animate-bounce" />
+      <h2 class="text-2xl font-bold text-gray-800 mb-3">不在道場範圍內</h2>
+      <p class="text-gray-500 mb-8 leading-relaxed">
+        系統偵測到您目前的位置不在「{{ appStore.selectedLocation?.name }}」的設定範圍內 (距離約超過 200 公尺)。<br><br>
+        請確認：<br>
+        1. 您的電話已開啟「定位服務」<br>
+        2. 瀏覽器有允許存取定位權限<br>
+        3. 您確實位於道場範圍內
+      </p>
+      <div class="flex flex-col w-full max-w-[250px] gap-3">
+        <button class="btn-primary w-full py-4 text-lg" @click="checkGeofence">
+          重新定位驗證
+        </button>
+        <button class="btn-ghost w-full py-3 text-red-500 border-red-100" @click="handleLogout">
+          切換帳號退出
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   ChevronLeft, ChevronDown, MapPin, Check,
   LayoutDashboard, ArrowLeftRight, History,
-  Package, Building2, FileBarChart2, Users, LogOut
+  Package, Building2, FileBarChart2, Users, LogOut, Settings, MapPinOff, Store
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -147,6 +175,61 @@ const router = useRouter()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 const showLocationDialog = ref(false)
+const isLocationLocked = ref(false)
+let geofenceInterval = null
+
+function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const p1 = lat1 * Math.PI/180;
+  const p2 = lat2 * Math.PI/180;
+  const deltaP = p2 - p1;
+  const deltaLon = lon2 - lon1;
+  const deltaLambda = (deltaLon * Math.PI) / 180;
+  const a = Math.sin(deltaP/2) * Math.sin(deltaP/2) +
+            Math.cos(p1) * Math.cos(p2) *
+            Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function checkGeofence() {
+  if (authStore.role !== 'staff') {
+    isLocationLocked.value = false
+    return
+  }
+  
+  const loc = appStore.selectedLocation
+  if (!loc || !loc.lat || !loc.lng) {
+    isLocationLocked.value = false
+    return
+  }
+
+  if (!navigator.geolocation) {
+    alert('您的裝置不支援地理位置功能，無法驗證。')
+    isLocationLocked.value = true
+    return
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const userLat = position.coords.latitude
+      const userLng = position.coords.longitude
+      const distance = getDistanceFromLatLonInM(loc.lat, loc.lng, userLat, userLng)
+      
+      if (distance > 200) {
+        isLocationLocked.value = true
+      } else {
+        isLocationLocked.value = false
+      }
+    },
+    (err) => {
+      isLocationLocked.value = true
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  )
+}
+
+watch(() => appStore.selectedLocationId, checkGeofence)
 
 function selectAndClose(id) {
   appStore.selectLocation(id)
@@ -161,10 +244,11 @@ async function handleLogout() {
 
 onMounted(() => {
   appStore.init()
+  setTimeout(checkGeofence, 1500)
+  geofenceInterval = setInterval(checkGeofence, 3 * 60 * 1000)
 })
 onUnmounted(() => {
-  // 注意：我們通常希望全域資料監聽在頁面切換時不中斷
-  // 但在此 AppLayout 結構下，若要切換使用者登出，可能需要 stop
+  if (geofenceInterval) clearInterval(geofenceInterval)
 })
 
 // 根據角色動態生成底部導航項目
@@ -172,7 +256,7 @@ const navItems = computed(() => {
   const items = [
     { to: '/', label: '認供結緣',  icon: ArrowLeftRight },
     { to: '/dashboard', label: '總覽',    icon: LayoutDashboard },
-    { to: '/transactions', label: '紀錄', icon: History },
+    { to: '/transactions', label: '出入庫', icon: History },
   ]
   if (authStore.isOwner) {
     items.push({ to: '/locations', label: '道場',   icon: Building2 })

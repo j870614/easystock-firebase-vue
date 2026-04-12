@@ -81,50 +81,63 @@
             </button>
           </div>
 
-          <div class="space-y-3">
-            <div v-for="(item, idx) in form.specs" :key="idx" 
-              class="p-3 bg-gray-50 rounded-xl border relative transition-all"
-              :class="item.isMarkedForDeletion ? 'opacity-30 grayscale pointer-events-none' : ''">
-              
-              <!-- 刪除/移除按鈕 -->
-              <div class="absolute -top-2 -right-2 flex gap-1">
-                <!-- 管理員只能停用，總管可以刪除 -->
-                <button v-if="item.id && authStore.isOwner" 
-                  class="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-sm"
-                  title="徹底刪除"
-                  @click="item.isMarkedForDeletion = true">
-                  <Trash2 class="w-3 h-3"/>
-                </button>
-                <button v-if="!item.id" 
-                  class="bg-gray-400 text-white p-1.5 rounded-full hover:bg-gray-500 shadow-sm"
-                  @click="removeSpecLine(idx)">
-                  <X class="w-3 h-3"/>
-                </button>
-              </div>
+          <VueDraggable
+            v-model="form.specs"
+            item-key="spec"
+            handle=".drag-spec-handle"
+            class="space-y-3"
+            ghost-class="opacity-50"
+          >
+            <template #item="{ element: item, index: idx }">
+              <div class="p-3 bg-gray-50 rounded-xl border relative transition-all"
+                :class="item.isMarkedForDeletion ? 'opacity-30 grayscale pointer-events-none' : ''">
+                
+                <div class="absolute -top-3 -left-3 flex gap-1 z-10" v-if="!item.isMarkedForDeletion">
+                  <button class="drag-spec-handle bg-white border border-gray-200 text-gray-400 hover:text-gray-600 p-1.5 rounded-full shadow-sm cursor-grab active:cursor-grabbing">
+                    <GripVertical class="w-4 h-4" />
+                  </button>
+                </div>
 
-              <div class="grid grid-cols-2 gap-2 mb-2">
-                <div>
-                  <label class="text-xs text-gray-500 mb-1 block">規格名稱</label>
-                  <input v-model="item.spec" type="text" class="input py-1.5 text-sm" placeholder="如: M、薄 (可留空)" />
+                <!-- 刪除/移除按鈕 -->
+                <div class="absolute -top-2 -right-2 flex gap-1 z-10">
+                  <!-- 管理員只能停用，總管可以刪除 -->
+                  <button v-if="item.id && authStore.isOwner" 
+                    class="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-sm"
+                    title="徹底刪除"
+                    @click="item.isMarkedForDeletion = true">
+                    <Trash2 class="w-3 h-3"/>
+                  </button>
+                  <button v-if="!item.id" 
+                    class="bg-gray-400 text-white p-1.5 rounded-full hover:bg-gray-500 shadow-sm"
+                    @click="removeSpecLine(idx)">
+                    <X class="w-3 h-3"/>
+                  </button>
                 </div>
-                <div>
-                  <label class="text-xs text-gray-500 mb-1 block">單價</label>
-                  <input v-model.number="item.price" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                  <div>
+                    <label class="text-xs text-gray-500 mb-1 block">規格名稱</label>
+                    <input v-model="item.spec" type="text" class="input py-1.5 text-sm" placeholder="如: M、薄 (可留空)" />
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500 mb-1 block">單價</label>
+                    <input v-model.number="item.price" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+                  </div>
                 </div>
+                <div class="grid grid-cols-2 gap-2 items-end">
+                  <div>
+                    <label class="text-xs text-gray-500 mb-1 block">安全庫存</label>
+                    <input v-model.number="item.minStock" type="number" class="input py-1.5 text-sm" placeholder="預設: 0" min="0" />
+                  </div>
+                  <div class="flex items-center justify-end h-10 px-1">
+                     <span class="text-xs text-gray-400 mr-2">啟用狀態</span>
+                     <el-switch v-model="item.isActive" size="small" />
+                  </div>
+                </div>
+                <div v-if="item.isMarkedForDeletion" class="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded absolute top-2 left-2 font-bold pointer-events-auto">待刪除</div>
               </div>
-              <div class="grid grid-cols-2 gap-2 items-end">
-                <div>
-                  <label class="text-xs text-gray-500 mb-1 block">安全庫存</label>
-                  <input v-model.number="item.minStock" type="number" class="input py-1.5 text-sm" placeholder="預設: 0" min="0" />
-                </div>
-                <div class="flex items-center justify-end h-10 px-1">
-                   <span class="text-xs text-gray-400 mr-2">啟用狀態</span>
-                   <el-switch v-model="item.isActive" size="small" />
-                </div>
-              </div>
-              <div v-if="item.isMarkedForDeletion" class="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded absolute top-2 left-2 font-bold">待刪除</div>
-            </div>
-          </div>
+            </template>
+          </VueDraggable>
         </div>
       </div>
       <template #footer>
@@ -224,8 +237,11 @@ async function save() {
     const batch = writeBatch(db)
 
     if (editingId.value === 'GROUP') {
+      const baseOrder = draggableGroups.value.find(g => g.name === form.value.originalName)?.order || 100
+      
       // 1. 處理現有規格的更新與標記刪除
-      form.value.specs.forEach(s => {
+      form.value.specs.forEach((s, idx) => {
+        const itemOrder = baseOrder + idx
         if (s.id) {
           const pRef = doc(db, 'products', s.id)
           if (s.isMarkedForDeletion) {
@@ -236,31 +252,30 @@ async function save() {
                spec: s.spec.trim(),
                price: s.price,
                minStock: s.minStock,
-               isActive: s.isActive
+               isActive: s.isActive,
+               order: itemOrder
              })
           }
         } else if (!s.isMarkedForDeletion) {
           // 2. 處理編輯視窗中新增的規格
           const newRef = doc(collection(db, 'products'))
-          // 繼承同品名中現有的 order，若無則預設
-          const existingOrder = draggableGroups.value.find(g => g.name === form.value.originalName)?.order || 10
           batch.set(newRef, {
             name: baseName,
             spec: s.spec.trim(),
             price: s.price,
             minStock: s.minStock,
             isActive: s.isActive,
-            order: existingOrder
+            order: itemOrder
           })
         }
       })
     } else {
       // 全新新增模式
-      const nextOrder = (draggableGroups.value.length > 0) 
-        ? Math.max(...draggableGroups.value.map(g => g.order)) + 10 
-        : 10
+      const nextBaseOrder = (draggableGroups.value.length > 0) 
+        ? Math.max(...draggableGroups.value.map(g => g.order)) + 100 
+        : 100
 
-      form.value.specs.forEach(s => {
+      form.value.specs.forEach((s, idx) => {
         if (!s.isMarkedForDeletion) {
           const newRef = doc(collection(db, 'products'))
           batch.set(newRef, {
@@ -269,7 +284,7 @@ async function save() {
             price: s.price,
             minStock: s.minStock,
             isActive: true, // 新建預設啟用
-            order: nextOrder
+            order: nextBaseOrder + idx
           })
         }
       })
@@ -292,14 +307,14 @@ async function onDragEnd() {
   try {
     const batch = writeBatch(db)
     draggableGroups.value.forEach((group, index) => {
-      const newOrder = (index + 1) * 10
-      if (group.order !== newOrder) {
-        // 更新該群組下的所有 items
-        group.items.forEach(p => {
-          const pRef = doc(db, 'products', p.id)
-          batch.update(pRef, { order: newOrder })
-        })
+      const newBaseOrder = (index + 1) * 100
+      if (group.order !== newBaseOrder) {
+        group.order = newBaseOrder
       }
+      group.items.forEach((p, pIdx) => {
+        const pRef = doc(db, 'products', p.id)
+        batch.update(pRef, { order: newBaseOrder + pIdx })
+      })
     })
     await batch.commit()
   } catch(e) {

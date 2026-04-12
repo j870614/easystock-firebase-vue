@@ -75,5 +75,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ── settings 集合（系統設定）─────────────────────────────
+    match /settings/{docId} {
+      allow read:   if isAuth();
+      allow write:  if isOwner();
+    }
+
   }
 }

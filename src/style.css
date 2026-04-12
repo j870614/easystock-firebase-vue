@@ -89,12 +89,16 @@
     @apply fixed bottom-0 left-0 right-0 z-50
            bg-white/95 backdrop-blur-md
            border-t border-gray-100
-           grid h-16 safe-pb;
+           grid min-h-[4.5rem] pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_12px_rgba(0,0,0,0.03)];
   }
 
   .bottom-nav-item {
-    @apply flex flex-col items-center justify-center gap-0.5
+    @apply flex flex-col items-center justify-center gap-0.5 p-1
            text-gray-400 transition-colors duration-200;
+  }
+
+  .bottom-nav-item span {
+    @apply text-[10px] sm:text-xs font-medium scale-90 sm:scale-100;
   }
 
   .bottom-nav-item.active {
