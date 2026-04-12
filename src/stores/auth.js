@@ -70,6 +70,8 @@ export const useAuthStore = defineStore('auth', () => {
         photoURL:    firebaseUser.photoURL ?? '',
         role:        'pending',
         provider:    firebaseUser.providerData?.[0]?.providerId ?? 'unknown',
+        dharmaName:  '',
+        secularName: '',
         createdAt:   serverTimestamp(),
       }
       await setDoc(userRef, newProfile)

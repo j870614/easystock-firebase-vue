@@ -55,30 +55,85 @@
                 {{ tx.type === 'in' ? '+' : '−' }}{{ tx.qty }}
               </span>
             </div>
-            <div class="text-sm text-gray-500 mt-0.5">{{ tx.note || '—' }}</div>
+            <div class="text-sm text-gray-500 mt-0.5">
+              {{ tx.note || '—' }}
+              <span v-if="tx.editReason" class="text-xs text-amber-600 ml-2" :title="'修改原因: ' + tx.editReason">(曾修改)</span>
+            </div>
             <div class="text-xs text-gray-400 mt-1 flex gap-3">
               <span>{{ tx.date }}</span>
               <span>{{ tx.operator?.name }}</span>
             </div>
+            
+            <div v-if="authStore.isAdmin" class="mt-2 pt-2 border-t border-gray-100 flex justify-end gap-4">
+               <button class="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-brand-600 active:scale-95 transition-all" @click="openEdit(tx)">
+                 <Edit2 class="w-4 h-4"/> 編輯
+               </button>
+               <button class="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-red-600 active:scale-95 transition-all" @click="deleteTx(tx)">
+                 <Trash2 class="w-4 h-4"/> 刪除
+               </button>
+            </div>
           </div>
         </div>
       </div>
+      
+      <!-- 編輯 Dialog -->
+      <el-dialog
+        v-model="editDialog"
+        title="編輯交易紀錄"
+        width="90%"
+        align-center
+        destroy-on-close
+      >
+        <div class="space-y-4 pt-2">
+          <div class="border p-3 rounded-xl bg-gray-50">
+            <div class="text-sm text-gray-500">變更品項</div>
+            <div class="font-bold text-gray-800 text-lg">{{ selectedTxName }}</div>
+          </div>
+          <div>
+            <label class="label">日期</label>
+            <el-date-picker
+              v-model="editForm.date"
+              type="date"
+              value-format="YYYY-MM-DD"
+              class="w-full h-12"
+            />
+          </div>
+          <div>
+            <label class="label">數量 <span class="text-red-500">*</span></label>
+            <input v-model.number="editForm.qty" type="number" class="input text-lg" min="1" />
+          </div>
+          <div>
+            <label class="label">備註事項</label>
+            <input v-model="editForm.note" type="text" class="input" placeholder="選填" />
+          </div>
+          <div>
+            <label class="label">修改原因 <span class="text-red-500">*</span></label>
+            <textarea v-model="editForm.reason" class="input h-20 py-2 resize-none" placeholder="請詳細說明修改原因（例如：記錯數量、日期填錯等），此原因將會被系統記錄。"></textarea>
+          </div>
+          <button class="btn-primary w-full py-4 text-lg mt-4" :disabled="submitting || !editForm.reason.trim()" @click="submitEdit">
+            {{ submitting ? '儲存中...' : '確認修改' }}
+          </button>
+        </div>
+      </el-dialog>
     </template>
   </AppLayout>
 </template>
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore'
-import { Building2, History, ArrowDownCircle, ArrowUpCircle } from 'lucide-vue-next'
+import { collection, query, where, onSnapshot, orderBy, limit, doc, runTransaction, serverTimestamp } from 'firebase/firestore'
+import { Building2, History, ArrowDownCircle, ArrowUpCircle, MoreVertical, Edit2, Trash2 } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/components/AppLayout.vue'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const loading = ref(false)
 const transactions = ref([])
 const activeFilter = ref('all')
+const submitting = ref(false)
 let unsubscribe = null
 
 const filters = [
@@ -86,6 +141,11 @@ const filters = [
   { value: 'in',  label: '入庫' },
   { value: 'out', label: '出庫' },
 ]
+
+// Edit States
+const editDialog = ref(false)
+const editForm = ref({ id: null, qty: 0, date: '', note: '', reason: '', oldQty: 0, type: '', productId: '' })
+const selectedTxName = ref('')
 
 function stopListener() {
   if (unsubscribe) {
@@ -102,7 +162,7 @@ function listen() {
   const constraints = [
     where('locationId', '==', appStore.selectedLocationId),
     orderBy('timestamp', 'desc'),
-    limit(10), // 使用者要求的最近10筆
+    limit(20), // 增加至20筆
   ]
   
   if (activeFilter.value !== 'all') {
@@ -118,6 +178,114 @@ function listen() {
     console.error('Transactions listener error:', err)
     loading.value = false
   })
+}
+
+function openEdit(tx) {
+  selectedTxName.value = tx.productSnapshot?.name + (tx.productSnapshot?.spec ? ` (${tx.productSnapshot?.spec})` : '')
+  editForm.value = {
+    id: tx.id,
+    qty: tx.qty,
+    date: tx.date,
+    note: tx.note || '',
+    reason: '',
+    oldQty: tx.qty,
+    type: tx.type,
+    productId: tx.productId
+  }
+  editDialog.value = true
+}
+
+async function submitEdit() {
+  if (!editForm.value.reason.trim()) {
+    alert('請填寫修改原因')
+    return
+  }
+  if (editForm.value.qty <= 0) {
+    alert('數量必須大於 0')
+    return
+  }
+
+  submitting.value = true
+  try {
+    await runTransaction(db, async (t) => {
+      const locId = appStore.selectedLocationId
+      const stockDocId = `${locId}_${editForm.value.productId}`
+      const stockRef = doc(db, 'stocks', stockDocId)
+      const txRef = doc(db, 'transactions', editForm.value.id)
+
+      const stockSnap = await t.get(stockRef)
+      const currentStock = stockSnap.exists() ? stockSnap.data().currentStock : 0
+
+      const delta = editForm.value.qty - editForm.value.oldQty
+      const stockChange = editForm.value.type === 'in' ? delta : -delta
+      const newStock = currentStock + stockChange
+
+      if (newStock < 0) {
+        throw new Error('修改後會導致庫存變為負數，無法修改。')
+      }
+
+      if (stockSnap.exists()) {
+        t.update(stockRef, { currentStock: newStock })
+      } else {
+        t.set(stockRef, { locationId: locId, productId: editForm.value.productId, currentStock: newStock })
+      }
+
+      t.update(txRef, {
+        qty: editForm.value.qty,
+        date: editForm.value.date,
+        note: editForm.value.note,
+        editReason: editForm.value.reason,
+        editTimestamp: serverTimestamp(),
+        editBy: { uid: authStore.user.uid, name: authStore.user.displayName }
+      })
+    })
+
+    editDialog.value = false
+    alert('修改成功')
+  } catch(e) {
+    alert(e.message || '修改失敗')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function deleteTx(tx) {
+  const confirmObj = prompt(`確定要刪除這筆【${tx.type==='in'?'入庫':'出庫'}】紀錄嗎？\n資料將會回推庫存。\n\n請輸入 "delete" 確認刪除：`)
+  if (confirmObj !== 'delete') return
+
+  submitting.value = true
+  try {
+    await runTransaction(db, async (t) => {
+      const locId = appStore.selectedLocationId
+      const stockDocId = `${locId}_${tx.productId}`
+      const stockRef = doc(db, 'stocks', stockDocId)
+      const txRef = doc(db, 'transactions', tx.id)
+
+      const stockSnap = await t.get(stockRef)
+      const currentStock = stockSnap.exists() ? stockSnap.data().currentStock : 0
+
+      // 刪除入庫會減少庫存，刪除出庫會增加庫存
+      const stockChange = tx.type === 'in' ? -tx.qty : tx.qty
+      const newStock = currentStock + stockChange
+
+      if (newStock < 0) {
+        throw new Error('刪除後會導致庫存變為負數，無法刪除。')
+      }
+
+      if (stockSnap.exists()) {
+        t.update(stockRef, { currentStock: newStock })
+      } else {
+        t.set(stockRef, { locationId: locId, productId: tx.productId, currentStock: newStock })
+      }
+
+      t.delete(txRef)
+    })
+    alert('已成功刪除')
+  } catch(e) {
+    alert(e.message || '刪除失敗')
+  } finally {
+    submitting.value = false
+  }
 }
 
 watch(() => [appStore.selectedLocationId, activeFilter.value], listen)

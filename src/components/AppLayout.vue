@@ -137,7 +137,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 
 const props = defineProps({
-  title: { type: String, default: '易存庫存系統' },
+  title: { type: String, default: '彌陀之家東林寺庫存管理系統' },
   showBack: { type: Boolean, default: false },
   showLocationPicker: { type: Boolean, default: true },
 })

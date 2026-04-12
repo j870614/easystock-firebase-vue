@@ -25,6 +25,14 @@
         { "fieldPath": "locationId", "order": "ASCENDING" },
         { "fieldPath": "date",       "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "products",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "order",    "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

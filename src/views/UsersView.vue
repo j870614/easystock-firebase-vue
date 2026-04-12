@@ -20,7 +20,11 @@
           :alt="u.displayName"
         />
         <div class="flex-1 min-w-0">
-          <div class="font-semibold text-gray-800 truncate">{{ u.displayName }}</div>
+          <div class="font-semibold text-gray-800 truncate">
+            <span v-if="u.dharmaName">{{ u.dharmaName }} ({{ u.secularName }})</span>
+            <span v-else-if="u.secularName">{{ u.secularName }}</span>
+            <span v-else>{{ u.displayName }}</span>
+          </div>
           <div class="text-sm text-gray-400 truncate">{{ u.email }}</div>
           <span :class="`badge-role-${u.role}`" class="mt-1">{{ roleLabel(u.role) }}</span>
         </div>
