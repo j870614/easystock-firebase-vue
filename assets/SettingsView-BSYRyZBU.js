@@ -1,0 +1,17 @@
+import{u as C,o as n,A as d,w as M,g as s,c as f,b as t,d as m,e as D,I as x,h as g,ag as u,q as y,x as c,ae as T,D as V,O as h}from"./index-BEbSyNlT.js";import{u as B,_ as S,S as A,C as b}from"./AppLayout-B2D1D9Kq.js";import{c as k}from"./createLucideIcon-D0XKUs7o.js";import"./log-out-B_xD49nz.js";/**
+ * @license lucide-vue-next v0.477.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const N=k("CircleCheckBigIcon",[["path",{d:"M21.801 10A10 10 0 1 1 17 3.335",key:"yps3ct"}],["path",{d:"m9 11 3 3L22 4",key:"1pflzl"}]]);/**
+ * @license lucide-vue-next v0.477.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const I=k("TestTubeIcon",[["path",{d:"M14.5 2v17.5c0 1.4-1.1 2.5-2.5 2.5c-1.4 0-2.5-1.1-2.5-2.5V2",key:"125lnx"}],["path",{d:"M8.5 2h7",key:"csnxdl"}],["path",{d:"M14.5 16h-5",key:"1ox875"}]]),O={key:0,class:"text-center py-20 text-gray-400"},E={key:1,class:"space-y-4"},P={class:"card"},$={class:"font-semibold text-gray-800 text-lg mb-4 flex items-center gap-2"},z={class:"flex items-start gap-3"},L={class:"flex items-start gap-3"},H={__name:"SettingsView",setup(R){const v=C(),r=B();async function p(a){if(r.systemMode!==a)if(a==="production"){if(prompt(`【警告】即將切換至「正式上線模式」
+
+系統將會清除「所有出入庫紀錄」並將「所有庫存歸零」！道場與品相設定將會保留。
+
+確認執行請輸入 "PROD"：`)!=="PROD")return;try{await w(),await u(y(c,"settings","system"),{mode:"production"},{merge:!0}),alert("已成功切換至正式上線模式，並清理所有測試數據。")}catch(o){alert("切換失敗："+o.message)}}else{if(prompt(`【警告】切換回「開發測試模式」不會還原被刪除的資料。
+
+確認切換請輸入 "DEV"：`)!=="DEV")return;try{await u(y(c,"settings","system"),{mode:"development"},{merge:!0}),alert("已切換回開發測試模式。")}catch(o){alert("切換失敗："+o.message)}}}async function w(){const a=["transactions","stocks"];for(const e of a){const o=await T(V(c,e));let i=h(c),l=0;for(const _ of o.docs)i.delete(_.ref),l++,l===500&&(await i.commit(),i=h(c),l=0);l>0&&await i.commit()}}return(a,e)=>(n(),d(S,{title:"系統設定","show-location-picker":!1},{default:M(()=>[s(v).isOwner?(n(),f("div",E,[t("div",P,[t("h2",$,[m(s(A),{class:"w-5 h-5 text-gray-500"}),e[3]||(e[3]=D(" 系統執行環境 ",-1))]),t("div",{class:x(["p-4 rounded-xl border-2 transition-all cursor-pointer",s(r).systemMode==="development"?"border-amber-400 bg-amber-50":"border-gray-200 hover:border-gray-300"]),onClick:e[0]||(e[0]=o=>p("development"))},[t("div",z,[m(s(I),{class:"w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5"}),e[4]||(e[4]=t("div",{class:"flex-1"},[t("div",{class:"font-bold text-gray-800"},"開發測試模式 (Development)"),t("div",{class:"text-sm text-gray-500 mt-1"},"供系統建置初期測試使用，可隨意新增測試數據。")],-1)),s(r).systemMode==="development"?(n(),d(s(b),{key:0,class:"w-6 h-6 text-amber-600 flex-shrink-0"})):g("",!0)])],2),t("div",{class:x(["p-4 rounded-xl border-2 transition-all cursor-pointer mt-3",s(r).systemMode==="production"?"border-green-500 bg-green-50":"border-gray-200 hover:border-gray-300"]),onClick:e[1]||(e[1]=o=>p("production"))},[t("div",L,[m(s(N),{class:"w-6 h-6 text-green-500 flex-shrink-0 mt-0.5"}),e[5]||(e[5]=t("div",{class:"flex-1"},[t("div",{class:"font-bold text-gray-800"},"正式上線模式 (Production)"),t("div",{class:"text-sm text-gray-500 mt-1"},"切換至此模式時，系統將會清除所有開發階段的測試出入庫紀錄與庫存資料。")],-1)),s(r).systemMode==="production"?(n(),d(s(b),{key:0,class:"w-6 h-6 text-green-600 flex-shrink-0"})):g("",!0)])],2)])])):(n(),f("div",O,[...e[2]||(e[2]=[t("p",null,"無權限訪問",-1)])]))]),_:1}))}};export{H as default};
