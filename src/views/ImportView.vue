@@ -268,7 +268,7 @@ async function doImport() {
         locationId: row.locationId,
         date:       new Date().toISOString().slice(0, 10),
         timestamp:  serverTimestamp(),
-        type:       'adjust',
+        type:       'in',
         productId:  row.productId,
         productSnapshot: {
           name:  row.productName,

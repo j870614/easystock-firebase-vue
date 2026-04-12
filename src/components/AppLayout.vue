@@ -111,7 +111,7 @@
       </div>
       
       <!-- 新增：管理入口 -->
-      <div v-if="authStore.isAdmin" class="mt-6 pt-4 border-t border-gray-100">
+      <div v-if="authStore.isOwner" class="mt-6 pt-4 border-t border-gray-100">
         <button 
           class="w-full py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-brand-300 hover:text-brand-600 transition-all flex items-center justify-center gap-2"
           @click="showLocationDialog = false; $router.push('/locations')"
@@ -174,11 +174,14 @@ const navItems = computed(() => {
     { to: '/dashboard', label: '總覽',    icon: LayoutDashboard },
     { to: '/transactions', label: '紀錄', icon: History },
   ]
-  if (authStore.isAdmin) {
+  if (authStore.isOwner) {
     items.push({ to: '/locations', label: '道場',   icon: Building2 })
     items.push({ to: '/reports',  label: '報表',   icon: FileBarChart2 })
     items.push({ to: '/products', label: '品項',   icon: Package })
     items.push({ to: '/users',    label: '成員',   icon: Users })
+  } else if (authStore.isAdmin) {
+    items.push({ to: '/reports',  label: '報表',   icon: FileBarChart2 })
+    items.push({ to: '/products', label: '品項',   icon: Package })
   }
   return items
 })

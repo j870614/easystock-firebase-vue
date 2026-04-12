@@ -49,7 +49,7 @@ const routes = [
     path: '/locations',
     name: 'locations',
     component: () => import('@/views/LocationsView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'admin' },
+    meta: { requiresAuth: true, requiredRole: 'owner' },
   },
   {
     path: '/reports',
@@ -61,7 +61,7 @@ const routes = [
     path: '/import',
     name: 'import',
     component: () => import('@/views/ImportView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'admin' },
+    meta: { requiresAuth: true, requiredRole: 'owner' },
   },
   {
     path: '/users',

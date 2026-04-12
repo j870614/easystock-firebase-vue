@@ -26,21 +26,12 @@
           <FileDown class="w-5 h-5" />
           <span>{{ exporting ? '匯出中…' : 'Excel 匯出' }}</span>
         </button>
-
-        <button
-          class="btn-ghost flex-1 text-lg py-4 gap-2 border-2"
-          :disabled="!selectedYear || !appStore.selectedLocationId || previewData.length === 0"
-          @click="print"
-        >
-          <Printer class="w-5 h-5" />
-          <span>列印 A4</span>
-        </button>
       </div>
 
-      <!-- 網頁預覽 / 列印用表格 -->
-      <div class="card overflow-x-auto print-container">
+      <!-- 網頁預覽表格 -->
+      <div class="card overflow-x-auto">
         <div v-if="loadingPreview" class="py-10 text-center text-gray-400">載入報表資料中...</div>
-        <div v-else-if="previewData.length === 0" class="py-10 text-center text-gray-400 no-print">無資料可供預覽</div>
+        <div v-else-if="previewData.length === 0" class="py-10 text-center text-gray-400">無資料可供預覽</div>
         <table v-else class="w-full text-left border-collapse min-w-max text-sm preview-table">
           <thead>
             <tr>
@@ -77,7 +68,11 @@
         </table>
       </div>
 
-      <router-link to="/import" class="btn-ghost w-full text-lg py-5 gap-3 flex items-center justify-center no-print">
+      <router-link
+        v-if="authStore.isOwner"
+        to="/import"
+        class="btn-ghost w-full text-lg py-5 gap-3 flex items-center justify-center"
+      >
         <Upload class="w-6 h-6" />
         <span>初期庫存 Excel 匯入</span>
       </router-link>
@@ -89,12 +84,14 @@
 import { ref, watch, onMounted } from 'vue'
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'
 import ExcelJS from 'exceljs'
-import { FileDown, Printer, Upload } from 'lucide-vue-next'
+import { FileDown, Upload } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/components/AppLayout.vue'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const selectedYear = ref(String(new Date().getFullYear()))
 const exporting = ref(false)
 const loadingPreview = ref(false)
@@ -325,56 +322,11 @@ async function exportExcel() {
     exporting.value = false
   }
 }
-
-function print() {
-  window.print()
-}
 </script>
 
 <style>
 /* 共用的預覽表格樣式，讓它不只在列印時，在網頁上也好看 */
 .preview-table th, .preview-table td {
   border-color: #e5e7eb;
-}
-
-@media print {
-  @page { size: A4 landscape; margin: 12mm; }
-  
-  /* 隱藏不想印出的東西 */
-  .no-print, .top-nav, .bottom-nav { 
-    display: none !important; 
-  }
-  
-  /* 解除限制以便列印 */
-  body, html { 
-    background: white !important; 
-  }
-  .page-content { 
-    padding: 0 !important; 
-    overflow: visible !important;
-  }
-  .print-container {
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    overflow: visible !important;
-  }
-  
-  /* 表格列印樣式 */
-  .preview-table {
-    font-size: 11px;
-    width: 100% !important;
-  }
-  .preview-table th {
-    background-color: #f3f4f6 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  
-  /* 防止表格被切斷 */
-  .preview-table tr {
-    page-break-inside: avoid;
-  }
 }
 </style>
