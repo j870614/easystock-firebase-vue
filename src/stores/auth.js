@@ -5,6 +5,8 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signOut as firebaseSignOut,
+  setPersistence,
+  browserSessionPersistence,
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
 import { auth, googleProvider, db } from '@/firebase'
@@ -31,11 +33,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** 監聽 Firebase Auth 狀態（在 main.js 初始化時呼叫） */
   function init() {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
+      // 強制等待持久化設定完成
+      await setPersistence(auth, browserSessionPersistence)
+      
       onAuthStateChanged(auth, async (firebaseUser) => {
         user.value = firebaseUser
         if (firebaseUser) {
-          await loadProfile(firebaseUser) // 這裡必須 await，確保角色資料回來才放行路由
+          await loadProfile(firebaseUser)
         } else {
           profile.value = null
           stopProfileListener()

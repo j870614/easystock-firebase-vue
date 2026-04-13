@@ -26,7 +26,10 @@ const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 setPersistence(auth, browserSessionPersistence)
 export const googleProvider = new GoogleAuthProvider()
-googleProvider.setCustomParameters({ prompt: 'select_account login' })
+googleProvider.setCustomParameters({ 
+  prompt: 'select_account login consent',
+  access_type: 'offline'
+})
 
 // Firestore (啟用離線快取，行動端在訊號弱時仍可讀取)
 export const db = initializeFirestore(app, {
