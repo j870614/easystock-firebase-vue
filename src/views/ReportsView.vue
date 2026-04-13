@@ -38,6 +38,32 @@
               />
             </el-config-provider>
           </div>
+          
+          <div class="pt-4 border-t border-gray-100">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-medium text-gray-700 text-sm">匯出品項</h3>
+              <button class="text-brand-600 text-xs hover:underline" @click="selectAllProducts" v-if="selectedProductIds.length !== appStore.activeProducts.length">全選</button>
+              <button class="text-brand-600 text-xs hover:underline" @click="selectedProductIds = []" v-else>清除全部</button>
+            </div>
+            <el-select
+              v-model="selectedProductIds"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              placeholder="請選擇要匯出的品項"
+              class="w-full"
+            >
+              <el-option
+                v-for="item in appStore.activeProducts"
+                :key="item.id"
+                :label="`${item.name} ${item.spec || ''}`"
+                :value="item.id"
+              />
+            </el-select>
+            <p v-if="selectedProductIds.length > 10" class="text-amber-600 text-xs mt-2 flex items-center gap-1">
+              <AlertTriangle class="w-4 h-4" /> 選擇過多品項可能導致 Excel 寬度過大，閱讀不易。
+            </p>
+          </div>
         </div>
       </div>
 
@@ -109,7 +135,7 @@ import { ref, watch, onMounted, computed } from 'vue'
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'
 import zhTw from 'element-plus/es/locale/lang/zh-tw'
 import ExcelJS from 'exceljs'
-import { FileDown, Upload } from 'lucide-vue-next'
+import { FileDown, Upload, AlertTriangle } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -126,6 +152,8 @@ const selectedRange = ref([
   `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}-28`
 ])
 
+const selectedProductIds = ref([])
+
 const exporting = ref(false)
 const loadingPreview = ref(false)
 const previewData = ref([])
@@ -133,6 +161,7 @@ const groupedProducts = ref([])
 
 const isDataReady = computed(() => {
   if (!appStore.selectedLocationId) return false
+  if (selectedProductIds.value.length === 0) return false
   if (exportType.value === 'year') return !!selectedYear.value
   if (exportType.value === 'month') return !!selectedMonth.value
   if (exportType.value === 'custom') return !!(selectedRange.value && selectedRange.value.length === 2)
@@ -165,7 +194,17 @@ async function loadPreview() {
   }
 }
 
-watch(() => [appStore.selectedLocationId, exportType.value, selectedYear.value, selectedMonth.value, selectedRange.value], loadPreview)
+watch(() => appStore.activeProducts, (newVal) => {
+  if (newVal.length > 0 && selectedProductIds.value.length === 0) {
+    selectedProductIds.value = newVal.map(p => p.id)
+  }
+}, { immediate: true })
+
+function selectAllProducts() {
+  selectedProductIds.value = appStore.activeProducts.map(p => p.id)
+}
+
+watch(() => [appStore.selectedLocationId, exportType.value, selectedYear.value, selectedMonth.value, selectedRange.value, selectedProductIds.value], loadPreview, { deep: true })
 onMounted(() => {
   if (appStore.activeProducts.length > 0) {
     loadPreview()
@@ -184,8 +223,10 @@ async function buildReportData(locId) {
   // 1. 取得所有產品並在本地排序
   const productQ = query(collection(db, 'products'), where('isActive', '==', true))
   const productSnap = await getDocs(productQ)
-  const products = productSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+  let products = productSnap.docs.map(d => ({ id: d.id, ...d.data() }))
   products.sort((a, b) => (a.order || 0) - (b.order || 0))
+  // 僅保留使用者選取的品項
+  products = products.filter(p => selectedProductIds.value.includes(p.id))
 
   // 2. 取得所有交易紀錄並在本地排序 (為了計算正確的前期庫存)
   const txQ = query(collection(db, 'transactions'), where('locationId', '==', locId))

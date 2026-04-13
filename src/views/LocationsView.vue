@@ -49,7 +49,18 @@
         </div>
         <div>
           <label class="label">地址（選填）</label>
-          <input v-model="form.address" type="text" class="input" placeholder="例如：香港XX區XX路XX號" />
+          <div class="flex gap-2">
+            <input v-model="form.address" type="text" class="input" placeholder="例如：香港XX區XX路XX號" />
+            <button 
+              class="btn-ghost px-3 shrink-0" 
+              :disabled="!form.address || geocoding" 
+              @click="getLocationFromAddress"
+              title="從地址獲取經緯度"
+            >
+              <div v-if="geocoding" class="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+              <Search v-else class="w-4 h-4" />
+            </button>
+          </div>
         </div>
         <div class="pt-2 border-t mt-4">
           <div class="flex items-center justify-between mb-2">
@@ -84,7 +95,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { collection, addDoc, updateDoc, doc, writeBatch } from 'firebase/firestore'
-import { Plus, Pencil, Building2, GripVertical, MapPin } from 'lucide-vue-next'
+import { Plus, Pencil, Building2, GripVertical, MapPin, Search } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
@@ -93,6 +104,7 @@ import VueDraggable from 'vuedraggable'
 const appStore = useAppStore()
 const loading    = ref(false)
 const saving     = ref(false)
+const geocoding  = ref(false)
 const dialogVisible = ref(false)
 const editingId  = ref(null)
 const draggableLocations = ref([])
@@ -108,6 +120,7 @@ function openForm(loc = null) {
   form.value = loc
     ? { name: loc.name, address: loc.address ?? '', lat: loc.lat ?? null, lng: loc.lng ?? null, isActive: loc.isActive }
     : { name: '', address: '', lat: null, lng: null, isActive: true }
+  geocoding.value = false
   dialogVisible.value = true
 }
 
@@ -126,6 +139,63 @@ function getLocation() {
     },
     { enableHighAccuracy: true }
   );
+}
+
+async function getLocationFromAddress() {
+  if (!form.value.address) return
+  
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  if (!apiKey) {
+    alert('系統未設定 Google Maps API 金鑰，無法使用此功能。')
+    return
+  }
+
+  geocoding.value = true
+  try {
+    // 1. 確保載入 Google Maps SDK (前端 SDK 支援網域限制)
+    await loadGoogleMapsScript(apiKey)
+    
+    // 2. 使用 SDK 的 Geocoder
+    const geocoder = new window.google.maps.Geocoder()
+    geocoder.geocode({ 
+      address: form.value.address,
+      language: 'zh-TW',
+      region: 'tw'
+    }, (results, status) => {
+      geocoding.value = false
+      if (status === 'OK' && results[0]) {
+        const location = results[0].geometry.location
+        form.value.lat = location.lat()
+        form.value.lng = location.lng()
+      } else if (status === 'ZERO_RESULTS') {
+        alert('找不到該地址的座標，請確認地址是否正確。')
+      } else {
+        console.error('Geocoder failed:', status)
+        alert(`定位失敗 (${status})，請確認金鑰是否已啟用 Geocoding API 並允許目前的網域。`)
+      }
+    })
+  } catch (err) {
+    console.error('Load SDK error:', err)
+    alert('載入地圖元件失敗，請檢查網路連線或金鑰設定。')
+    geocoding.value = false
+  }
+}
+
+// 動態載入 Google Maps Script 的輔助函式
+function loadGoogleMapsScript(apiKey) {
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.maps) {
+      resolve()
+      return
+    }
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
+    script.async = true
+    script.defer = true
+    script.onload = resolve
+    script.onerror = reject
+    document.head.appendChild(script)
+  })
 }
 
 async function save() {

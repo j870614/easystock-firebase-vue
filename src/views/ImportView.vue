@@ -8,9 +8,10 @@
           <div class="text-sm text-amber-800 leading-relaxed">
             <p class="font-semibold mb-1">注意事項</p>
             <ul class="list-disc list-inside space-y-1">
+              <li>目前匯入目標道場：<strong class="text-brand-700 bg-brand-100 px-1.5 py-0.5 rounded">{{ appStore.selectedLocation?.name }}</strong></li>
               <li>匯入將會<strong>覆蓋</strong>該道場現有庫存</li>
-              <li>Excel 格式：第一欄「道場名稱」、第二欄「品項名稱」、第三欄「規格」、第四欄「庫存數量」</li>
-              <li>道場與品項名稱須與系統設定完全一致</li>
+              <li>Excel 格式：第一欄「品項名稱」、第二欄「規格」、第三欄「庫存數量」</li>
+              <li>您下載的範本已為您自動填入系統設定的品項</li>
             </ul>
           </div>
         </div>
@@ -66,7 +67,6 @@
           <table class="w-full text-sm">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-3 py-2 text-left text-gray-500 font-medium">道場</th>
                 <th class="px-3 py-2 text-left text-gray-500 font-medium">品項</th>
                 <th class="px-3 py-2 text-left text-gray-500 font-medium">規格</th>
                 <th class="px-3 py-2 text-right text-gray-500 font-medium">數量</th>
@@ -75,7 +75,6 @@
             </thead>
             <tbody class="divide-y divide-gray-100">
               <tr v-for="(row, i) in preview" :key="i" class="hover:bg-gray-50">
-                <td class="px-3 py-2 text-gray-800">{{ row.locationName }}</td>
                 <td class="px-3 py-2 text-gray-800">{{ row.productName }}</td>
                 <td class="px-3 py-2 text-gray-500">{{ row.spec }}</td>
                 <td class="px-3 py-2 text-right font-semibold">{{ row.qty }}</td>
@@ -117,9 +116,12 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
+import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
+import { ElMessageBox } from 'element-plus'
 
 const authStore = useAuthStore()
+const appStore = useAppStore()
 
 const dragging     = ref(false)
 const preview      = ref([])
@@ -133,7 +135,6 @@ async function downloadTemplate() {
   const ws = wb.addWorksheet('初期庫存')
 
   ws.columns = [
-    { header: '道場名稱', key: 'location', width: 20 },
     { header: '品項名稱', key: 'name',     width: 16 },
     { header: '規格',     key: 'spec',     width: 10 },
     { header: '庫存數量', key: 'qty',      width: 10 },
@@ -143,12 +144,22 @@ async function downloadTemplate() {
   ws.getRow(1).font = { bold: true }
   ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDEBF7' } }
 
-  // 範例資料
-  ws.addRows([
-    { location: '本會道場', name: '背心', spec: 'M',  qty: 10 },
-    { location: '本會道場', name: '背心', spec: 'L',  qty: 5  },
-    { location: '本會道場', name: '圍巾', spec: '薄', qty: 27 },
-  ])
+  // 範例資料與自動帶入
+  const activeProducts = appStore.activeProducts
+  if (activeProducts.length > 0) {
+    const rows = activeProducts.map(p => ({
+      name: p.name,
+      spec: p.spec || '',
+      qty: 0 // 預設為0
+    }))
+    ws.addRows(rows)
+  } else {
+    ws.addRows([
+      { name: '背心', spec: 'M',  qty: 10 },
+      { name: '背心', spec: 'L',  qty: 5  },
+      { name: '圍巾', spec: '薄', qty: 27 },
+    ])
+  }
 
   const buffer = await wb.xlsx.writeBuffer()
   const blob   = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -169,15 +180,13 @@ async function parseExcel(file) {
   const rows = []
   ws.eachRow((row, rowNum) => {
     if (rowNum === 1) return // 跳過標頭
-    const [, locationName, productName, spec, qty] = row.values
-    if (!locationName && !productName) return
+    const [, productName, spec, qty] = row.values
+    if (!productName) return
     rows.push({
-      locationName: String(locationName  ?? '').trim(),
       productName:  String(productName   ?? '').trim(),
       spec:         String(spec          ?? '').trim(),
       qty:          Number(qty           ?? 0),
       matched:      false,
-      locationId:   null,
       productId:    null,
       error:        null,
     })
@@ -186,12 +195,7 @@ async function parseExcel(file) {
 }
 
 async function validate(rows) {
-  // 拉取所有道場與產品做 map
-  const [locSnap, prodSnap] = await Promise.all([
-    getDocs(collection(db, 'locations')),
-    getDocs(collection(db, 'products')),
-  ])
-  const locMap  = Object.fromEntries(locSnap.docs.map(d => [d.data().name, d.id]))
+  const prodSnap = await getDocs(collection(db, 'products'))
   const prodMap = {} // { "背心_M": productId }
   prodSnap.docs.forEach(d => {
     const data = d.data()
@@ -201,20 +205,15 @@ async function validate(rows) {
 
   const errs = []
   rows.forEach((row, i) => {
-    const locId  = locMap[row.locationName]
     const prodId = prodMap[`${row.productName}_${row.spec}`]
 
-    if (!locId) {
-      row.error = `道場「${row.locationName}」不存在`
-      errs.push(`第 ${i + 2} 列：${row.error}`)
-    } else if (!prodId) {
+    if (!prodId) {
       row.error = `品項「${row.productName} ${row.spec}」不存在`
       errs.push(`第 ${i + 2} 列：${row.error}`)
     } else if (isNaN(row.qty) || row.qty < 0) {
       row.error = '庫存數量不合法'
       errs.push(`第 ${i + 2} 列：${row.error}`)
     } else {
-      row.locationId = locId
       row.productId  = prodId
       row.matched    = true
     }
@@ -246,18 +245,35 @@ async function doImport() {
   const validRows = preview.value.filter(r => r.matched)
   if (validRows.length === 0) return
 
+  const targetLoc = appStore.selectedLocation
+  if (!targetLoc) {
+    alert('未選取道場')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `確定要匯入並覆蓋「${targetLoc.name}」的庫存嗎？此操作將無法還原。`,
+      '確認匯入覆蓋',
+      { confirmButtonText: '確定覆蓋', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch (e) {
+    return // user cancelled
+  }
+
   importing.value = true
   let count = 0
+  const locId = targetLoc.id
 
   try {
     // Firestore writeBatch 最多 500 筆，但初期庫存不會超過
     const batch = writeBatch(db)
 
     for (const row of validRows) {
-      const stockDocId = `${row.locationId}_${row.productId}`
+      const stockDocId = `${locId}_${row.productId}`
       const stockRef   = doc(db, 'stocks', stockDocId)
       batch.set(stockRef, {
-        locationId:   row.locationId,
+        locationId:   locId,
         productId:    row.productId,
         currentStock: row.qty,
       }, { merge: false }) // 強制覆蓋
@@ -265,7 +281,7 @@ async function doImport() {
       // 新增一筆 adjust 類型的交易紀錄作為稽核軌跡
       const txRef = doc(collection(db, 'transactions'))
       batch.set(txRef, {
-        locationId: row.locationId,
+        locationId: locId,
         date:       new Date().toISOString().slice(0, 10),
         timestamp:  serverTimestamp(),
         type:       'in',
