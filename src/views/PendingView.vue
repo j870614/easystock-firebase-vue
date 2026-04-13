@@ -17,13 +17,13 @@
           <input v-model="form.dharmaName" type="text" class="input" placeholder="例如：法音" />
         </div>
         <div>
-          <label class="label">俗名 (必填)</label>
+          <label class="label">俗名 (選填)</label>
           <input v-model="form.secularName" type="text" class="input" placeholder="真實姓名" />
         </div>
         
         <button 
           class="btn-primary w-full mt-2" 
-          :disabled="submitting || !form.secularName.trim()"
+          :disabled="submitting"
           @click="submitProfile"
         >
           <span v-if="submitting">送出中...</span>
@@ -88,18 +88,19 @@ const form = ref({
 })
 
 const needsProfile = computed(() => {
-  return authStore.profile && !authStore.profile.secularName
+  if (!authStore.profile) return false
+  // 若兩個都沒填，也沒提交過，才需要顯示
+  return !authStore.profile.secularName && !authStore.profile.dharmaName && !authStore.profile.profileSubmitted
 })
 
 async function submitProfile() {
-  if (!form.value.secularName.trim()) return
-  
   submitting.value = true
   try {
     const userRef = doc(db, 'users', authStore.user.uid)
     await updateDoc(userRef, {
       dharmaName: form.value.dharmaName.trim(),
-      secularName: form.value.secularName.trim()
+      secularName: form.value.secularName.trim(),
+      profileSubmitted: true
     })
   } catch (err) {
     console.error('更新個資失敗', err)

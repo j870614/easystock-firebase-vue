@@ -2,7 +2,7 @@
 // ⚠️ 請複製 .env.example 為 .env 並填入您的 Firebase 設定
 
 import { initializeApp } from 'firebase/app'
-import { getAuth, GoogleAuthProvider } from 'firebase/auth'
+import { getAuth, GoogleAuthProvider, setPersistence, browserSessionPersistence } from 'firebase/auth'
 import {
   getFirestore,
   initializeFirestore,
@@ -24,8 +24,9 @@ const app = initializeApp(firebaseConfig)
 
 // Auth
 export const auth = getAuth(app)
+setPersistence(auth, browserSessionPersistence)
 export const googleProvider = new GoogleAuthProvider()
-googleProvider.setCustomParameters({ prompt: 'select_account' })
+googleProvider.setCustomParameters({ prompt: 'select_account login' })
 
 // Firestore (啟用離線快取，行動端在訊號弱時仍可讀取)
 export const db = initializeFirestore(app, {
