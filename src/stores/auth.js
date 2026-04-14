@@ -112,11 +112,11 @@ export const useAuthStore = defineStore('auth', () => {
     // LINE 不支援 Hash，所以統一導向實體存在且不會 404 的首頁
     const redirectUri = encodeURIComponent(`${window.location.origin}${baseUrl}/`)
     const state = crypto.randomUUID()
-    sessionStorage.setItem('line_oauth_state', state)
-    sessionStorage.setItem('line_oauth_action', action)
+    localStorage.setItem('line_oauth_state', state)
+    localStorage.setItem('line_oauth_action', action)
     // 若是 link 模式，記錄當前使用者 uid 供 callback 使用
     if (action === 'link' && user.value?.uid) {
-      sessionStorage.setItem('line_link_uid', user.value.uid)
+      localStorage.setItem('line_link_uid', user.value.uid)
     }
 
     const lineAuthUrl =

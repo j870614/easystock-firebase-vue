@@ -2,7 +2,7 @@
   <div class="min-h-dvh transition-colors duration-300" :class="appStore.isReplenishMode ? 'bg-green-50' : 'bg-stock-bg'">
     <!-- 頂部導航 -->
     <header class="top-nav" :class="appStore.isReplenishMode ? 'bg-green-100 shadow-green-200/50' : ''">
-      <div class="flex items-center gap-3 flex-1">
+      <div class="flex items-center gap-3 flex-1 min-w-0 w-full">
         <!-- 左側：返回或漢堡 -->
         <slot name="header-left">
           <button
@@ -15,24 +15,24 @@
         </slot>
 
         <!-- 標題 -->
-        <h1 class="text-lg font-bold text-gray-800 flex-1 truncate">
+        <h1 class="text-lg font-bold text-gray-800 flex-1 min-w-0 truncate">
           {{ title }}
         </h1>
 
         <!-- 右側：道場選擇器與登出 -->
         <slot name="header-right">
-          <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex items-center gap-2 flex-shrink-0 min-w-0">
             <button
               v-if="showLocationPicker && appStore.activeLocations.length > 0"
-              class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors"
+              class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors flex-shrink-0 min-w-0"
               :class="authStore.isAdmin ? 'bg-brand-50 text-brand-700 hover:bg-brand-100' : 'bg-gray-100 text-gray-700'"
               @click="authStore.isAdmin && (showLocationDialog = true)"
             >
-              <MapPin class="w-4 h-4" />
-              <span class="max-w-20 truncate">
+              <MapPin class="w-4 h-4 flex-shrink-0" />
+              <span class="max-w-20 truncate inline-block align-bottom">
                 {{ appStore.selectedLocation?.name ?? '選擇道場' }}
               </span>
-              <ChevronDown v-if="authStore.isAdmin" class="w-3 h-3" />
+              <ChevronDown v-if="authStore.isAdmin" class="w-3 h-3 flex-shrink-0" />
             </button>
             <router-link
               to="/profile"

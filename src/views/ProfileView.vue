@@ -113,7 +113,7 @@ const googleEmail = computed(() => {
 
 // 判斷 LINE 連結狀態
 const isLineLinked = computed(() => {
-  return !!authStore.profile?.lineUid
+  return !!authStore.profile?.lineUid || authStore.user?.uid?.startsWith('line:')
 })
 
 async function handleLinkGoogle() {

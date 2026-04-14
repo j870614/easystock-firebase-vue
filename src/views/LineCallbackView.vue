@@ -20,22 +20,32 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 onMounted(async () => {
-  const code  = route.query.code
-  const state = route.query.state
-  const savedState = sessionStorage.getItem('line_oauth_state')
-  const action = sessionStorage.getItem('line_oauth_action') || 'login'
-  const linkUid = sessionStorage.getItem('line_link_uid')
+  let code  = route.query.code
+  let state = route.query.state
+  
+  if (!code || !state) {
+    // Fallback: 如果 vue-router 尚未準備好，直接從 URL 讀取
+    const hashStr = window.location.hash
+    const queryStr = hashStr.split('?')[1] || ''
+    const fallbackParams = new URLSearchParams(queryStr)
+    code = code || fallbackParams.get('code')
+    state = state || fallbackParams.get('state')
+  }
+
+  const savedState = localStorage.getItem('line_oauth_state')
+  const action = localStorage.getItem('line_oauth_action') || 'login'
+  const linkUid = localStorage.getItem('line_link_uid')
 
   // CSRF 驗證
   if (!code || state !== savedState) {
-    ElMessage.error('LINE 驗證失敗：無效的請求')
+    ElMessage.error('LINE 驗證失敗：無效的請求，請重新嘗試')
     router.replace('/login')
     return
   }
 
-  sessionStorage.removeItem('line_oauth_state')
-  sessionStorage.removeItem('line_oauth_action')
-  sessionStorage.removeItem('line_link_uid')
+  localStorage.removeItem('line_oauth_state')
+  localStorage.removeItem('line_oauth_action')
+  localStorage.removeItem('line_link_uid')
 
   try {
     if (action === 'link') {
