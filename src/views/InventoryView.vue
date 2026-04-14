@@ -16,8 +16,11 @@
           <span v-if="appStore.isReplenishMode" class="truncate">📦 入庫模式</span>
           <span v-else class="truncate">🙏 認供結緣</span>
         </div>
-        <el-switch v-model="appStore.isReplenishMode" style="--el-switch-on-color: #22c55e;" />
-        <div class="w-32 flex-shrink-0">
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs font-bold transition-colors" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-gray-400'">補貨</span>
+          <el-switch v-model="appStore.isReplenishMode" style="--el-switch-on-color: #22c55e;" />
+        </div>
+        <div class="w-28 flex-shrink-0">
           <el-date-picker
             v-model="date"
             type="date"
