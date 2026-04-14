@@ -13,17 +13,18 @@
 
       <div class="card w-full max-w-sm text-left mb-6 space-y-4">
         <div>
-          <label class="label">法名 (選填)</label>
+          <label class="label">法名</label>
           <input v-model="form.dharmaName" type="text" class="input" placeholder="例如：法音" />
         </div>
         <div>
-          <label class="label">俗名 (選填)</label>
+          <label class="label">俗名</label>
           <input v-model="form.secularName" type="text" class="input" placeholder="真實姓名" />
         </div>
+        <p class="text-xs text-amber-600 mt-1 font-medium">※ 以上兩項請擇一填寫，以便管理員進行審核。</p>
         
         <button 
           class="btn-primary w-full mt-2" 
-          :disabled="submitting"
+          :disabled="submitting || (!form.dharmaName.trim() && !form.secularName.trim())"
           @click="submitProfile"
         >
           <span v-if="submitting">送出中...</span>
