@@ -21,7 +21,7 @@
       </h1>
 
       <!-- 右側：道場選擇器與登出 -->
-      <div class="flex-shrink-0 flex items-center gap-2 justify-end w-auto">
+      <div class="flex-none flex items-center gap-2 justify-end">
         <slot name="header-right">
           <button
             v-if="showLocationPicker && appStore.activeLocations.length > 0"

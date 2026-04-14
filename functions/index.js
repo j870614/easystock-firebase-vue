@@ -167,7 +167,10 @@ exports.linkLine = onCall(
       linkedAt: FieldValue.serverTimestamp(),
     }, { merge: true })
 
-    return { success: true }
+    // 回傳 Custom Token，讓前端可在 session 丟失後重新登入（解決 Safari session 問題）
+    const auth = getAuth()
+    const customToken = await auth.createCustomToken(currentUid)
+    return { success: true, token: customToken }
   }
 )
 

@@ -70,9 +70,13 @@ onMounted(async () => {
       })
 
       if (data?.success) {
+        // 若 session 在 Safari OAuth 跳轉後丟失，用 Custom Token 重新登入
+        if (data.token && !authStore.isAuthenticated) {
+          await signInWithCustomToken(auth, data.token)
+        }
         ElMessage.success('LINE 帳號已成功連結！')
-        // 等待 Firebase Realtime 更新（通常 500-1000ms）
-        await new Promise(resolve => setTimeout(resolve, 800))
+        // 等待 Firestore onSnapshot 更新 profile
+        await new Promise(resolve => setTimeout(resolve, 500))
         router.replace('/profile')
       } else {
         throw new Error(data?.message || '後端回傳連結失敗')
