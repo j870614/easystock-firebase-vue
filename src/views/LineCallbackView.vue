@@ -55,7 +55,7 @@ onMounted(async () => {
       // 一般登入模式
       const lineLoginFn = httpsCallable(functions, 'lineLogin')
       const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '')
-      const redirectUri = `${window.location.origin}${baseUrl}/auth/line/callback`
+      const redirectUri = `${window.location.origin}${baseUrl}/`
 
       const { data } = await lineLoginFn({
         code,

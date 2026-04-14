@@ -109,7 +109,8 @@ export const useAuthStore = defineStore('auth', () => {
   function loginWithLine(action = 'login') {
     const channelId = import.meta.env.VITE_LINE_CHANNEL_ID
     const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '')
-    const redirectUri = encodeURIComponent(`${window.location.origin}${baseUrl}/auth/line/callback`)
+    // LINE 不支援 Hash，所以統一導向實體存在且不會 404 的首頁
+    const redirectUri = encodeURIComponent(`${window.location.origin}${baseUrl}/`)
     const state = crypto.randomUUID()
     sessionStorage.setItem('line_oauth_state', state)
     sessionStorage.setItem('line_oauth_action', action)

@@ -12,6 +12,18 @@ import router from './router'
 import { useAuthStore } from '@/stores/auth'
 
 async function bootstrap() {
+  // 處理 LINE OAuth 在 Hash 模式下的中轉邏輯
+  // LINE 導向首頁帶來的 ?code=xxx 會被轉給 #/auth/line/callback
+  const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.has('code') && urlParams.has('state')) {
+    const code = urlParams.get('code')
+    const state = urlParams.get('state')
+    const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '')
+    // 轉向到 Hash 路由，並移除原本的 search params 避免重複觸發
+    window.location.replace(`${window.location.origin}${baseUrl}/#/auth/line/callback?code=${code}&state=${state}`)
+    return // 停止執行後續，等待重新導向
+  }
+
   const app = createApp(App)
   const pinia = createPinia()
 
