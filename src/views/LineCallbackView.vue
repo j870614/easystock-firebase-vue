@@ -42,7 +42,7 @@ onMounted(async () => {
       // 帳號連結模式：呼叫 linkLine CF，將 LINE 綁定至現有帳號
       const linkLineFn = httpsCallable(functions, 'linkLine')
       const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '')
-      const redirectUri = `${window.location.origin}${baseUrl}/auth/line/callback`
+      const redirectUri = `${window.location.origin}${baseUrl}/`
 
       await linkLineFn({
         code,
