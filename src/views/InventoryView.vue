@@ -75,12 +75,13 @@
           <div v-for="p in selectedGroupItems" :key="p.id" class="border-2 rounded-xl p-4 flex justify-between items-center" :class="appStore.isReplenishMode ? 'border-green-50' : 'border-brand-50'">
             <div>
               <div class="font-bold text-gray-800 text-lg">{{ p.spec || '預設規格' }}</div>
+              <div class="text-sm text-brand-600 font-bold mt-1" v-if="!appStore.isReplenishMode">單價：{{ getProductPrice(p) }}</div>
               <div class="text-sm text-gray-500 mt-1">目前庫存：{{ getStock(p.id) }}</div>
             </div>
-            <button class="px-5 py-2.5 rounded-xl text-white font-bold transition-all active:scale-95"
+            <button class="px-5 py-2.5 rounded-xl text-white font-bold transition-all active:scale-95 whitespace-nowrap"
               :class="appStore.isReplenishMode ? 'bg-green-500 hover:bg-green-600' : 'bg-brand-500 hover:bg-brand-600'"
               @click="addToCart(p)">
-              加入清單
+              加入{{ appStore.isReplenishMode ? '入庫' : '結緣' }}清單
             </button>
           </div>
         </div>
@@ -101,6 +102,7 @@
                <div class="flex-1">
                  <div class="font-bold text-gray-800">{{ item.product.name }}</div>
                  <div v-if="item.product.spec" class="text-sm text-gray-500">{{ item.product.spec }}</div>
+                 <div class="text-sm text-brand-600 font-bold mt-1" v-if="!appStore.isReplenishMode">{{ item.price }} x {{ item.qty }} = {{ item.price * item.qty }}</div>
                </div>
                
                <div class="flex items-center gap-1">
@@ -116,6 +118,10 @@
           </div>
           
           <div class="p-4 pt-2">
+             <div class="flex justify-between items-center px-2 mb-3 text-lg font-bold text-gray-800" v-if="!appStore.isReplenishMode">
+                <span>總計金額</span>
+                <span class="text-brand-600">${{ cartTotalPrice }}</span>
+             </div>
              <button class="w-full text-xl py-4 rounded-2xl transition-transform active:scale-95 font-bold flex justify-center items-center gap-2"
               :class="appStore.isReplenishMode ? 'bg-green-500 text-white shadow-lg shadow-green-200 hover:bg-green-600' : 'bg-brand-500 text-white shadow-lg shadow-brand-200 hover:bg-brand-600'"
               :disabled="submitting"
@@ -185,6 +191,21 @@ const groupedProducts = computed(() => {
   return groups
 })
 
+const cartTotalPrice = computed(() => {
+  return cart.value.reduce((sum, item) => sum + (item.price * item.qty), 0)
+})
+
+const locationCountry = computed(() => appStore.selectedLocation?.country || '台灣')
+
+function getProductPrice(p) {
+  const overrides = p.overrides || {}
+  const countryOverride = overrides[locationCountry.value]
+  if (countryOverride && countryOverride.price != null && countryOverride.price !== '') {
+    return Number(countryOverride.price)
+  }
+  return Number(p.price || 0)
+}
+
 function getStock(productId) {
   return stockMap.value[productId] ?? 0
 }
@@ -201,6 +222,7 @@ function openProductSelect(name, groupItems) {
 }
 
 function addToCart(product) {
+  const price = getProductPrice(product)
   // 檢查購物車內是否已有該商品
   const existing = cart.value.find(item => item.product.id === product.id)
   if (existing) {
@@ -208,6 +230,7 @@ function addToCart(product) {
   } else {
     cart.value.push({
       product,
+      price,
       qty: 1
     })
   }
@@ -308,7 +331,7 @@ async function submitCart() {
           productSnapshot: {
             name: item.product.name,
             spec: item.product.spec ?? '',
-            price: item.product.price ?? 0,
+            price: item.price ?? 0,
           },
           qty: item.qty,
           operator: {

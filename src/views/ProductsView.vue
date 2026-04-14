@@ -34,6 +34,9 @@
                 <div class="text-sm text-gray-500 bg-white px-2 py-1 rounded-lg border shadow-sm">
                   {{ group.items.length }} 個規格
                 </div>
+                <button class="p-2 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click="openForm(group, true)" title="複製此品項">
+                  <Copy class="w-5 h-5" />
+                </button>
                 <button class="p-2 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click="openForm(group)">
                   <Pencil class="w-5 h-5" />
                 </button>
@@ -83,7 +86,7 @@
 
           <VueDraggable
             v-model="form.specs"
-            item-key="spec"
+            item-key="key"
             handle=".drag-spec-handle"
             class="space-y-3"
             ghost-class="opacity-50"
@@ -130,10 +133,37 @@
                     <input v-model.number="item.minStock" type="number" class="input py-1.5 text-sm" placeholder="預設: 0" min="0" />
                   </div>
                   <div class="flex items-center justify-end h-10 px-1">
-                     <span class="text-xs text-gray-400 mr-2">啟用狀態</span>
+                     <span class="text-xs text-gray-400 mr-2">系統啟用狀態</span>
                      <el-switch v-model="item.isActive" size="small" />
                   </div>
                 </div>
+
+                <!-- 地區設定 (Overrides) -->
+                <div class="mt-3 pt-3 border-t border-gray-200" v-if="uniqueCountries.length > 0">
+                  <div class="text-xs text-brand-600 font-bold mb-2 flex items-center gap-1">
+                    各國度設定 (選填)
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                     <div v-for="country in uniqueCountries" :key="country" class="bg-white p-2 rounded border border-gray-200 flex flex-col gap-1 shadow-sm">
+                        <div class="font-bold text-xs text-gray-700">{{ country }}</div>
+                        <div class="flex items-center gap-2">
+                           <div class="flex-1">
+                             <label class="text-[10px] text-gray-500 block mb-0.5">自訂單價</label>
+                             <input type="number" class="input py-1 text-xs" :placeholder="`預設: ${item.price || 0}`"
+                                    :value="item.overrides?.[country]?.price ?? ''"
+                                    @input="e => updateOverride(item, country, 'price', e.target.value)" />
+                           </div>
+                           <div class="flex flex-col items-center justify-end">
+                             <label class="text-[10px] text-gray-500 block mb-0.5">啟用</label>
+                             <el-switch size="small"
+                                        :model-value="item.overrides?.[country]?.isActive ?? true"
+                                        @change="val => updateOverride(item, country, 'isActive', val)" />
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+                </div>
+
                 <div v-if="item.isMarkedForDeletion" class="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded absolute top-2 left-2 font-bold pointer-events-auto">待刪除</div>
               </div>
             </template>
@@ -151,16 +181,17 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import {
   collection, addDoc, updateDoc, doc, writeBatch, deleteDoc
 } from 'firebase/firestore'
-import { Plus, Pencil, GripVertical, X, Trash2 } from 'lucide-vue-next'
+import { Plus, Pencil, GripVertical, X, Trash2, Copy } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
 import VueDraggable from 'vuedraggable'
+import { v4 as uuidv4 } from 'uuid'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -192,30 +223,52 @@ watch(() => appStore.products, (newVal) => {
 
 }, { immediate: true })
 
+const uniqueCountries = computed(() => {
+  const map = new Set()
+  appStore.locations.forEach(l => {
+    if (l.country) map.add(l.country)
+  })
+  return Array.from(map)
+})
+
 const form = ref({ name: '', specs: [], originalName: '' })
 
 function addSpecLine() {
-  form.value.specs.push({ id: null, spec: '', price: 0, minStock: 0, isActive: true, isMarkedForDeletion: false })
+  form.value.specs.push({ key: uuidv4(), id: null, spec: '', price: 0, minStock: 0, isActive: true, isMarkedForDeletion: false, overrides: {} })
+}
+
+function updateOverride(item, country, field, value) {
+  if (!item.overrides) item.overrides = {}
+  if (!item.overrides[country]) item.overrides[country] = { isActive: true } // default behavior
+  
+  if (field === 'price') {
+    const num = parseFloat(value)
+    item.overrides[country].price = isNaN(num) ? null : num
+  } else {
+    item.overrides[country][field] = value
+  }
 }
 
 function removeSpecLine(idx) {
   form.value.specs.splice(idx, 1)
 }
 
-function openForm(group = null) {
-  editingId.value = group ? 'GROUP' : null // 使用 'GROUP' 標記編輯中
+function openForm(group = null, isCopy = false) {
+  editingId.value = group && !isCopy ? 'GROUP' : null 
   
   if (group) {
     form.value = {
-      originalName: group.name,
-      name: group.name,
+      originalName: isCopy ? '' : group.name,
+      name: isCopy ? `${group.name} (複製)` : group.name,
       specs: group.items.map(p => ({
-        id: p.id,
+        key: uuidv4(),
+        id: isCopy ? null : p.id,
         spec: p.spec ?? '',
         price: p.price ?? 0,
         minStock: p.minStock ?? 0,
-        isActive: p.isActive,
-        isMarkedForDeletion: false
+        isActive: isCopy ? true : p.isActive,
+        isMarkedForDeletion: false,
+        overrides: isCopy ? {} : (p.overrides ? JSON.parse(JSON.stringify(p.overrides)) : {})
       }))
     }
   } else {
@@ -223,7 +276,7 @@ function openForm(group = null) {
       originalName: '',
       name: '',
       specs: [
-        { id: null, spec: '', price: 0, minStock: 0, isActive: true, isMarkedForDeletion: false }
+        { key: uuidv4(), id: null, spec: '', price: 0, minStock: 0, isActive: true, isMarkedForDeletion: false, overrides: {} }
       ]
     }
   }
@@ -253,7 +306,8 @@ async function save() {
                price: s.price,
                minStock: s.minStock,
                isActive: s.isActive,
-               order: itemOrder
+               order: itemOrder,
+               overrides: s.overrides || {}
              })
           }
         } else if (!s.isMarkedForDeletion) {
@@ -265,7 +319,8 @@ async function save() {
             price: s.price,
             minStock: s.minStock,
             isActive: s.isActive,
-            order: itemOrder
+            order: itemOrder,
+            overrides: s.overrides || {}
           })
         }
       })
@@ -284,7 +339,8 @@ async function save() {
             price: s.price,
             minStock: s.minStock,
             isActive: true, // 新建預設啟用
-            order: nextBaseOrder + idx
+            order: nextBaseOrder + idx,
+            overrides: s.overrides || {}
           })
         }
       })
