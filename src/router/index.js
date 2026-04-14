@@ -104,7 +104,18 @@ const ROLE_WEIGHT = { owner: 3, admin: 2, staff: 1, pending: 0 }
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
-  // 等待 Auth 初始化完成（防止重新整理時閃跳）
+  // 1. 處理 GitHub Pages + Hash 模式下的 LINE OAuth 參數中轉
+  // 檢查 URL Search Params (?code=...)，如果存在則轉向 line-callback
+  const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.has('code') && urlParams.has('state')) {
+    const query = Object.fromEntries(urlParams.entries())
+    // 清理 URL 的 Search 部分，防止重新整理重複觸發
+    window.history.replaceState(null, '', window.location.pathname + window.location.hash)
+    // 透過 Router 轉向到驗證頁面
+    return { name: 'line-callback', query }
+  }
+
+  // 2. 等待 Auth 初始化完成（防止重新整理時閃跳）
   if (authStore.loading) {
     await authStore.init()
   }
