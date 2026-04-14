@@ -2,8 +2,8 @@
   <div class="min-h-dvh transition-colors duration-300" :class="appStore.isReplenishMode ? 'bg-green-50' : 'bg-stock-bg'">
     <!-- 頂部導航 -->
     <header class="top-nav" :class="appStore.isReplenishMode ? 'bg-green-100 shadow-green-200/50' : ''">
-      <div class="flex items-center gap-3 flex-1 min-w-0 w-full">
-        <!-- 左側：返回或漢堡 -->
+      <!-- 左側：返回或漢堡 -->
+      <div class="flex-shrink-0 min-w-[40px]">
         <slot name="header-left">
           <button
             v-if="showBack"
@@ -13,42 +13,41 @@
             <ChevronLeft class="w-6 h-6 text-gray-600" />
           </button>
         </slot>
+      </div>
 
-        <!-- 標題 -->
-        <h1 class="text-lg font-bold text-gray-800 flex-1 min-w-0 truncate">
-          {{ title }}
-        </h1>
+      <!-- 標題 -->
+      <h1 class="text-lg font-bold text-gray-800 flex-1 min-w-0 truncate text-center">
+        {{ title }}
+      </h1>
 
-        <!-- 右側：道場選擇器與登出 -->
+      <!-- 右側：道場選擇器與登出 -->
+      <div class="flex-shrink-0 flex items-center gap-2 justify-end min-w-[40px]">
         <slot name="header-right">
-          <div class="flex items-center gap-2 flex-shrink-0 min-w-0">
-            <button
-              v-if="showLocationPicker && appStore.activeLocations.length > 0"
-              class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors flex-shrink-0 min-w-0"
-              :class="authStore.isAdmin ? 'bg-brand-50 text-brand-700 hover:bg-brand-100' : 'bg-gray-100 text-gray-700'"
-              @click="authStore.isAdmin && (showLocationDialog = true)"
-            >
-              <MapPin class="w-4 h-4 flex-shrink-0" />
-              <span class="max-w-20 truncate inline-block align-bottom">
-                {{ appStore.selectedLocation?.name ?? '選擇道場' }}
-              </span>
-              <ChevronDown v-if="authStore.isAdmin" class="w-3 h-3 flex-shrink-0" />
-            </button>
-            <router-link
-              to="/profile"
-              class="p-1 rounded-full hover:ring-2 hover:ring-brand-300 transition-all flex-shrink-0"
-            >
-              <img
-                v-if="authStore.user?.photoURL"
-                :src="authStore.user.photoURL"
-                class="w-8 h-8 rounded-full bg-gray-200"
-                :alt="authStore.user.displayName"
-              />
-              <div v-else class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
-                <User class="w-4 h-4 text-brand-600" />
-              </div>
-            </router-link>
-          </div>
+          <button
+            v-if="showLocationPicker && appStore.activeLocations.length > 0"
+            class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors bg-gray-100 text-gray-700 flex-shrink-0"
+            :class="{ 'bg-brand-50 text-brand-700': authStore.isAdmin }"
+            @click="authStore.isAdmin && (showLocationDialog = true)"
+          >
+            <MapPin class="w-4 h-4 flex-shrink-0" />
+            <span class="max-w-[80px] truncate">
+              {{ appStore.selectedLocation?.name ?? '選擇道場' }}
+            </span>
+            <ChevronDown v-if="authStore.isAdmin" class="w-3 h-3 flex-shrink-0" />
+          </button>
+          
+          <router-link
+            to="/profile"
+            class="w-9 h-9 flex items-center justify-center rounded-full hover:ring-2 hover:ring-brand-300 transition-all flex-shrink-0 bg-gray-200 overflow-hidden"
+          >
+            <img
+              v-if="authStore.user?.photoURL"
+              :src="authStore.user.photoURL"
+              class="w-full h-full object-cover"
+              :alt="authStore.user.displayName"
+            />
+            <User v-else class="w-5 h-5 text-gray-500" />
+          </router-link>
         </slot>
       </div>
     </header>
