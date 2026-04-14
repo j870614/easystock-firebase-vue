@@ -1,4 +1,4 @@
-import{aq as a}from"./index-BDsWugMf.js";/**
+import{am as a}from"./index-B13yIf0b.js";/**
  * @license lucide-vue-next v0.477.0 - ISC
  *
  * This source code is licensed under the ISC license.
@@ -18,4 +18,4 @@ import{aq as a}from"./index-BDsWugMf.js";/**
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const m=(e,t)=>(r,{slots:s})=>a(h,{...r,iconNode:t,name:e},s);export{m as c};
+ */const g=(e,t)=>(r,{slots:s})=>a(h,{...r,iconNode:t,name:e},s);export{g as c};
