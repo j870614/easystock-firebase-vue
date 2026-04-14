@@ -19,9 +19,11 @@ async function bootstrap() {
     const code = urlParams.get('code')
     const state = urlParams.get('state')
     const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '')
-    // 轉向到 Hash 路由，並移除原本的 search params 避免重複觸發
-    window.location.replace(`${window.location.origin}${baseUrl}/#/auth/line/callback?code=${code}&state=${state}`)
-    return // 停止執行後續，等待重新導向
+    
+    // 使用 history.replaceState 清理 Search Params 並轉向到 Hash 路由
+    // 這樣不會觸發頁面重載，且能讓 App 繼續執行掛載流程
+    const newPath = `${baseUrl}/#/auth/line/callback?code=${code}&state=${state}`
+    window.history.replaceState(null, '', newPath)
   }
 
   const app = createApp(App)
