@@ -35,10 +35,14 @@
         <button
           v-for="(group, name) in groupedProducts"
           :key="name"
-          class="card flex flex-col items-center justify-center p-4 gap-2 transition-all active:scale-95 border-2"
+          class="card flex flex-col items-center justify-center p-4 gap-2 transition-all active:scale-95 border-2 relative"
           :class="appStore.isReplenishMode ? 'border-transparent hover:border-green-300' : 'border-transparent hover:border-brand-300'"
           @click="openProductSelect(name, group)"
         >
+          <!-- 安全庫存警示標籤 -->
+          <div v-if="hasLowStock(group)" class="absolute -top-2 -right-2 bg-red-500 text-white shadow-md text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse z-10 border border-white">
+            建議補貨
+          </div>
           <!-- 圓形字首 Icon -->
           <div
             class="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-sm"
@@ -76,12 +80,16 @@
             <div>
               <div class="font-bold text-gray-800 text-lg">{{ p.spec || '預設規格' }}</div>
               <div class="text-sm text-brand-600 font-bold mt-1" v-if="!appStore.isReplenishMode">單價：{{ getProductPrice(p) }}</div>
-              <div class="text-sm text-gray-500 mt-1">目前庫存：{{ getStock(p.id) }}</div>
+              <div class="text-sm text-gray-500 mt-1 flex items-center gap-2">
+                <div>目前庫存：{{ getStock(p.id) }}</div>
+                <div v-if="getStock(p.id) <= (p.minStock || 0)" class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">⚠️ 建議補貨</div>
+              </div>
             </div>
-            <button class="px-5 py-2.5 rounded-xl text-white font-bold transition-all active:scale-95 whitespace-nowrap"
-              :class="appStore.isReplenishMode ? 'bg-green-500 hover:bg-green-600' : 'bg-brand-500 hover:bg-brand-600'"
+            <button class="px-5 py-2.5 rounded-xl text-white font-bold transition-all active:scale-95 whitespace-nowrap disabled:opacity-50 disabled:active:scale-100"
+              :class="getCartButtonClass(p)"
+              :disabled="isAddToCartDisabled(p)"
               @click="addToCart(p)">
-              加入{{ appStore.isReplenishMode ? '入庫' : '結緣' }}清單
+              {{ getCartButtonText(p) }}
             </button>
           </div>
         </div>
@@ -210,10 +218,37 @@ function getStock(productId) {
   return stockMap.value[productId] ?? 0
 }
 
+function hasLowStock(group) {
+  return group.some(p => getStock(p.id) <= (p.minStock || 0))
+}
+
+function isAddToCartDisabled(p) {
+  if (appStore.isReplenishMode) return false
+  return getStock(p.id) <= 0
+}
+
+function getCartButtonText(p) {
+  if (appStore.isReplenishMode) return '加入入庫清單'
+  if (getStock(p.id) <= 0) return '庫存不足'
+  return '加入結緣清單'
+}
+
+function getCartButtonClass(p) {
+  if (appStore.isReplenishMode) return 'bg-green-500 hover:bg-green-600'
+  if (getStock(p.id) <= 0) return 'bg-gray-400 cursor-not-allowed'
+  return 'bg-brand-500 hover:bg-brand-600'
+}
+
 function openProductSelect(name, groupItems) {
   if (groupItems.length === 1) {
-    // 只有單一規格，直接加入購物車
-    addToCart(groupItems[0])
+    const p = groupItems[0]
+    // 只有單一規格，直接加入購物車前先檢查防呆
+    if (!appStore.isReplenishMode && getStock(p.id) <= 0) {
+      if (navigator.vibrate) navigator.vibrate(200)
+      alert(`【${p.name}${p.spec ? '-' + p.spec : ''}】庫存不足，無法結緣`)
+      return
+    }
+    addToCart(p)
     return
   }
   selectedGroupName.value = name
@@ -337,6 +372,7 @@ async function submitCart() {
           operator: {
             uid: authStore.user.uid,
             name: authStore.user.displayName,
+            dharmaName: authStore.profile?.dharmaName || '',
           },
         })
       }

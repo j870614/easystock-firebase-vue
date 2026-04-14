@@ -61,7 +61,7 @@
             </div>
             <div class="text-xs text-gray-400 mt-1 flex gap-3">
               <span>{{ tx.date }}</span>
-              <span>{{ tx.operator?.name }}</span>
+              <span>{{ tx.operator?.dharmaName || tx.operator?.name }}</span>
             </div>
             
             <div v-if="authStore.isAdmin" class="mt-2 pt-2 border-t border-gray-100 flex justify-end gap-4">
@@ -236,7 +236,11 @@ async function submitEdit() {
         note: editForm.value.note,
         editReason: editForm.value.reason,
         editTimestamp: serverTimestamp(),
-        editBy: { uid: authStore.user.uid, name: authStore.user.displayName }
+        editBy: { 
+          uid: authStore.user.uid, 
+          name: authStore.user.displayName,
+          dharmaName: authStore.profile?.dharmaName || '',
+        }
       })
     })
 
