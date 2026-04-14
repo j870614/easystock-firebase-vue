@@ -8,20 +8,20 @@
 
 <script setup>
 import { onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { httpsCallable } from 'firebase/functions'
 import { signInWithCustomToken } from 'firebase/auth'
 import { functions, auth } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
 onMounted(async () => {
-  const params = new URLSearchParams(location.search)
-  const code  = params.get('code')
-  const state = params.get('state')
+  const code  = route.query.code
+  const state = route.query.state
   const savedState = sessionStorage.getItem('line_oauth_state')
   const action = sessionStorage.getItem('line_oauth_action') || 'login'
   const linkUid = sessionStorage.getItem('line_link_uid')
