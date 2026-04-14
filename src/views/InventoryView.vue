@@ -11,19 +11,20 @@
 
     <template v-else>
       <!-- 日期與類型提示 -->
-      <div class="mb-4 flex items-center justify-between">
-        <div class="text-xl font-bold flex items-center gap-2" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-brand-600'">
-          <span v-if="appStore.isReplenishMode">📦 入庫作業模式</span>
-          <span v-else>🙏 認供結緣模式</span>
+      <div class="mb-4 flex items-center gap-2">
+        <div class="flex-1 text-base font-bold flex items-center gap-1.5 min-w-0" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-brand-600'">
+          <span v-if="appStore.isReplenishMode" class="truncate">📦 入庫模式</span>
+          <span v-else class="truncate">🙏 認供結緣</span>
         </div>
-        <div class="w-32">
+        <el-switch v-model="appStore.isReplenishMode" style="--el-switch-on-color: #22c55e;" />
+        <div class="w-32 flex-shrink-0">
           <el-date-picker
             v-model="date"
             type="date"
             placeholder="選擇日期"
             format="YYYY/MM/DD"
             value-format="YYYY-MM-DD"
-            class="w-full flex-1"
+            class="w-full"
             :clearable="false"
           />
         </div>

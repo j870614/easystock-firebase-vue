@@ -9,7 +9,8 @@ import {
   browserSessionPersistence,
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
-import { auth, googleProvider, db } from '@/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { auth, googleProvider, db, functions } from '@/firebase'
 
 export const useAuthStore = defineStore('auth', () => {
   // ── State ────────────────────────────────────────────
@@ -102,12 +103,19 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** LINE Login OAuth 跳頁 */
-  function loginWithLine() {
+  /** LINE Login OAuth 跳頁
+   * @param {string} action - 'login'（預設）或 'link'（連結現有帳號）
+   */
+  function loginWithLine(action = 'login') {
     const channelId = import.meta.env.VITE_LINE_CHANNEL_ID
     const redirectUri = encodeURIComponent(`${location.origin}/auth/line/callback`)
     const state = crypto.randomUUID()
     sessionStorage.setItem('line_oauth_state', state)
+    sessionStorage.setItem('line_oauth_action', action)
+    // 若是 link 模式，記錄當前使用者 uid 供 callback 使用
+    if (action === 'link' && user.value?.uid) {
+      sessionStorage.setItem('line_link_uid', user.value.uid)
+    }
 
     const lineAuthUrl =
       `https://access.line.me/oauth2/v2.1/authorize?` +
@@ -118,6 +126,25 @@ export const useAuthStore = defineStore('auth', () => {
       `&scope=profile%20openid%20email`
 
     location.href = lineAuthUrl
+  }
+
+  /** 連結 Google 帳號（僅限 LINE 登入用戶使用）
+   * 透過 Google Popup 取得 Google uid，再呼叫 CF 將 LINE 資料合併至 Google doc
+   */
+  async function linkGoogle() {
+    const currentLineUid = user.value?.uid
+    if (!currentLineUid?.startsWith('line:')) {
+      throw new Error('此功能僅適用於 LINE 登入帳號')
+    }
+
+    // signInWithPopup 會切換 Auth 使用者至 Google，這是預期行為
+    const result = await signInWithPopup(auth, googleProvider)
+    const googleUid = result.user.uid
+
+    // 呼叫 CF 合併 LINE doc 至 Google doc
+    const linkGoogleFn = httpsCallable(functions, 'linkGoogle')
+    await linkGoogleFn({ lineUid: currentLineUid, googleUid })
+    // Auth 狀態已切換至 Google，loadProfile 將自動讀取新的 doc
   }
 
   /** 登出 */
@@ -143,6 +170,7 @@ export const useAuthStore = defineStore('auth', () => {
     init,
     loginWithGoogle,
     loginWithLine,
+    linkGoogle,
     signOut,
   }
 })

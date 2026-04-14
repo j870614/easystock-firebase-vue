@@ -23,30 +23,50 @@ onMounted(async () => {
   const code  = params.get('code')
   const state = params.get('state')
   const savedState = sessionStorage.getItem('line_oauth_state')
+  const action = sessionStorage.getItem('line_oauth_action') || 'login'
+  const linkUid = sessionStorage.getItem('line_link_uid')
 
   // CSRF 驗證
   if (!code || state !== savedState) {
-    ElMessage.error('LINE 登入失敗：無效的請求')
+    ElMessage.error('LINE 驗證失敗：無效的請求')
     router.replace('/login')
     return
   }
 
   sessionStorage.removeItem('line_oauth_state')
+  sessionStorage.removeItem('line_oauth_action')
+  sessionStorage.removeItem('line_link_uid')
 
   try {
-    // 呼叫 Cloud Function 換取 Firebase Custom Token
-    const lineLogin = httpsCallable(functions, 'lineLogin')
-    const { data } = await lineLogin({
-      code,
-      redirectUri: `${location.origin}/auth/line/callback`,
-    })
-
-    await signInWithCustomToken(auth, data.token)
-    router.replace('/')
+    if (action === 'link') {
+      // 帳號連結模式：呼叫 linkLine CF，將 LINE 綁定至現有帳號
+      const linkLineFn = httpsCallable(functions, 'linkLine')
+      await linkLineFn({
+        code,
+        redirectUri: `${location.origin}/auth/line/callback`,
+        currentUid: linkUid,
+      })
+      ElMessage.success('LINE 帳號已成功連結！')
+      router.replace('/profile')
+    } else {
+      // 一般登入模式
+      const lineLoginFn = httpsCallable(functions, 'lineLogin')
+      const { data } = await lineLoginFn({
+        code,
+        redirectUri: `${location.origin}/auth/line/callback`,
+      })
+      await signInWithCustomToken(auth, data.token)
+      router.replace('/')
+    }
   } catch (e) {
     console.error(e)
-    ElMessage.error('LINE 登入失敗，請重試')
-    router.replace('/login')
+    if (action === 'link') {
+      ElMessage.error('LINE 連結失敗，請重試')
+      router.replace('/profile')
+    } else {
+      ElMessage.error('LINE 登入失敗，請重試')
+      router.replace('/login')
+    }
   }
 })
 </script>

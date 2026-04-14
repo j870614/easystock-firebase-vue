@@ -33,6 +33,10 @@ service cloud.firestore {
       allow create: if isAuth() && request.auth.uid == uid
                     && request.resource.data.role == 'pending';
 
+      // 自己更新自己的個人資料（僅限 profileSubmitted 流程欄位）
+      allow update: if isAuth() && request.auth.uid == uid
+                    && request.resource.data.role == resource.data.role;
+
       // owner 可更新任何欄位（包含 role）
       allow update: if isOwner();
 
@@ -79,6 +83,13 @@ service cloud.firestore {
     match /settings/{docId} {
       allow read:   if isAuth();
       allow write:  if isOwner();
+    }
+
+    // ── duties 集合（執事選項）───────────────────────────
+    // 所有已登入用戶可讀（PendingView 需要），只有 owner 可管理
+    match /duties/{dutyId} {
+      allow read:  if isAuth();
+      allow write: if isOwner();
     }
 
   }

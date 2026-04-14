@@ -7,7 +7,7 @@
       </div>
       <h1 class="text-2xl font-bold text-gray-800 mb-3">完善使用者資訊</h1>
       <p class="text-gray-500 leading-relaxed mb-6">
-        請填寫您的法名與俗名<br />
+        請填寫法名或俗名（擇一），並選擇執事，<br />
         以便管理員辨識並開通權限。
       </p>
 
@@ -20,11 +20,28 @@
           <label class="label">俗名</label>
           <input v-model="form.secularName" type="text" class="input" placeholder="真實姓名" />
         </div>
-        <p class="text-xs text-amber-600 mt-1 font-medium">※ 以上兩項請擇一填寫，以便管理員進行審核。</p>
-        
-        <button 
-          class="btn-primary w-full mt-2" 
-          :disabled="submitting || (!form.dharmaName.trim() && !form.secularName.trim())"
+        <p class="text-xs text-amber-600 font-medium">※ 法名與俗名請擇一填寫，以便管理員進行審核。</p>
+
+        <div>
+          <label class="label">執事 <span class="text-red-500">*</span></label>
+          <el-select
+            v-model="form.dutyId"
+            class="w-full"
+            placeholder="請選擇執事"
+            :loading="dutiesLoading"
+          >
+            <el-option
+              v-for="d in appStore.activeDuties"
+              :key="d.id"
+              :label="d.name"
+              :value="d.id"
+            />
+          </el-select>
+        </div>
+
+        <button
+          class="btn-primary w-full mt-2"
+          :disabled="submitting || (!form.dharmaName.trim() && !form.secularName.trim()) || !form.dutyId"
           @click="submitProfile"
         >
           <span v-if="submitting">送出中...</span>
@@ -54,10 +71,11 @@
           />
           <div>
             <div class="font-semibold text-gray-800">
-              <span v-if="authStore.profile?.dharmaName">{{ authStore.profile.dharmaName }} ({{ authStore.profile?.secularName }})</span>
+              <span v-if="authStore.profile?.dharmaName">{{ authStore.profile.dharmaName }}<span v-if="authStore.profile?.secularName">（{{ authStore.profile.secularName }}）</span></span>
               <span v-else-if="authStore.profile?.secularName">{{ authStore.profile.secularName }}</span>
               <span v-else>{{ authStore.user?.displayName }}</span>
             </div>
+            <div v-if="authStore.profile?.dutyName" class="text-sm text-purple-600 mt-0.5">{{ authStore.profile.dutyName }}</div>
             <div class="text-sm text-gray-500">{{ authStore.user?.email }}</div>
             <span class="badge-role-pending mt-1">待審核</span>
           </div>
@@ -72,35 +90,58 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Clock, LogOut, UserPlus } from 'lucide-vue-next'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
+import { useAppStore } from '@/stores/app'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const appStore = useAppStore()
 
 const submitting = ref(false)
+const dutiesLoading = ref(true)
 const form = ref({
   dharmaName: '',
-  secularName: ''
+  secularName: '',
+  dutyId: ''
+})
+
+onMounted(async () => {
+  appStore.init()
+  // 等待第一次 duties 資料
+  if (appStore.duties.length === 0) {
+    const unwatch = watch(() => appStore.duties.length, (len) => {
+      if (len > 0) {
+        dutiesLoading.value = false
+        unwatch()
+      }
+    })
+    // 若 1 秒內無資料也關掉 loading
+    setTimeout(() => { dutiesLoading.value = false }, 1000)
+  } else {
+    dutiesLoading.value = false
+  }
 })
 
 const needsProfile = computed(() => {
   if (!authStore.profile) return false
-  // 若兩個都沒填，也沒提交過，才需要顯示
   return !authStore.profile.secularName && !authStore.profile.dharmaName && !authStore.profile.profileSubmitted
 })
 
 async function submitProfile() {
   submitting.value = true
   try {
+    const duty = appStore.activeDuties.find(d => d.id === form.value.dutyId)
     const userRef = doc(db, 'users', authStore.user.uid)
     await updateDoc(userRef, {
       dharmaName: form.value.dharmaName.trim(),
       secularName: form.value.secularName.trim(),
+      dutyId: form.value.dutyId,
+      dutyName: duty?.name || '',
       profileSubmitted: true
     })
   } catch (err) {

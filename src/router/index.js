@@ -76,6 +76,18 @@ const routes = [
     meta: { requiresAuth: true, requiredRole: 'owner' },
   },
   {
+    path: '/admin',
+    name: 'admin',
+    component: () => import('@/views/AdminHubView.vue'),
+    meta: { requiresAuth: true, requiredRole: 'owner' },
+  },
+  {
+    path: '/profile',
+    name: 'profile',
+    component: () => import('@/views/ProfileView.vue'),
+    meta: { requiresAuth: true, requiredRole: 'staff' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },

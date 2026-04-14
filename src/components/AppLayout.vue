@@ -22,15 +22,6 @@
         <!-- 右側：道場選擇器與登出 -->
         <slot name="header-right">
           <div class="flex items-center gap-2">
-            <!-- 補貨模式開關 -->
-            <div
-              v-if="$route.name === 'offering'"
-              class="flex items-center gap-1.5 mr-1"
-            >
-              <span class="text-xs font-bold transition-colors" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-gray-400'">補貨<br>開關</span>
-              <el-switch v-model="appStore.isReplenishMode" style="--el-switch-on-color: #22c55e;" />
-            </div>
-
             <button
               v-if="showLocationPicker && appStore.activeLocations.length > 0"
               class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors"
@@ -43,12 +34,20 @@
               </span>
               <ChevronDown v-if="authStore.isAdmin" class="w-3 h-3" />
             </button>
-            <button
-              class="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-              @click="handleLogout"
+            <router-link
+              to="/profile"
+              class="p-1 rounded-full hover:ring-2 hover:ring-brand-300 transition-all flex-shrink-0"
             >
-              <LogOut class="w-5 h-5" />
-            </button>
+              <img
+                v-if="authStore.user?.photoURL"
+                :src="authStore.user.photoURL"
+                class="w-8 h-8 rounded-full bg-gray-200"
+                :alt="authStore.user.displayName"
+              />
+              <div v-else class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center">
+                <User class="w-4 h-4 text-brand-600" />
+              </div>
+            </router-link>
           </div>
         </slot>
       </div>
@@ -69,7 +68,7 @@
         :key="item.to"
         :to="item.to"
         class="bottom-nav-item"
-        :class="{ active: $route.path.startsWith(item.to) }"
+        :class="{ active: isNavActive(item.to) }"
       >
         <component :is="item.icon" class="w-6 h-6" />
         <span class="text-xs">{{ item.label }}</span>
@@ -158,7 +157,7 @@ import { useRoute } from 'vue-router'
 import {
   ChevronLeft, ChevronDown, MapPin, Check,
   LayoutDashboard, ArrowLeftRight, History,
-  Package, Building2, FileBarChart2, Users, LogOut, Settings, MapPinOff, Store
+  Package, Building2, FileBarChart2, Users, LogOut, Settings, MapPinOff, Store, LayoutGrid, User
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -251,6 +250,16 @@ onUnmounted(() => {
   if (geofenceInterval) clearInterval(geofenceInterval)
 })
 
+// 管理中心涵蓋的子頁面（這些頁面也應讓「管理」tab active）
+const ADMIN_SUB_PATHS = ['/locations', '/products', '/users', '/settings', '/import', '/admin']
+
+function isNavActive(to) {
+  const path = route.path
+  if (to === '/admin') return ADMIN_SUB_PATHS.some(p => path.startsWith(p))
+  if (to === '/') return path === '/'
+  return path.startsWith(to)
+}
+
 // 根據角色動態生成底部導航項目
 const navItems = computed(() => {
   const items = [
@@ -259,10 +268,8 @@ const navItems = computed(() => {
     { to: '/transactions', label: '出入庫', icon: History },
   ]
   if (authStore.isOwner) {
-    items.push({ to: '/locations', label: '道場',   icon: Building2 })
-    items.push({ to: '/reports',  label: '報表',   icon: FileBarChart2 })
-    items.push({ to: '/products', label: '品項',   icon: Package })
-    items.push({ to: '/users',    label: '成員',   icon: Users })
+    items.push({ to: '/reports', label: '報表',   icon: FileBarChart2 })
+    items.push({ to: '/admin',   label: '管理',   icon: LayoutGrid })
   } else if (authStore.isAdmin) {
     items.push({ to: '/reports',  label: '報表',   icon: FileBarChart2 })
     items.push({ to: '/products', label: '品項',   icon: Package })

@@ -12,31 +12,39 @@
       <div
         v-for="u in users"
         :key="u.uid"
-        class="card flex items-center gap-3"
+        class="card flex flex-col gap-2"
       >
-        <img
-          :src="u.photoURL || ''"
-          class="w-12 h-12 rounded-full bg-gray-200 flex-shrink-0"
-          :alt="u.displayName"
-        />
-        <div class="flex-1 min-w-0">
-          <div class="font-semibold text-gray-800 truncate">
-            <span v-if="u.dharmaName">{{ u.dharmaName }} ({{ u.secularName }})</span>
-            <span v-else-if="u.secularName">{{ u.secularName }}</span>
-            <span v-else>{{ u.displayName }}</span>
+        <!-- 第一行：頭像 + 名稱/執事 + role badge -->
+        <div class="flex items-center gap-3">
+          <img
+            :src="u.photoURL || ''"
+            class="w-12 h-12 rounded-full bg-gray-200 flex-shrink-0"
+            :alt="u.displayName"
+          />
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-gray-800 truncate">
+              <span v-if="u.dharmaName">{{ u.dharmaName }}</span>
+              <span v-else-if="u.secularName">{{ u.secularName }}</span>
+              <span v-else>{{ u.displayName }}</span>
+            </div>
+            <div class="text-sm text-gray-400 truncate">
+              <span v-if="u.dharmaName && u.secularName">{{ u.secularName }} · </span>
+              {{ u.email }}
+            </div>
+            <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+              <span :class="`badge-role-${u.role}`">{{ roleLabel(u.role) }}</span>
+              <span v-if="u.dutyName" class="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full">{{ u.dutyName }}</span>
+              <span v-if="u.uid === selfUid" class="text-xs text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full border border-brand-200">本人</span>
+            </div>
           </div>
-          <div class="text-sm text-gray-400 truncate">{{ u.email }}</div>
-          <span :class="`badge-role-${u.role}`" class="mt-1">{{ roleLabel(u.role) }}</span>
         </div>
 
-        <!-- 角色與道場設定堆疊 -->
-        <div class="flex flex-col gap-2 items-end">
-          <!-- 角色選擇（只有 owner 可操作，且不可改自己） -->
+        <!-- 第二行：owner 可編輯的下拉選單 -->
+        <div v-if="authStore.isOwner && u.uid !== selfUid" class="flex gap-2">
           <el-select
-            v-if="u.uid !== selfUid"
             v-model="u.role"
-            class="w-28"
-            :disabled="!authStore.isOwner"
+            class="flex-1 min-w-0"
+            size="small"
             @change="changeRole(u)"
           >
             <el-option label="待審核" value="pending" />
@@ -44,13 +52,46 @@
             <el-option label="管理員" value="admin" />
             <el-option label="系統總管" value="owner" />
           </el-select>
-          <span v-else-if="u.uid === selfUid" class="text-xs text-brand-600 bg-brand-50 px-2 py-1 rounded">本人</span>
-          
-          <!-- 道場指派設定（owner 或 admin 均可幫自己或他人改）-->
+
           <el-select
-            v-if="authStore.isAdmin"
             v-model="u.assignedLocationId"
-            class="w-32"
+            class="flex-1 min-w-0"
+            size="small"
+            placeholder="指派道場"
+            clearable
+            @change="changeLocation(u)"
+          >
+            <el-option
+              v-for="loc in appStore.locations"
+              :key="loc.id"
+              :label="loc.name"
+              :value="loc.id"
+            />
+          </el-select>
+
+          <el-select
+            v-model="u.dutyId"
+            class="flex-1 min-w-0"
+            size="small"
+            placeholder="執事"
+            clearable
+            @change="changeDuty(u)"
+          >
+            <el-option
+              v-for="d in appStore.activeDuties"
+              :key="d.id"
+              :label="d.name"
+              :value="d.id"
+            />
+          </el-select>
+        </div>
+
+        <!-- admin（非 owner）僅可改道場 -->
+        <div v-else-if="authStore.isAdmin && !authStore.isOwner && u.uid !== selfUid" class="flex gap-2">
+          <el-select
+            v-model="u.assignedLocationId"
+            class="flex-1 min-w-0"
+            size="small"
             placeholder="指派道場"
             clearable
             @change="changeLocation(u)"
@@ -96,7 +137,7 @@ const roleLabel = r => ROLE_MAP[r] ?? r
 function listen() {
   loading.value = true
   const q = query(collection(db, 'users'), orderBy('displayName'))
-  
+
   unsubscribe = onSnapshot(q, (snap) => {
     users.value = snap.docs.map(d => ({ ...d.data(), uid: d.id }))
     loading.value = false
@@ -113,7 +154,7 @@ async function changeRole(u) {
   }
   try {
     await updateDoc(doc(db, 'users', u.uid), { role: u.role })
-    ElMessage.success(`已將 ${u.displayName} 的角色更新為「${roleLabel(u.role)}」`)
+    ElMessage.success(`已將角色更新為「${roleLabel(u.role)}」`)
   } catch (e) {
     ElMessage.error('更新失敗，請確認您的權限。')
   }
@@ -123,9 +164,21 @@ async function changeLocation(u) {
   try {
     await updateDoc(doc(db, 'users', u.uid), { assignedLocationId: u.assignedLocationId || null })
     const locName = appStore.locations.find(l => l.id === u.assignedLocationId)?.name || '無'
-    ElMessage.success(`已將 ${u.displayName} 指派至「${locName}」`)
+    ElMessage.success(`道場已更新為「${locName}」`)
   } catch (e) {
     ElMessage.error('更新道場失敗，請確認您的權限。')
+  }
+}
+
+async function changeDuty(u) {
+  const duty = appStore.activeDuties.find(d => d.id === u.dutyId)
+  const dutyName = duty?.name || ''
+  try {
+    await updateDoc(doc(db, 'users', u.uid), { dutyId: u.dutyId || null, dutyName })
+    u.dutyName = dutyName
+    ElMessage.success(dutyName ? `執事已更新為「${dutyName}」` : '已清除執事')
+  } catch (e) {
+    ElMessage.error('更新執事失敗，請確認您的權限。')
   }
 }
 

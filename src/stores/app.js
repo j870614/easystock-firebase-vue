@@ -10,6 +10,7 @@ export const useAppStore = defineStore('app', () => {
   // ── State ─────────────────────────────────────────────
   const locations = ref([])             // 所有道場清單
   const products = ref([])              // 所有品項清單
+  const duties = ref([])                // 執事選項清單
   const selectedLocationId = ref(
     localStorage.getItem('selectedLocationId') ?? null
   )
@@ -19,6 +20,10 @@ export const useAppStore = defineStore('app', () => {
   // ── Getters ───────────────────────────────────────────
   const activeProducts = computed(() =>
     products.value.filter(p => p.isActive)
+  )
+
+  const activeDuties = computed(() =>
+    duties.value.filter(d => d.isActive)
   )
 
   const selectedLocation = computed(() =>
@@ -43,6 +48,7 @@ export const useAppStore = defineStore('app', () => {
   // ── Actions ───────────────────────────────────────────
   let unsubscribeLocs = null
   let unsubscribeProds = null
+  let unsubscribeDuties = null
 
   function init() {
     if (unsubscribeLocs) return
@@ -76,6 +82,12 @@ export const useAppStore = defineStore('app', () => {
     unsubscribeProds = onSnapshot(qProd, (snap) => {
       products.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     })
+
+    // 監聽執事選項
+    const qDuties = query(collection(db, 'duties'), orderBy('order'))
+    unsubscribeDuties = onSnapshot(qDuties, (snap) => {
+      duties.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    })
   }
 
   function stop() {
@@ -87,6 +99,10 @@ export const useAppStore = defineStore('app', () => {
       unsubscribeProds()
       unsubscribeProds = null
     }
+    if (unsubscribeDuties) {
+      unsubscribeDuties()
+      unsubscribeDuties = null
+    }
   }
 
   function selectLocation(id) {
@@ -97,6 +113,8 @@ export const useAppStore = defineStore('app', () => {
   return {
     locations,
     products,
+    duties,
+    activeDuties,
     selectedLocationId,
     selectedLocation,
     activeLocations,
