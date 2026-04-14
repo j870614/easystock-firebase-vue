@@ -82,10 +82,10 @@ service cloud.firestore {
     }
 
     // ── duties 集合（執事選項）───────────────────────────
-    // 所有已登入用戶可讀（PendingView 需要），只有 owner 可管理
+    // 所有已登入用戶可讀（PendingView 需要），只有管理員以上可管理
     match /duties/{dutyId} {
       allow read:  if isAuth();
-      allow write: if isOwner();
+      allow write: if isAdmin();
     }
 
   }
