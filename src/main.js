@@ -11,6 +11,10 @@ import App from './App.vue'
 import router from './router'
 import { useAuthStore } from '@/stores/auth'
 
+async function bootstrap() {
+  const app = createApp(App)
+  const pinia = createPinia()
+
   app.use(pinia)
   app.use(router)
   app.use(ElementPlus, { locale: zhTw, size: 'large' })
