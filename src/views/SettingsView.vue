@@ -171,7 +171,7 @@ async function saveDuty() {
     dutyDialog.value = false
   } catch (e) {
     console.error('[SettingsView] saveDuty error:', e)
-    ElMessage.error('儲存失敗：' + (e.code || e.message))
+    ElMessage.error(`儲存失敗：${e.code || e.message} (目前角色: ${authStore.role})`)
   } finally {
     savingDuty.value = false
   }
