@@ -11,24 +11,6 @@ import App from './App.vue'
 import router from './router'
 import { useAuthStore } from '@/stores/auth'
 
-async function bootstrap() {
-  // 處理 LINE OAuth 在 Hash 模式下的中轉邏輯
-  // LINE 導向首頁帶來的 ?code=xxx 會被轉給 #/auth/line/callback
-  const urlParams = new URLSearchParams(window.location.search)
-  if (urlParams.has('code') && urlParams.has('state')) {
-    const code = urlParams.get('code')
-    const state = urlParams.get('state')
-    const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '')
-    
-    // 使用 history.replaceState 清理 Search Params 並轉向到 Hash 路由
-    // 這樣不會觸發頁面重載，且能讓 App 繼續執行掛載流程
-    const newPath = `${baseUrl}/#/auth/line/callback?code=${code}&state=${state}`
-    window.history.replaceState(null, '', newPath)
-  }
-
-  const app = createApp(App)
-  const pinia = createPinia()
-
   app.use(pinia)
   app.use(router)
   app.use(ElementPlus, { locale: zhTw, size: 'large' })
@@ -38,10 +20,20 @@ async function bootstrap() {
     app.component(key, component)
   }
 
-  // 等待 Auth 狀態初始化完成，再掛載 App
-  // 這樣 router guard 就不會在 loading 狀態下做錯誤的跳轉
+  // 等待 Auth 狀態初始化完成
   const authStore = useAuthStore()
   await authStore.init()
+
+  // 處理 LINE OAuth 在 Hash 模式下的中轉邏輯
+  // 檢查真正的 URL Search Params (?code=...)
+  const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.has('code') && urlParams.has('state')) {
+    const query = Object.fromEntries(urlParams.entries())
+    // 清理 URL 的 Search 部分，防止重新整理重複觸發
+    window.history.replaceState(null, '', window.location.pathname + window.location.hash)
+    // 透過 Router 轉向到驗證頁面
+    router.replace({ name: 'line-callback', query })
+  }
 
   app.mount('#app')
 }

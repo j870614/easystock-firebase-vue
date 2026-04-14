@@ -33,7 +33,15 @@ onMounted(async () => {
   }
 
   const savedState = localStorage.getItem('line_oauth_state')
-  const action = localStorage.getItem('line_oauth_action') || 'login'
+  let action = localStorage.getItem('line_oauth_action')
+  
+  // 智慧判定：如果 action 遺失 (Safari 狀況)，但目前明明是登入狀態，那高機率是要「連結」
+  if (!action && authStore.isAuthenticated) {
+    action = 'link'
+  } else if (!action) {
+    action = 'login'
+  }
+
   // 優先從目前登入狀態拿 uid，這在 Safari 私密瀏覽下最準確
   const linkUid = authStore.user?.uid || localStorage.getItem('line_link_uid')
 
@@ -55,13 +63,18 @@ onMounted(async () => {
       const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '')
       const redirectUri = `${window.location.origin}${baseUrl}/`
 
-      await linkLineFn({
+      const { data } = await linkLineFn({
         code,
         redirectUri,
         currentUid: linkUid,
       })
-      ElMessage.success('LINE 帳號已成功連結！')
-      router.replace('/profile')
+      
+      if (data?.success) {
+        ElMessage.success('LINE 帳號已成功連結！')
+        router.replace('/profile')
+      } else {
+        throw new Error(data?.message || '後端回傳連結失敗')
+      }
     } else {
       // 一般登入模式
       const lineLoginFn = httpsCallable(functions, 'lineLogin')
@@ -81,7 +94,7 @@ onMounted(async () => {
       ElMessage.error('LINE 連結失敗，請重試')
       router.replace('/profile')
     } else {
-      ElMessage.error('LINE 登入失敗，請重試')
+      ElMessage.error('LINE 登入失敗：' + (e.message || '請確認 LINE 帳號是否正確'))
       router.replace('/login')
     }
   }
