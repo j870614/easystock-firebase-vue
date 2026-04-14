@@ -34,7 +34,8 @@ onMounted(async () => {
 
   const savedState = localStorage.getItem('line_oauth_state')
   const action = localStorage.getItem('line_oauth_action') || 'login'
-  const linkUid = localStorage.getItem('line_link_uid')
+  // 優先從目前登入狀態拿 uid，這在 Safari 私密瀏覽下最準確
+  const linkUid = authStore.user?.uid || localStorage.getItem('line_link_uid')
 
   // CSRF 驗證
   if (!code || state !== savedState) {

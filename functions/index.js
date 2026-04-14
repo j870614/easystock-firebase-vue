@@ -139,10 +139,11 @@ exports.linkLine = onCall(
     secrets: [LINE_CHANNEL_ID, LINE_CHANNEL_SECRET],
   },
   async (request) => {
-    const { code, redirectUri, currentUid } = request.data
+    const { code, redirectUri } = request.data
+    const currentUid = request.auth?.uid || request.data.currentUid
 
     if (!code || !redirectUri || !currentUid) {
-      throw new HttpsError('invalid-argument', '缺少必要參數')
+      throw new HttpsError('invalid-argument', '缺少必要參數 (code, redirectUri 或未登入)')
     }
 
     const { lineUid, displayName, photoURL } =
@@ -179,10 +180,12 @@ exports.linkGoogle = onCall(
     region: 'asia-east1',
   },
   async (request) => {
-    const { lineUid, googleUid } = request.data
+    // 優先使用 Firebase 驗證的身分
+    const googleUid = request.auth?.uid || request.data.googleUid
+    const lineUid   = request.data.lineUid
 
     if (!lineUid || !googleUid) {
-      throw new HttpsError('invalid-argument', '缺少必要參數')
+      throw new HttpsError('invalid-argument', '缺少必要參數 (lineUid 或未登入)')
     }
 
     const db = getFirestore()
