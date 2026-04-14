@@ -38,7 +38,4 @@ export const db = initializeFirestore(app, {
   }),
 })
 
-// Cloud Functions
-export const functions = getFunctions(app, 'asia-east1')
-
 export default app
