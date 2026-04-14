@@ -12,8 +12,8 @@
       <div class="w-24 h-24 bg-white rounded-3xl shadow-2xl flex items-center justify-center mb-6">
         <span class="text-5xl">📦</span>
       </div>
-      <h1 class="text-4xl font-bold text-white tracking-tight">彌陀之家</h1>
-      <p class="text-white/70 text-lg mt-1">東林寺庫存管理系統</p>
+      <h1 class="text-4xl font-bold text-white tracking-tight">彌陀之家東林寺</h1>
+      <p class="text-white/70 text-lg mt-1">庫存管理系統</p>
     </div>
 
     <!-- 登入卡片 -->

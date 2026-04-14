@@ -14,7 +14,7 @@
       <div class="card w-full max-w-sm text-left mb-6 space-y-4">
         <div>
           <label class="label">法名</label>
-          <input v-model="form.dharmaName" type="text" class="input" placeholder="例如：法音" />
+          <input v-model="form.dharmaName" type="text" class="input" placeholder="例如：普某" />
         </div>
         <div>
           <label class="label">俗名</label>
