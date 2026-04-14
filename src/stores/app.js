@@ -46,51 +46,87 @@ export const useAppStore = defineStore('app', () => {
   })
 
   // ── Actions ───────────────────────────────────────────
+  let unsubscribeSys = null
   let unsubscribeLocs = null
   let unsubscribeProds = null
   let unsubscribeDuties = null
 
   function init() {
-    if (unsubscribeLocs) return
+    const authStore = useAuthStore()
 
-    // 監聽系統設定
-    const sysRef = doc(db, 'settings', 'system')
-    onSnapshot(sysRef, (snap) => {
-      if (snap.exists()) {
-        systemMode.value = snap.data().mode || 'development'
-      } else {
-        systemMode.value = 'development'
-      }
-    })
+    // 1. 監聽系統設定 (所有已登入者皆可讀)
+    if (!unsubscribeSys) {
+      const sysRef = doc(db, 'settings', 'system')
+      unsubscribeSys = onSnapshot(sysRef, (snap) => {
+        if (snap.exists()) {
+          systemMode.value = snap.data().mode || 'development'
+        }
+      }, (err) => {
+        console.error('[AppStore] System setting listener error:', err.message)
+      })
+    }
 
-    // 監聽道場
-    const qLoc = query(collection(db, 'locations'), orderBy('name'))
-    unsubscribeLocs = onSnapshot(qLoc, (snap) => {
-      locations.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      
-      // 確保選中的道場在允許的清單內，若不在，則強制選取第一個可見的
-      const currentAllowed = activeLocations.value.find(l => l.id === selectedLocationId.value)
-      if (!currentAllowed && activeLocations.value.length > 0) {
-        selectLocation(activeLocations.value[0].id)
-      } else if (!selectedLocationId.value && activeLocations.value.length > 0) {
-        selectLocation(activeLocations.value[0].id)
-      }
-    })
+    // 2. 監聽執事選項 (所有已登入者皆可讀，PendingView 需要)
+    if (!unsubscribeDuties) {
+      const qDuties = query(collection(db, 'duties'), orderBy('order'))
+      unsubscribeDuties = onSnapshot(qDuties, (snap) => {
+        duties.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      }, (err) => {
+        console.error('[AppStore] Duties listener error:', err.message)
+      })
+    }
 
-    // 監聽品項
-    const qProd = query(collection(db, 'products'), orderBy('order'))
-    unsubscribeProds = onSnapshot(qProd, (snap) => {
-      products.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    })
-
-    // 監聽執事選項
-    const qDuties = query(collection(db, 'duties'), orderBy('order'))
-    unsubscribeDuties = onSnapshot(qDuties, (snap) => {
-      duties.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    })
+    // 3. 監聽道場與品項 (僅限具有角色權限者)
+    // 我們使用一個簡單的檢查，並配合 watch 處理角色動態變更
+    checkAndStartStaffListeners()
   }
 
+  function checkAndStartStaffListeners() {
+    const authStore = useAuthStore()
+    if (!authStore.isStaff) return
+
+    // 監聽道場
+    if (!unsubscribeLocs) {
+      const qLoc = query(collection(db, 'locations'), orderBy('name'))
+      unsubscribeLocs = onSnapshot(qLoc, (snap) => {
+        locations.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        
+        // 確保選中的道場在允許的清單內
+        const currentAllowed = activeLocations.value.find(l => l.id === selectedLocationId.value)
+        if (!currentAllowed && activeLocations.value.length > 0) {
+          selectLocation(activeLocations.value[0].id)
+        } else if (!selectedLocationId.value && activeLocations.value.length > 0) {
+          selectLocation(activeLocations.value[0].id)
+        }
+      }, (err) => {
+        console.error('[AppStore] Locations listener error:', err.message)
+      })
+    }
+
+    // 監聽品項
+    if (!unsubscribeProds) {
+      const qProd = query(collection(db, 'products'), orderBy('order'))
+      unsubscribeProds = onSnapshot(qProd, (snap) => {
+        products.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      }, (err) => {
+        console.error('[AppStore] Products listener error:', err.message)
+      })
+    }
+  }
+
+  // 監聽角色變化，如果從 pending 變成 staff，自動啟動監聽器
+  import { watch } from 'vue'
+  watch(() => useAuthStore().isStaff, (isStaff) => {
+    if (isStaff) {
+      checkAndStartStaffListeners()
+    }
+  })
+
   function stop() {
+    if (unsubscribeSys) {
+      unsubscribeSys()
+      unsubscribeSys = null
+    }
     if (unsubscribeLocs) {
       unsubscribeLocs()
       unsubscribeLocs = null

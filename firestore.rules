@@ -7,20 +7,20 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function myRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
     function isOwner() {
-      return isAuth() && myRole() == 'owner';
+      return isAuth() && getUserData().role == 'owner';
     }
 
     function isAdmin() {
-      return isAuth() && myRole() in ['owner', 'admin'];
+      return isAuth() && getUserData().role in ['owner', 'admin'];
     }
 
     function isStaff() {
-      return isAuth() && myRole() in ['owner', 'admin', 'staff'];
+      return isAuth() && getUserData().role in ['owner', 'admin', 'staff'];
     }
 
     // ── users 集合 ────────────────────────────────────────────

@@ -170,7 +170,8 @@ async function saveDuty() {
     }
     dutyDialog.value = false
   } catch (e) {
-    ElMessage.error('操作失敗：' + e.message)
+    console.error('[SettingsView] saveDuty error:', e)
+    ElMessage.error('儲存失敗：' + (e.code || e.message))
   } finally {
     savingDuty.value = false
   }
@@ -186,7 +187,10 @@ async function deleteDuty(duty) {
     await deleteDoc(doc(db, 'duties', duty.id))
     ElMessage.success('執事已刪除')
   } catch (e) {
-    if (e !== 'cancel') ElMessage.error('刪除失敗：' + e.message)
+    if (e !== 'cancel') {
+      console.error('[SettingsView] deleteDuty error:', e)
+      ElMessage.error('刪除失敗：' + (e.code || e.message))
+    }
   }
 }
 
