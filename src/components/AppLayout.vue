@@ -3,7 +3,7 @@
     <!-- 頂部導航 -->
     <header class="top-nav" :class="appStore.isReplenishMode ? 'bg-green-100 shadow-green-200/50' : ''">
       <!-- 左側：返回或漢堡 -->
-      <div class="flex-shrink-0 min-w-[40px]">
+      <div class="flex-shrink-0 w-10">
         <slot name="header-left">
           <button
             v-if="showBack"
@@ -21,7 +21,7 @@
       </h1>
 
       <!-- 右側：道場選擇器與登出 -->
-      <div class="flex-shrink-0 flex items-center gap-2 justify-end min-w-[40px]">
+      <div class="flex-shrink-0 flex items-center gap-2 justify-end w-auto">
         <slot name="header-right">
           <button
             v-if="showLocationPicker && appStore.activeLocations.length > 0"
@@ -38,15 +38,15 @@
           
           <router-link
             to="/profile"
-            class="w-9 h-9 flex items-center justify-center rounded-full hover:ring-2 hover:ring-brand-300 transition-all flex-shrink-0 bg-gray-200 overflow-hidden"
+            class="flex flex-shrink-0 w-9 h-9 items-center justify-center rounded-full hover:ring-2 hover:ring-brand-300 transition-all bg-gray-200 overflow-hidden"
           >
             <img
               v-if="authStore.user?.photoURL"
               :src="authStore.user.photoURL"
-              class="w-full h-full object-cover"
+              class="block w-full h-full object-cover"
               :alt="authStore.user.displayName"
             />
-            <User v-else class="w-5 h-5 text-gray-500" />
+            <User v-else class="w-5 h-5 flex-shrink-0 text-gray-500" />
           </router-link>
         </slot>
       </div>

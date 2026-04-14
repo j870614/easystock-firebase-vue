@@ -68,9 +68,11 @@ onMounted(async () => {
         redirectUri,
         currentUid: linkUid,
       })
-      
+
       if (data?.success) {
         ElMessage.success('LINE 帳號已成功連結！')
+        // 等待 Firebase Realtime 更新（通常 500-1000ms）
+        await new Promise(resolve => setTimeout(resolve, 800))
         router.replace('/profile')
       } else {
         throw new Error(data?.message || '後端回傳連結失敗')
