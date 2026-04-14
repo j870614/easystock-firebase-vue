@@ -108,7 +108,8 @@ export const useAuthStore = defineStore('auth', () => {
    */
   function loginWithLine(action = 'login') {
     const channelId = import.meta.env.VITE_LINE_CHANNEL_ID
-    const redirectUri = encodeURIComponent(`${location.origin}/auth/line/callback`)
+    const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '')
+    const redirectUri = encodeURIComponent(`${window.location.origin}${baseUrl}/auth/line/callback`)
     const state = crypto.randomUUID()
     sessionStorage.setItem('line_oauth_state', state)
     sessionStorage.setItem('line_oauth_action', action)

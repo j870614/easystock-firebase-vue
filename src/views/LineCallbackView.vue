@@ -41,9 +41,12 @@ onMounted(async () => {
     if (action === 'link') {
       // 帳號連結模式：呼叫 linkLine CF，將 LINE 綁定至現有帳號
       const linkLineFn = httpsCallable(functions, 'linkLine')
+      const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '')
+      const redirectUri = `${window.location.origin}${baseUrl}/auth/line/callback`
+
       await linkLineFn({
         code,
-        redirectUri: `${location.origin}/auth/line/callback`,
+        redirectUri,
         currentUid: linkUid,
       })
       ElMessage.success('LINE 帳號已成功連結！')
@@ -51,9 +54,12 @@ onMounted(async () => {
     } else {
       // 一般登入模式
       const lineLoginFn = httpsCallable(functions, 'lineLogin')
+      const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '')
+      const redirectUri = `${window.location.origin}${baseUrl}/auth/line/callback`
+
       const { data } = await lineLoginFn({
         code,
-        redirectUri: `${location.origin}/auth/line/callback`,
+        redirectUri,
       })
       await signInWithCustomToken(auth, data.token)
       router.replace('/')
