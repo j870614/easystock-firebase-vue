@@ -1,7 +1,7 @@
 // src/stores/app.js
 // 全域 UI 狀態（選取的道場、通知訊息等）
 import { defineStore } from 'pinia'
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted, watch } from 'vue'
 import { doc, getDoc, collection, onSnapshot, query, where, orderBy } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from './auth'
@@ -115,7 +115,6 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // 監聽角色變化，如果從 pending 變成 staff，自動啟動監聽器
-  import { watch } from 'vue'
   watch(() => useAuthStore().isStaff, (isStaff) => {
     if (isStaff) {
       checkAndStartStaffListeners()
