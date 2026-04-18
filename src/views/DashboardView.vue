@@ -42,7 +42,7 @@
       <template v-else>
         <!-- 庫存預警 -->
         <div v-if="lowStockItems.length > 0" class="mb-6">
-          <h2 class="text-base font-semibold text-red-500 mb-3 flex items-center gap-2">
+          <h2 class="font-semibold text-red-500 mb-3 flex items-center gap-2" :style="{ fontSize: 'var(--fs-main)' }">
             <AlertTriangle class="w-5 h-5 flex-shrink-0" /> 急需補貨
           </h2>
           <div class="grid grid-cols-2 gap-3">
@@ -51,7 +51,7 @@
               :key="item.id"
               class="card bg-red-50 border-l-4 border-l-red-500 !p-3 flex flex-col gap-1"
             >
-              <div class="text-sm text-red-900 leading-snug truncate">
+              <div class="text-red-900 leading-snug break-words" :style="{ fontSize: 'var(--fs-main)' }">
                 {{ item.name }}
                 <span v-if="item.spec" class="font-medium">・{{ item.spec }}</span>
               </div>
@@ -67,7 +67,7 @@
           </div>
         </div>
 
-        <h2 class="text-base font-semibold text-gray-500 mb-3">各品項庫存</h2>
+        <h2 class="font-semibold text-gray-500 mb-3" :style="{ fontSize: 'var(--fs-main)' }">各品項庫存</h2>
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div
             v-for="item in stockItems"
@@ -75,7 +75,7 @@
             class="card flex flex-col gap-1"
             :class="item.currentStock <= 0 ? 'border-l-4 border-l-red-400' : 'border-l-4 border-l-green-500'"
           >
-            <div class="text-sm text-gray-500 leading-snug">
+            <div class="text-gray-500 leading-snug break-words" :style="{ fontSize: 'var(--fs-main)' }">
               {{ item.name }}
               <span v-if="item.spec" class="font-medium">・{{ item.spec }}</span>
             </div>
@@ -90,7 +90,7 @@
         </div>
 
         <!-- 今日統計 -->
-        <h2 class="text-base font-semibold text-gray-500 mb-3">今日交易</h2>
+        <h2 class="font-semibold text-gray-500 mb-3" :style="{ fontSize: 'var(--fs-main)' }">今日交易</h2>
         <div class="grid grid-cols-2 gap-3">
           <div class="card text-center">
             <div class="text-sm text-green-600 font-medium mb-1">入庫</div>

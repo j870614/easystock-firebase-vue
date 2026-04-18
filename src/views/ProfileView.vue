@@ -26,6 +26,44 @@
       </div>
     </div>
 
+    <!-- 字體大小 -->
+    <div class="card mb-4">
+      <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2" :style="{ fontSize: 'var(--fs-main)' }">
+        <ALargeSmall class="w-5 h-5 text-gray-400" /> 字體大小
+      </h2>
+      <div class="flex items-center gap-3">
+        <button
+          class="flex-1 py-3 rounded-xl border-2 font-bold transition-all select-none"
+          :class="appStore.fontScale === 0
+            ? 'border-gray-200 bg-gray-100 text-gray-300 cursor-not-allowed'
+            : 'border-gray-200 bg-white text-gray-700 hover:border-brand-400 active:scale-95'"
+          :disabled="appStore.fontScale === 0"
+          @click="appStore.updateFontScale(appStore.fontScale - 1)"
+        >
+          <span :style="{ fontSize: 'var(--fs-main)' }">A<sup>-</sup></span>
+        </button>
+        <div class="flex gap-1.5">
+          <span
+            v-for="i in [0, 1, 2]"
+            :key="i"
+            class="block w-2 h-2 rounded-full transition-all duration-300"
+            :class="appStore.fontScale === i ? 'bg-brand-600 scale-125' : 'bg-gray-200'"
+          />
+        </div>
+        <button
+          class="flex-1 py-3 rounded-xl border-2 font-bold transition-all select-none"
+          :class="appStore.fontScale === 2
+            ? 'border-gray-200 bg-gray-100 text-gray-300 cursor-not-allowed'
+            : 'border-gray-200 bg-white text-gray-700 hover:border-brand-400 active:scale-95'"
+          :disabled="appStore.fontScale === 2"
+          @click="appStore.updateFontScale(appStore.fontScale + 1)"
+        >
+          <span :style="{ fontSize: 'var(--fs-main)' }">A<sup>+</sup></span>
+        </button>
+      </div>
+      <p class="text-center text-gray-400 mt-2" :style="{ fontSize: 'var(--fs-main)' }">{{ ['小', '預設', '大'][appStore.fontScale] }}</p>
+    </div>
+
     <!-- 登入方式 -->
     <div class="card mb-4">
       <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -55,7 +93,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Link, LogOut } from 'lucide-vue-next'
+import { Link, LogOut, ALargeSmall } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'

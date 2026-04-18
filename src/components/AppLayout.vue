@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-dvh transition-colors duration-300" :class="appStore.isReplenishMode ? 'bg-green-50' : 'bg-stock-bg'">
+  <div class="min-h-dvh transition-colors duration-300" :class="appStore.isReplenishMode ? 'bg-green-50' : 'bg-stock-bg'" :data-fs="appStore.fontScale">
     <!-- 頂部導航 -->
     <header class="top-nav" :class="appStore.isReplenishMode ? 'bg-green-100 shadow-green-200/50' : ''">
       <!-- 左側：返回或漢堡 -->
@@ -303,6 +303,7 @@ watch(() => authStore.isAuthenticated, (val) => {
 
 onMounted(() => {
   appStore.init()
+  appStore.applyFontScale()
   setTimeout(checkGeofence, 1500)
   geofenceInterval = setInterval(checkGeofence, 3 * 60 * 1000)
   startIdleTimer()

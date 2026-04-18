@@ -35,7 +35,7 @@
 
       <!-- POS 品項網格 -->
       <div v-if="loadingProducts" class="text-gray-400 py-10 text-center">載入中…</div>
-      <div v-else class="grid grid-cols-2 gap-3 pb-32" :class="{ 'pb-72': cart.length > 0 }">
+      <div v-else class="grid gap-3 pb-32" :class="[appStore.fontScale === 2 ? 'grid-cols-1' : 'grid-cols-2', { 'pb-72': cart.length > 0 }]">
         <button
           v-for="(group, name) in groupedProducts"
           :key="name"
@@ -55,15 +55,14 @@
             {{ String(name).charAt(0) }}
           </div>
           <div class="text-center w-full min-w-0">
-            <div class="font-bold text-gray-800 leading-snug text-base line-clamp-2 break-words">
+            <div class="font-bold text-gray-800 leading-snug break-words" :style="{ fontSize: 'var(--fs-name)' }">
               {{ name }}
             </div>
-            <div v-if="group.length > 1" class="text-xs text-gray-400 mt-1">
+            <div v-if="group.length > 1" class="text-gray-400 mt-1" :style="{ fontSize: 'var(--fs-main)' }">
               {{ group.length }} 種規格
             </div>
-            <!-- Show total stock of all variants in this group -->
             <div v-else class="mt-1">
-               <span class="text-sm text-gray-500 bg-gray-50 border px-2 py-0.5 rounded-full">
+               <span class="text-gray-500 bg-gray-50 border px-2 py-0.5 rounded-full" :style="{ fontSize: 'var(--fs-main)' }">
                  總庫存 {{ getStock(group[0].id) }}
                </span>
             </div>
@@ -82,9 +81,9 @@
         <div class="space-y-4 py-2">
           <div v-for="p in selectedGroupItems" :key="p.id" class="border-2 rounded-xl p-4 flex justify-between items-center" :class="appStore.isReplenishMode ? 'border-green-50' : 'border-brand-50'">
             <div>
-              <div class="font-bold text-gray-800 text-lg">{{ p.spec || '預設規格' }}</div>
-              <div class="text-sm text-brand-600 font-bold mt-1" v-if="!appStore.isReplenishMode">單價：{{ getProductPrice(p) }}</div>
-              <div class="text-sm text-gray-500 mt-1 flex items-center gap-2">
+              <div class="font-bold text-gray-800" :style="{ fontSize: 'var(--fs-name)' }">{{ p.spec || '預設規格' }}</div>
+              <div class="font-bold text-brand-600 mt-1" v-if="!appStore.isReplenishMode" :style="{ fontSize: 'var(--fs-main)' }">單價：{{ getProductPrice(p) }}</div>
+              <div class="text-gray-500 mt-1 flex items-center gap-2" :style="{ fontSize: 'var(--fs-main)' }">
                 <div>目前庫存：{{ getStock(p.id) }}</div>
                 <div v-if="getStock(p.id) <= (p.minStock || 0)" class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">⚠️ 建議補貨</div>
               </div>

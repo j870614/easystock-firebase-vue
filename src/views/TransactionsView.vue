@@ -10,7 +10,8 @@
         <button
           v-for="f in filters"
           :key="f.value"
-          class="flex-shrink-0 px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all"
+          class="flex-shrink-0 px-4 py-2 rounded-xl border-2 font-medium transition-all"
+          :style="{ fontSize: 'var(--fs-main)' }"
           :class="activeFilter === f.value
             ? 'border-brand-500 bg-brand-50 text-brand-700'
             : 'border-gray-200 bg-white text-gray-600'"
@@ -42,7 +43,7 @@
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
-              <span class="font-semibold text-gray-800 truncate">
+              <span class="font-semibold text-gray-800 break-all" :style="{ fontSize: 'var(--fs-main)' }">
                 {{ tx.productSnapshot?.name }}
                 <span v-if="tx.productSnapshot?.spec" class="text-gray-500 font-normal">
                   {{ tx.productSnapshot.spec }}

@@ -17,6 +17,9 @@ export const useAppStore = defineStore('app', () => {
   const isReplenishMode = ref(false)    // 是否開啟補貨模式
   const systemMode = ref('development') // 系統執行模式
   const idleTimeout = ref(30)           // 閒置自動登出時間（分鐘），0 = 停用
+  const fontScale = ref(
+    Number(localStorage.getItem('fontScale') ?? 1)
+  )                                     // 字體縮放比例 0=小 1=預設 2=大
 
   // ── Getters ───────────────────────────────────────────
   const activeProducts = computed(() =>
@@ -147,6 +150,18 @@ export const useAppStore = defineStore('app', () => {
     localStorage.setItem('selectedLocationId', id)
   }
 
+  function updateFontScale(val) {
+    const clamped = Math.min(2, Math.max(0, val))
+    fontScale.value = clamped
+    localStorage.setItem('fontScale', clamped)
+    document.documentElement.setAttribute('data-fs', clamped)
+  }
+
+  // 初始化時套用儲存的字體偏好
+  function applyFontScale() {
+    document.documentElement.setAttribute('data-fs', fontScale.value)
+  }
+
   return {
     locations,
     products,
@@ -159,8 +174,11 @@ export const useAppStore = defineStore('app', () => {
     isReplenishMode,
     systemMode,
     idleTimeout,
+    fontScale,
     init,
     stop,
     selectLocation,
+    updateFontScale,
+    applyFontScale,
   }
 })
