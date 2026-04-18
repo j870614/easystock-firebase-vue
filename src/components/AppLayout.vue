@@ -243,22 +243,34 @@ async function handleLogout() {
 // ── 閒置自動登出 ──────────────────────────────────────
 let idleTimer = null
 const IDLE_EVENTS = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click']
+let lastActivityTime = Date.now()
 
 function resetIdleTimer() {
+  lastActivityTime = Date.now()
   if (!appStore.idleTimeout || appStore.idleTimeout <= 0) return
+  
   if (idleTimer) clearTimeout(idleTimer)
   idleTimer = setTimeout(async () => {
-    if (authStore.isAuthenticated) {
+    // 檢查最後一次活動時間
+    const now = Date.now()
+    const diff = now - lastActivityTime
+    const limit = appStore.idleTimeout * 60 * 1000
+    
+    // 確保真的超過時間且使用者已登入
+    if (diff >= limit && authStore.isAuthenticated) {
+      console.log('[IdleTimeout] User idle, signing out...')
       await authStore.signOut()
       appStore.stop()
       router.push('/login')
+    } else if (authStore.isAuthenticated) {
+      // 若因某些原因未達時間，重新設定剩餘時間的 Timer
+      resetIdleTimer()
     }
   }, appStore.idleTimeout * 60 * 1000)
 }
 
 function startIdleTimer() {
-  if (!authStore.isAuthenticated) return
-  if (appStore.idleTimeout <= 0) return
+  if (!authStore.isAuthenticated || appStore.idleTimeout <= 0) return
   IDLE_EVENTS.forEach(evt => window.addEventListener(evt, resetIdleTimer, { passive: true }))
   resetIdleTimer()
 }
@@ -282,8 +294,12 @@ watch(() => authStore.isAuthenticated, (val) => {
     startIdleTimer()
   } else {
     stopIdleTimer()
+    // 跨分頁同步：若另一分頁登出，此分頁也應跳轉
+    if (route.path !== '/login' && route.path !== '/pending') {
+      router.push('/login')
+    }
   }
-})
+}, { immediate: true })
 
 onMounted(() => {
   appStore.init()

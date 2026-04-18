@@ -61,7 +61,7 @@ export const useAppStore = defineStore('app', () => {
       unsubscribeSys = onSnapshot(sysRef, (snap) => {
         if (snap.exists()) {
           systemMode.value = snap.data().mode || 'development'
-          idleTimeout.value = snap.data().idleTimeout ?? 30
+          idleTimeout.value = Number(snap.data().idleTimeout ?? 30)
         }
       }, (err) => {
         console.error('[AppStore] System setting listener error:', err.message)
