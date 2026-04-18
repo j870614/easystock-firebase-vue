@@ -41,25 +41,26 @@
           
           <div class="pt-4 border-t border-gray-100">
             <div class="flex items-center justify-between mb-2">
-              <h3 class="font-medium text-gray-700 text-sm">匯出品項</h3>
-              <button class="text-brand-600 text-xs hover:underline" @click="selectAllProducts" v-if="selectedProductIds.length !== appStore.activeProducts.length">全選</button>
-              <button class="text-brand-600 text-xs hover:underline" @click="selectedProductIds = []" v-else>清除全部</button>
+              <h3 class="font-medium text-gray-700 text-sm">匯出品相</h3>
+              <button class="text-brand-600 text-xs hover:underline" @click="selectAllProductGroups" v-if="selectedGroupNames.length !== productGroups.length">全選</button>
+              <button class="text-brand-600 text-xs hover:underline" @click="selectedGroupNames = []" v-else>清除全部</button>
             </div>
             <el-select
-              v-model="selectedProductIds"
+              v-model="selectedGroupNames"
               multiple
               collapse-tags
               collapse-tags-tooltip
-              placeholder="請選擇要匯出的品項"
+              placeholder="請選擇要匯出的品相名稱"
               class="w-full"
             >
               <el-option
-                v-for="item in appStore.activeProducts"
-                :key="item.id"
-                :label="`${item.name} ${item.spec || ''}`"
-                :value="item.id"
+                v-for="name in productGroups"
+                :key="name"
+                :label="name"
+                :value="name"
               />
             </el-select>
+            <p class="text-xs text-gray-400 mt-1.5">選擇品相後，會匯出該品相的所有規格。</p>
             <p v-if="selectedProductIds.length > 10" class="text-amber-600 text-xs mt-2 flex items-center gap-1">
               <AlertTriangle class="w-4 h-4" /> 選擇過多品項可能導致 Excel 寬度過大，閱讀不易。
             </p>
@@ -119,7 +120,7 @@
       </div>
 
       <router-link
-        v-if="authStore.isOwner"
+        v-if="authStore.isAdmin || authStore.isOwner"
         to="/import"
         class="btn-ghost w-full text-lg py-5 gap-3 flex items-center justify-center"
       >
@@ -152,7 +153,28 @@ const selectedRange = ref([
   `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}-28`
 ])
 
-const selectedProductIds = ref([])
+// 品相選擇（以名稱為單位）
+const selectedGroupNames = ref([])
+
+// 所有品相名稱清單（去重）
+const productGroups = computed(() => {
+  const names = []
+  const seen = new Set()
+  appStore.activeProducts.forEach(p => {
+    if (!seen.has(p.name)) {
+      seen.add(p.name)
+      names.push(p.name)
+    }
+  })
+  return names
+})
+
+// 由品相名稱反推實際 productIds
+const selectedProductIds = computed(() => {
+  return appStore.activeProducts
+    .filter(p => selectedGroupNames.value.includes(p.name))
+    .map(p => p.id)
+})
 
 const exporting = ref(false)
 const loadingPreview = ref(false)
@@ -161,7 +183,7 @@ const groupedProducts = ref([])
 
 const isDataReady = computed(() => {
   if (!appStore.selectedLocationId) return false
-  if (selectedProductIds.value.length === 0) return false
+  if (selectedGroupNames.value.length === 0) return false
   if (exportType.value === 'year') return !!selectedYear.value
   if (exportType.value === 'month') return !!selectedMonth.value
   if (exportType.value === 'custom') return !!(selectedRange.value && selectedRange.value.length === 2)
@@ -195,16 +217,18 @@ async function loadPreview() {
 }
 
 watch(() => appStore.activeProducts, (newVal) => {
-  if (newVal.length > 0 && selectedProductIds.value.length === 0) {
-    selectedProductIds.value = newVal.map(p => p.id)
+  if (newVal.length > 0 && selectedGroupNames.value.length === 0) {
+    // 預設全選所有品相名稱
+    const names = [...new Set(newVal.map(p => p.name))]
+    selectedGroupNames.value = names
   }
 }, { immediate: true })
 
-function selectAllProducts() {
-  selectedProductIds.value = appStore.activeProducts.map(p => p.id)
+function selectAllProductGroups() {
+  selectedGroupNames.value = [...productGroups.value]
 }
 
-watch(() => [appStore.selectedLocationId, exportType.value, selectedYear.value, selectedMonth.value, selectedRange.value, selectedProductIds.value], loadPreview, { deep: true })
+watch(() => [appStore.selectedLocationId, exportType.value, selectedYear.value, selectedMonth.value, selectedRange.value, selectedGroupNames.value], loadPreview, { deep: true })
 onMounted(() => {
   if (appStore.activeProducts.length > 0) {
     loadPreview()

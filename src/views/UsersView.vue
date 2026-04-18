@@ -39,12 +39,34 @@
           </div>
         </div>
 
+        <!-- 系統總管可編輯法名/俗名 -->
+        <div v-if="authStore.isOwner && editingUid === u.uid" class="flex flex-col gap-2 bg-gray-50 rounded-xl p-3 border">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">法名</label>
+              <input v-model="editForm.dharmaName" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="法名（選填）" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">俗名</label>
+              <input v-model="editForm.secularName" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="俗名（選填）" />
+            </div>
+          </div>
+          <div class="flex gap-2 justify-end">
+            <button class="text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100" @click="editingUid = null">取消</button>
+            <button class="text-sm px-4 py-1.5 rounded-lg bg-brand-500 text-white hover:bg-brand-600" @click="saveNames(u)">儲存</button>
+          </div>
+        </div>
+        <div v-else-if="authStore.isOwner" class="flex justify-end">
+          <button class="text-xs text-brand-600 hover:underline flex items-center gap-1" @click="startEditNames(u)">
+            ✏️ 編輯法名/俗名
+          </button>
+        </div>
+
         <!-- 第二行：owner 可編輯的下拉選單 -->
-        <div v-if="authStore.isOwner && u.uid !== selfUid" class="flex gap-2">
+        <div v-if="authStore.isOwner && u.uid !== selfUid" class="grid grid-cols-1 gap-2">
           <el-select
             v-model="u.role"
-            class="flex-1 min-w-0"
-            size="small"
+            class="w-full"
             @change="changeRole(u)"
           >
             <el-option label="待審核" value="pending" />
@@ -55,8 +77,7 @@
 
           <el-select
             v-model="u.assignedLocationId"
-            class="flex-1 min-w-0"
-            size="small"
+            class="w-full"
             placeholder="指派道場"
             clearable
             @change="changeLocation(u)"
@@ -71,8 +92,7 @@
 
           <el-select
             v-model="u.dutyId"
-            class="flex-1 min-w-0"
-            size="small"
+            class="w-full"
             placeholder="執事"
             clearable
             @change="changeDuty(u)"
@@ -91,7 +111,6 @@
           <el-select
             v-model="u.assignedLocationId"
             class="flex-1 min-w-0"
-            size="small"
             placeholder="指派道場"
             clearable
             @change="changeLocation(u)"
@@ -124,6 +143,8 @@ const selfUid = computed(() => authStore.user?.uid)
 
 const users = ref([])
 const loading = ref(false)
+const editingUid = ref(null)
+const editForm = ref({ dharmaName: '', secularName: '' })
 let unsubscribe = null
 
 const ROLE_MAP = {
@@ -179,6 +200,26 @@ async function changeDuty(u) {
     ElMessage.success(dutyName ? `執事已更新為「${dutyName}」` : '已清除執事')
   } catch (e) {
     ElMessage.error('更新執事失敗，請確認您的權限。')
+  }
+}
+
+function startEditNames(u) {
+  editingUid.value = u.uid
+  editForm.value = { dharmaName: u.dharmaName || '', secularName: u.secularName || '' }
+}
+
+async function saveNames(u) {
+  try {
+    await updateDoc(doc(db, 'users', u.uid), {
+      dharmaName: editForm.value.dharmaName.trim(),
+      secularName: editForm.value.secularName.trim(),
+    })
+    u.dharmaName = editForm.value.dharmaName.trim()
+    u.secularName = editForm.value.secularName.trim()
+    editingUid.value = null
+    ElMessage.success('法名/俗名已更新')
+  } catch (e) {
+    ElMessage.error('更新失敗：' + e.message)
   }
 }
 

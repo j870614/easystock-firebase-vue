@@ -11,16 +11,16 @@
 
     <template v-else>
       <!-- 日期與類型提示 -->
-      <div class="mb-4 flex items-center gap-2">
-        <div class="flex-1 text-base font-bold flex items-center gap-1.5 min-w-0" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-brand-600'">
-          <span v-if="appStore.isReplenishMode" class="truncate">📦 入庫模式</span>
-          <span v-else class="truncate">🙏 認供結緣</span>
+      <div class="mb-4 flex flex-wrap items-center gap-2">
+        <div class="font-bold flex items-center gap-1.5 text-base" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-brand-600'">
+          <span v-if="appStore.isReplenishMode">📦 入庫模式</span>
+          <span v-else>🙏 認供結緣</span>
         </div>
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs font-bold transition-colors" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-gray-400'">補貨</span>
+        <div class="flex items-center gap-1.5 ml-auto">
+          <span class="text-xs font-bold transition-colors whitespace-nowrap" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-gray-400'">補貨</span>
           <el-switch v-model="appStore.isReplenishMode" style="--el-switch-on-color: #22c55e;" />
         </div>
-        <div class="w-28 flex-shrink-0">
+        <div class="w-full sm:w-auto">
           <el-date-picker
             v-model="date"
             type="date"
@@ -39,7 +39,7 @@
         <button
           v-for="(group, name) in groupedProducts"
           :key="name"
-          class="card flex flex-col items-center justify-center p-4 gap-2 transition-all active:scale-95 border-2 relative"
+          class="card flex flex-col items-center justify-center p-4 gap-2 transition-all active:scale-95 border-2 relative min-w-0"
           :class="appStore.isReplenishMode ? 'border-transparent hover:border-green-300' : 'border-transparent hover:border-brand-300'"
           @click="openProductSelect(name, group)"
         >
@@ -49,13 +49,13 @@
           </div>
           <!-- 圓形字首 Icon -->
           <div
-            class="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-sm"
+            class="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-sm flex-shrink-0"
             :class="appStore.isReplenishMode ? 'bg-green-400' : 'bg-brand-500'"
           >
             {{ String(name).charAt(0) }}
           </div>
-          <div class="text-center w-full">
-            <div class="font-bold text-gray-800 truncate leading-snug text-lg">
+          <div class="text-center w-full min-w-0">
+            <div class="font-bold text-gray-800 leading-snug text-base line-clamp-2 break-words">
               {{ name }}
             </div>
             <div v-if="group.length > 1" class="text-xs text-gray-400 mt-1">

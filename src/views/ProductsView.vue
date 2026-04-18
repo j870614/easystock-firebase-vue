@@ -24,21 +24,21 @@
         <template #item="{ element: group }">
           <div class="card p-0 overflow-hidden border-2" :class="group.items.some(i => i.isActive) ? 'border-transparent' : 'opacity-50 border-gray-200'">
             <!-- 群組標頭 -->
-            <div class="flex items-center gap-3 p-3 bg-gray-50 border-b">
-              <button class="drag-handle p-2 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0">
+            <div class="flex items-center gap-2 p-3 bg-gray-50 border-b">
+              <button class="drag-handle p-1.5 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0">
                 <GripVertical class="w-5 h-5" />
               </button>
-              <div class="font-bold text-gray-800 flex-1">{{ group.name }}</div>
+              <div class="font-bold text-gray-800 flex-1 min-w-0 line-clamp-2 break-words">{{ group.name }}</div>
               
-              <div class="flex items-center gap-2">
-                <div class="text-sm text-gray-500 bg-white px-2 py-1 rounded-lg border shadow-sm">
+              <div class="flex items-center gap-1.5 flex-shrink-0">
+                <div class="text-xs text-gray-500 bg-white px-2 py-1 rounded-lg border shadow-sm hidden sm:block">
                   {{ group.items.length }} 個規格
                 </div>
-                <button class="p-2 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click="openForm(group, true)" title="複製此品項">
-                  <Copy class="w-5 h-5" />
+                <button class="p-1.5 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click="openForm(group, true)" title="複製此品項">
+                  <Copy class="w-4 h-4" />
                 </button>
-                <button class="p-2 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click="openForm(group)">
-                  <Pencil class="w-5 h-5" />
+                <button class="p-1.5 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click="openForm(group)">
+                  <Pencil class="w-4 h-4" />
                 </button>
               </div>
             </div>
