@@ -240,13 +240,60 @@ async function handleLogout() {
   router.push('/login')
 }
 
+// ── 閒置自動登出 ──────────────────────────────────────
+let idleTimer = null
+const IDLE_EVENTS = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click']
+
+function resetIdleTimer() {
+  if (!appStore.idleTimeout || appStore.idleTimeout <= 0) return
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(async () => {
+    if (authStore.isAuthenticated) {
+      await authStore.signOut()
+      appStore.stop()
+      router.push('/login')
+    }
+  }, appStore.idleTimeout * 60 * 1000)
+}
+
+function startIdleTimer() {
+  if (!authStore.isAuthenticated) return
+  if (appStore.idleTimeout <= 0) return
+  IDLE_EVENTS.forEach(evt => window.addEventListener(evt, resetIdleTimer, { passive: true }))
+  resetIdleTimer()
+}
+
+function stopIdleTimer() {
+  if (idleTimer) {
+    clearTimeout(idleTimer)
+    idleTimer = null
+  }
+  IDLE_EVENTS.forEach(evt => window.removeEventListener(evt, resetIdleTimer))
+}
+
+// 當設定值或登入狀態變化時，重新啟動偵測器
+watch(() => appStore.idleTimeout, () => {
+  stopIdleTimer()
+  startIdleTimer()
+})
+
+watch(() => authStore.isAuthenticated, (val) => {
+  if (val) {
+    startIdleTimer()
+  } else {
+    stopIdleTimer()
+  }
+})
+
 onMounted(() => {
   appStore.init()
   setTimeout(checkGeofence, 1500)
   geofenceInterval = setInterval(checkGeofence, 3 * 60 * 1000)
+  startIdleTimer()
 })
 onUnmounted(() => {
   if (geofenceInterval) clearInterval(geofenceInterval)
+  stopIdleTimer()
 })
 
 // 管理中心涵蓋的子頁面（這些頁面也應讓「管理」tab active）

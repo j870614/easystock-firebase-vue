@@ -16,6 +16,7 @@ export const useAppStore = defineStore('app', () => {
   )
   const isReplenishMode = ref(false)    // 是否開啟補貨模式
   const systemMode = ref('development') // 系統執行模式
+  const idleTimeout = ref(30)           // 閒置自動登出時間（分鐘），0 = 停用
 
   // ── Getters ───────────────────────────────────────────
   const activeProducts = computed(() =>
@@ -60,6 +61,7 @@ export const useAppStore = defineStore('app', () => {
       unsubscribeSys = onSnapshot(sysRef, (snap) => {
         if (snap.exists()) {
           systemMode.value = snap.data().mode || 'development'
+          idleTimeout.value = snap.data().idleTimeout ?? 30
         }
       }, (err) => {
         console.error('[AppStore] System setting listener error:', err.message)
@@ -87,7 +89,7 @@ export const useAppStore = defineStore('app', () => {
 
     // 監聽道場
     if (!unsubscribeLocs) {
-      const qLoc = query(collection(db, 'locations'), orderBy('name'))
+      const qLoc = query(collection(db, 'locations'), orderBy('order'))
       unsubscribeLocs = onSnapshot(qLoc, (snap) => {
         locations.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         
@@ -156,6 +158,7 @@ export const useAppStore = defineStore('app', () => {
     activeProducts,
     isReplenishMode,
     systemMode,
+    idleTimeout,
     init,
     stop,
     selectLocation,

@@ -47,6 +47,42 @@
         </button>
       </div>
 
+      <!-- 安全性設定 -->
+      <div class="card">
+        <h2 class="font-semibold text-gray-800 text-lg mb-4 flex items-center gap-2">
+          <ShieldCheck class="w-5 h-5 text-gray-500" /> 安全性設定
+        </h2>
+        <div class="space-y-3">
+          <div>
+            <label class="text-sm font-medium text-gray-700 block mb-1">
+              閒置自動登出時間（分鐘）
+            </label>
+            <p class="text-xs text-gray-400 mb-2">設定為 0 表示停用此功能，最少 5 分鐘，最多 480 分鐘（桉8小時）。</p>
+            <div class="flex items-center gap-3">
+              <input
+                v-model.number="idleTimeoutInput"
+                type="number"
+                min="0"
+                max="480"
+                step="5"
+                class="input w-32 text-center text-lg font-bold"
+                placeholder="30"
+              />
+              <span class="text-gray-500 text-sm">分鐘</span>
+              <span v-if="idleTimeoutInput === 0" class="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">️ 功能已停用</span>
+              <span v-else class="text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-1 rounded-lg">✓ {{ idleTimeoutInput }} 分鐘無操作応自動登出</span>
+            </div>
+          </div>
+          <button
+            class="btn-primary w-full"
+            :disabled="savingIdleTimeout"
+            @click="saveIdleTimeout"
+          >
+            {{ savingIdleTimeout ? '儲存中…' : '儲存安全設定' }}
+          </button>
+        </div>
+      </div>
+
       <!-- 系統執行環境 -->
       <div class="card">
         <h2 class="font-semibold text-gray-800 text-lg mb-4 flex items-center gap-2">
@@ -116,9 +152,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { doc, getDocs, collection, writeBatch, setDoc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
-import { Settings, TestTube, CheckCircle, Check, Users, Plus, Pencil, Trash2 } from 'lucide-vue-next'
+import { Settings, TestTube, CheckCircle, Check, Users, Plus, Pencil, Trash2, ShieldCheck } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
@@ -129,6 +165,32 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 
 onMounted(() => appStore.init())
+
+// ── 閒置自動登出設定 ────────────────────────────────────
+const idleTimeoutInput = ref(appStore.idleTimeout)
+const savingIdleTimeout = ref(false)
+
+// 當 Firestore 更新後，同步到輸入框
+watch(() => appStore.idleTimeout, (val) => {
+  idleTimeoutInput.value = val
+}, { immediate: true })
+
+async function saveIdleTimeout() {
+  const val = idleTimeoutInput.value
+  if (val !== 0 && (val < 5 || val > 480)) {
+    ElMessage.warning('請設定 0（停用）或 5~480 之間的分鐘數')
+    return
+  }
+  savingIdleTimeout.value = true
+  try {
+    await setDoc(doc(db, 'settings', 'system'), { idleTimeout: val }, { merge: true })
+    ElMessage.success(val === 0 ? '已停用閒置自動登出' : `已設定閒置 ${val} 分鐘後自動登出`)
+  } catch (e) {
+    ElMessage.error('儲存失敗：' + e.message)
+  } finally {
+    savingIdleTimeout.value = false
+  }
+}
 
 // ── 執事 CRUD ──────────────────────────────────────────
 const dutyDialog = ref(false)
