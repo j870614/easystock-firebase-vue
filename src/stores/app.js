@@ -36,17 +36,18 @@ export const useAppStore = defineStore('app', () => {
 
   const activeLocations = computed(() => {
     const authStore = useAuthStore()
-    let locs = locations.value.filter(l => l.isActive)
-    
-    // 非管理員只能看到自己被指派的道場
-    if (!authStore.isAdmin && authStore.assignedLocationId) {
-      locs = locs.filter(l => l.id === authStore.assignedLocationId)
-    } else if (!authStore.isAdmin && !authStore.assignedLocationId) {
-      // 尚未被指派的非管理員，看不到任何道場
-      locs = []
+    const locs = locations.value.filter(l => l.isActive)
+
+    // 僅系統總管可看到並切換所有道場
+    if (authStore.isOwner) return locs
+
+    // 其他角色（含 admin）只能看到被指派的道場
+    if (authStore.assignedLocationId) {
+      return locs.filter(l => l.id === authStore.assignedLocationId)
     }
-    
-    return locs
+
+    // 尚未指派者，看不到任何道場
+    return []
   })
 
   // ── Actions ───────────────────────────────────────────
@@ -95,13 +96,19 @@ export const useAppStore = defineStore('app', () => {
       const qLoc = query(collection(db, 'locations'), orderBy('order'))
       unsubscribeLocs = onSnapshot(qLoc, (snap) => {
         locations.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        
-        // 確保選中的道場在允許的清單內
-        const currentAllowed = activeLocations.value.find(l => l.id === selectedLocationId.value)
-        if (!currentAllowed && activeLocations.value.length > 0) {
-          selectLocation(activeLocations.value[0].id)
-        } else if (!selectedLocationId.value && activeLocations.value.length > 0) {
-          selectLocation(activeLocations.value[0].id)
+
+        // 優先強制選取 profile 中指派的道場（忽略 localStorage 記憶）
+        const assigned = authStore.assignedLocationId
+        if (assigned && activeLocations.value.find(l => l.id === assigned)) {
+          selectLocation(assigned)
+        } else {
+          // 指派道場不可用時，從允許清單中選第一個
+          const currentAllowed = activeLocations.value.find(l => l.id === selectedLocationId.value)
+          if (!currentAllowed && activeLocations.value.length > 0) {
+            selectLocation(activeLocations.value[0].id)
+          } else if (!selectedLocationId.value && activeLocations.value.length > 0) {
+            selectLocation(activeLocations.value[0].id)
+          }
         }
       }, (err) => {
         console.error('[AppStore] Locations listener error:', err.message)

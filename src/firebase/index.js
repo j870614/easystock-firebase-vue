@@ -26,9 +26,10 @@ const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 setPersistence(auth, browserSessionPersistence)
 export const googleProvider = new GoogleAuthProvider()
-googleProvider.setCustomParameters({ 
-  prompt: 'select_account login consent',
-  access_type: 'offline'
+// 共用電腦安全：強制每次重新選擇帳號並進行驗證（密碼或 Passkey）
+// 移除 access_type: 'offline' 避免 refresh token 殘留
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
 })
 
 // Firestore (啟用離線快取，行動端在訊號弱時仍可讀取)

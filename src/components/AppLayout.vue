@@ -26,14 +26,14 @@
           <button
             v-if="showLocationPicker && appStore.activeLocations.length > 0"
             class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors bg-gray-100 text-gray-700 flex-shrink-0"
-            :class="{ 'bg-brand-50 text-brand-700': authStore.isAdmin }"
-            @click="authStore.isAdmin && (showLocationDialog = true)"
+            :class="{ 'bg-brand-50 text-brand-700': authStore.isOwner }"
+            @click="authStore.isOwner && (showLocationDialog = true)"
           >
             <MapPin class="w-4 h-4 flex-shrink-0" />
             <span class="max-w-[80px] truncate">
               {{ appStore.selectedLocation?.name ?? '選擇道場' }}
             </span>
-            <ChevronDown v-if="authStore.isAdmin" class="w-3 h-3 flex-shrink-0" />
+            <ChevronDown v-if="authStore.isOwner" class="w-3 h-3 flex-shrink-0" />
           </button>
           
           <router-link
