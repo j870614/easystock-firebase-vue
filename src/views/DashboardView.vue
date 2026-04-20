@@ -86,7 +86,6 @@
           </div>
         </div>
       </template>
-      </template>
     </template>
   </AppLayout>
 </template>
