@@ -22,9 +22,14 @@ export const useAppStore = defineStore('app', () => {
   )                                     // 字體縮放比例 0=小 1=預設 2=大
 
   // ── Getters ───────────────────────────────────────────
-  const activeProducts = computed(() =>
-    products.value.filter(p => p.isActive)
-  )
+  const activeProducts = computed(() => {
+    return products.value.filter(p => {
+      if (!p.isActive) return false
+      const locId = selectedLocationId.value
+      if (!locId) return true
+      return p.overrides?.[locId]?.isActive ?? true
+    })
+  })
 
   const activeDuties = computed(() =>
     duties.value.filter(d => d.isActive)

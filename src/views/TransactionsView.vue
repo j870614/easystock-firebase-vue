@@ -136,6 +136,7 @@ const transactions = ref([])
 const activeFilter = ref('all')
 const submitting = ref(false)
 let unsubscribe = null
+let fallbackTimer = null
 
 const filters = [
   { value: 'all', label: '全部' },
@@ -153,10 +154,15 @@ function stopListener() {
     unsubscribe()
     unsubscribe = null
   }
+  if (fallbackTimer) {
+    clearTimeout(fallbackTimer)
+    fallbackTimer = null
+  }
 }
 
 function listen() {
   stopListener()
+  transactions.value = [] // 切換條件時先清空資料
   if (!appStore.selectedLocationId) return
   
   loading.value = true
@@ -170,14 +176,27 @@ function listen() {
     constraints.unshift(where('type', '==', activeFilter.value))
   }
   
+  // 設定一個 3 秒的 timeout，如果 3 秒內都拿不到伺服器最新資料(可能因為網路不穩/斷線)
+  // 還是要強制關閉 loading，讓使用者能看到快取資料
+  fallbackTimer = setTimeout(() => {
+    loading.value = false
+  }, 3000)
+  
   const q = query(collection(db, 'transactions'), ...constraints)
   
-  unsubscribe = onSnapshot(q, (snap) => {
+  unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
     transactions.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    loading.value = false
+    
+    // 如果資料真的來到了，而且是來自伺服器的最新資料 (!fromCache) 
+    // 或是剛剛才在設備上做出的本地變更 (hasPendingWrites) => 關閉 loading
+    if (!snap.metadata.fromCache || snap.metadata.hasPendingWrites) {
+      loading.value = false
+      if (fallbackTimer) clearTimeout(fallbackTimer)
+    }
   }, (err) => {
     console.error('Transactions listener error:', err)
     loading.value = false
+    if (fallbackTimer) clearTimeout(fallbackTimer)
   })
 }
 

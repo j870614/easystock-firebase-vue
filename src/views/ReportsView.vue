@@ -257,6 +257,8 @@ async function buildReportData(locId) {
   const productQ = query(collection(db, 'products'), where('isActive', '==', true))
   const productSnap = await getDocs(productQ)
   let products = productSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+  // 過濾掉在該道場被隱藏的品項
+  products = products.filter(p => p.overrides?.[locId]?.isActive ?? true)
   products.sort((a, b) => (a.order || 0) - (b.order || 0))
   // 僅保留使用者選取的品項
   products = products.filter(p => selectedProductIds.value.includes(p.id))
