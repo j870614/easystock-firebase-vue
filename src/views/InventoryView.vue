@@ -204,10 +204,19 @@ const cartTotalQty = computed(() => {
   return cart.value.reduce((sum, item) => sum + item.qty, 0)
 })
 
-// 分組品項：依據名稱歸類
+// 分組品項：依據名稱歸類，並過濾掉在該道場停用的品項
 const groupedProducts = computed(() => {
   const groups = {}
+  const locId = appStore.selectedLocationId
+  if (!locId) return groups
+
   appStore.activeProducts.forEach(p => {
+    // 如果道場有獨立設定不啟用，則略過
+    const locOverride = p.overrides?.[locId]
+    if (locOverride && locOverride.isActive === false) {
+      return
+    }
+
     if (!groups[p.name]) groups[p.name] = []
     groups[p.name].push(p)
   })
@@ -218,13 +227,12 @@ const cartTotalPrice = computed(() => {
   return cart.value.reduce((sum, item) => sum + (item.price * item.qty), 0)
 })
 
-const locationCountry = computed(() => appStore.selectedLocation?.country || '台灣')
-
 function getProductPrice(p) {
   const overrides = p.overrides || {}
-  const countryOverride = overrides[locationCountry.value]
-  if (countryOverride && countryOverride.price != null && countryOverride.price !== '') {
-    return Number(countryOverride.price)
+  const locId = appStore.selectedLocationId
+  const locOverride = overrides[locId]
+  if (locOverride && locOverride.price != null && locOverride.price !== '') {
+    return Number(locOverride.price)
   }
   return Number(p.price || 0)
 }

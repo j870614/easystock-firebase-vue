@@ -37,6 +37,13 @@
                 <div class="text-[10px] sm:text-xs text-gray-500 bg-white px-2 py-1 rounded-lg border shadow-sm hidden xs:block">
                   {{ group.items.length }} 個規格
                 </div>
+                <!-- 新增：群組開關 -->
+                <div class="ml-2 mr-1 flex items-center" @click.stop v-if="authStore.isAdmin || authStore.isOwner">
+                  <el-switch
+                    :model-value="group.items.some(i => i.isActive)"
+                    @change="(val) => toggleGroupActive(group, val)"
+                  />
+                </div>
                 <button class="p-1.5 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click.stop="openForm(group, true)" title="複製此品項">
                   <Copy class="w-4 h-4" />
                 </button>
@@ -147,26 +154,26 @@
                   </div>
                 </div>
 
-                <!-- 地區設定 (Overrides) -->
-                <div class="mt-3 pt-3 border-t border-gray-200" v-if="uniqueCountries.length > 0">
+                <!-- 道場獨立設定 (Overrides) -->
+                <div class="mt-3 pt-3 border-t border-gray-200" v-if="appStore.locations.length > 0">
                   <div class="text-xs text-brand-600 font-bold mb-2 flex items-center gap-1">
-                    各國度設定 (選填)
+                    各道場獨立設定 (選填)
                   </div>
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                     <div v-for="country in uniqueCountries" :key="country" class="bg-white p-2 rounded border border-gray-200 flex flex-col gap-1 shadow-sm">
-                        <div class="font-bold text-xs text-gray-700">{{ country }}</div>
+                     <div v-for="loc in appStore.locations" :key="loc.id" class="bg-white p-2 rounded border border-gray-200 flex flex-col gap-1 shadow-sm">
+                        <div class="font-bold text-[11px] text-gray-700 truncate" :title="loc.name">{{ loc.name }}</div>
                         <div class="flex items-center gap-2">
                            <div class="flex-1">
-                             <label class="text-[10px] text-gray-500 block mb-0.5">自訂單價</label>
+                             <label class="text-[10px] text-gray-500 block mb-0.5">單價覆蓋</label>
                              <input type="number" class="input py-1 text-xs" :placeholder="`預設: ${item.price || 0}`"
-                                    :value="item.overrides?.[country]?.price ?? ''"
-                                    @input="e => updateOverride(item, country, 'price', e.target.value)" />
+                                    :value="item.overrides?.[loc.id]?.price ?? ''"
+                                    @input="e => updateOverride(item, loc.id, 'price', e.target.value)" />
                            </div>
                            <div class="flex flex-col items-center justify-end">
-                             <label class="text-[10px] text-gray-500 block mb-0.5">啟用</label>
+                             <label class="text-[10px] text-gray-500 block mb-0.5">在該道場顯示</label>
                              <el-switch size="small"
-                                        :model-value="item.overrides?.[country]?.isActive ?? true"
-                                        @change="val => updateOverride(item, country, 'isActive', val)" />
+                                        :model-value="item.overrides?.[loc.id]?.isActive ?? true"
+                                        @change="val => updateOverride(item, loc.id, 'isActive', val)" />
                            </div>
                         </div>
                      </div>
@@ -243,13 +250,7 @@ watch(() => appStore.products, (newVal) => {
 
 }, { immediate: true })
 
-const uniqueCountries = computed(() => {
-  const map = new Set()
-  appStore.locations.forEach(l => {
-    if (l.country) map.add(l.country)
-  })
-  return Array.from(map)
-})
+
 
 const form = ref({ name: '', specs: [], originalName: '' })
 
@@ -257,15 +258,15 @@ function addSpecLine() {
   form.value.specs.push({ key: uuidv4(), id: null, spec: '', price: 0, minStock: 0, isActive: true, isMarkedForDeletion: false, overrides: {} })
 }
 
-function updateOverride(item, country, field, value) {
+function updateOverride(item, locId, field, value) {
   if (!item.overrides) item.overrides = {}
-  if (!item.overrides[country]) item.overrides[country] = { isActive: true } // default behavior
+  if (!item.overrides[locId]) item.overrides[locId] = { isActive: true } // default behavior
   
   if (field === 'price') {
     const num = parseFloat(value)
-    item.overrides[country].price = isNaN(num) ? null : num
+    item.overrides[locId].price = isNaN(num) ? null : num
   } else {
-    item.overrides[country][field] = value
+    item.overrides[locId][field] = value
   }
 }
 
@@ -377,6 +378,20 @@ async function save() {
 
 async function toggleActive(product, val) {
   await updateDoc(doc(db, 'products', product.id), { isActive: val })
+}
+
+async function toggleGroupActive(group, val) {
+  const batch = writeBatch(db)
+  group.items.forEach(p => {
+    const pRef = doc(db, 'products', p.id)
+    batch.update(pRef, { isActive: val })
+  })
+  try {
+    await batch.commit()
+  } catch(e) {
+    console.error(e)
+    alert('更新群組啟用狀態失敗')
+  }
 }
 
 async function onDragEnd() {

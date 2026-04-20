@@ -46,31 +46,31 @@
                 <button
                   class="text-brand-600 text-xs hover:underline"
                   @click="selectAllProducts"
-                  v-if="selectedProductIds.length !== appStore.activeProducts.length"
+                  v-if="selectedGroupNames.length !== productGroups.length"
                 >全選</button>
                 <button
                   class="text-gray-400 text-xs hover:underline"
-                  @click="selectedProductIds = []"
+                  @click="selectedGroupNames = []"
                   v-else
                 >取消全選</button>
               </div>
             </div>
-            <!-- 標籤式多選 -->
+            <!-- 標籤式多選 (以名稱為單位) -->
             <div class="flex flex-wrap gap-2">
               <button
-                v-for="item in appStore.activeProducts"
-                :key="item.id"
+                v-for="name in productGroups"
+                :key="name"
                 class="px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all"
-                :class="selectedProductIds.includes(item.id)
+                :class="selectedGroupNames.includes(name)
                   ? 'border-brand-500 bg-brand-50 text-brand-700'
                   : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'"
-                @click="toggleProduct(item.id)"
+                @click="toggleProduct(name)"
               >
-                {{ item.name }}<span v-if="item.spec" class="opacity-70"> · {{ item.spec }}</span>
+                {{ name }}
               </button>
             </div>
-            <p v-if="selectedProductIds.length > 10" class="text-amber-600 text-xs mt-2 flex items-center gap-1">
-              <AlertTriangle class="w-4 h-4" /> 選擇過多品項可能導致 Excel 寬度過大，閱讀不易。
+            <p v-if="selectedGroupNames.length > 10" class="text-amber-600 text-xs mt-2 flex items-center gap-1">
+              <AlertTriangle class="w-4 h-4" /> 選擇過多品相可能導致 Excel 寬度過大，閱讀不易。
             </p>
           </div>
         </div>
@@ -161,8 +161,28 @@ const selectedRange = ref([
   `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}-28`
 ])
 
-// 品項選擇
-const selectedProductIds = ref([])
+// 品相選擇（以名稱為單位）
+const selectedGroupNames = ref([])
+
+// 所有品相名稱清單（去重）
+const productGroups = computed(() => {
+  const names = []
+  const seen = new Set()
+  appStore.activeProducts.forEach(p => {
+    if (!seen.has(p.name)) {
+      seen.add(p.name)
+      names.push(p.name)
+    }
+  })
+  return names
+})
+
+// 由品相名稱反推實際 productIds
+const selectedProductIds = computed(() => {
+  return appStore.activeProducts
+    .filter(p => selectedGroupNames.value.includes(p.name))
+    .map(p => p.id)
+})
 
 const exporting = ref(false)
 const loadingPreview = ref(false)
@@ -205,19 +225,19 @@ async function loadPreview() {
 }
 
 function selectAllProducts() {
-  selectedProductIds.value = appStore.activeProducts.map(p => p.id)
+  selectedGroupNames.value = [...productGroups.value]
 }
 
-function toggleProduct(id) {
-  const idx = selectedProductIds.value.indexOf(id)
+function toggleProduct(name) {
+  const idx = selectedGroupNames.value.indexOf(name)
   if (idx === -1) {
-    selectedProductIds.value.push(id)
+    selectedGroupNames.value.push(name)
   } else {
-    selectedProductIds.value.splice(idx, 1)
+    selectedGroupNames.value.splice(idx, 1)
   }
 }
 
-watch(() => [appStore.selectedLocationId, exportType.value, selectedYear.value, selectedMonth.value, selectedRange.value, selectedProductIds.value], loadPreview, { deep: true })
+watch(() => [appStore.selectedLocationId, exportType.value, selectedYear.value, selectedMonth.value, selectedRange.value, selectedGroupNames.value], loadPreview, { deep: true })
 onMounted(() => {
   if (appStore.activeProducts.length > 0) {
     loadPreview()
