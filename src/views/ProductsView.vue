@@ -44,11 +44,14 @@
                     @change="(val) => toggleGroupActive(group, val)"
                   />
                 </div>
-                <button class="p-1.5 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click.stop="openForm(group, true)" title="複製此品項">
+                <button class="p-1.5 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click.stop="confirmCopy(group)" title="複製此品項">
                   <Copy class="w-4 h-4" />
                 </button>
                 <button class="p-1.5 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click.stop="openForm(group)">
                   <Pencil class="w-4 h-4" />
+                </button>
+                <button v-if="authStore.isOwner" class="p-1.5 rounded-xl border-2 border-red-100 bg-white text-red-500 hover:bg-red-50 transition-colors" @click.stop="confirmDeleteGroup(group)" title="刪除整個品項">
+                  <Trash2 class="w-4 h-4" />
                 </button>
                 <!-- 收合圖示 -->
                 <button class="p-1 text-gray-400 hover:text-gray-600 transition-transform duration-200" :class="expandedGroups.has(group.name) ? 'rotate-180' : ''" @click.stop="toggleGroup(group.name)">
@@ -218,6 +221,7 @@ import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
 import VueDraggable from 'vuedraggable'
 import { v4 as uuidv4 } from 'uuid'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -300,6 +304,53 @@ function updateOverride(item, key, field, value) {
 
 function removeSpecLine(idx) {
   form.value.specs.splice(idx, 1)
+}
+
+async function confirmCopy(group) {
+  try {
+    await ElMessageBox.confirm(`確定要複製「${group.name}」嗎？`, '複製確認', {
+      confirmButtonText: '複製',
+      cancelButtonText: '取消',
+      type: 'info'
+    })
+    openForm(group, true)
+  } catch {
+    // 使用者取消
+  }
+}
+
+async function confirmDeleteGroup(group) {
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `【危險操作】這將會徹底刪除「${group.name}」及其所有規格！<br/>為避免誤刪，請輸入「<b>${group.name}</b>」以確認：`,
+      '刪除整個品項',
+      {
+        confirmButtonText: '確定刪除',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger',
+        dangerouslyUseHTMLString: true,
+        inputValidator: (val) => val === group.name || '輸入的名稱不相符',
+        inputErrorMessage: '輸入的名稱不相符'
+      }
+    )
+    
+    loading.value = true
+    const batch = writeBatch(db)
+    group.items.forEach(p => {
+      batch.delete(doc(db, 'products', p.id))
+    })
+    await batch.commit()
+    ElMessage.success(`已刪除「${group.name}」`)
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error('刪除整個品項失敗:', e)
+      ElMessage.error('刪除失敗：' + e.message)
+    } else {
+      ElMessage.info('已取消刪除。')
+    }
+  } finally {
+    if (loading.value) loading.value = false
+  }
 }
 
 function openForm(group = null, isCopy = false) {

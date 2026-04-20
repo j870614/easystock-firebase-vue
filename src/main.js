@@ -24,9 +24,9 @@ async function bootstrap() {
     app.component(key, component)
   }
 
-  // 等待 Auth 狀態初始化完成
+  // 初始化 Auth 狀態 (不要 await，讓 App 先 mount，進而顯示 App.vue 裡的 loading 畫面)
   const authStore = useAuthStore()
-  await authStore.init()
+  authStore.init()
 
   app.mount('#app')
 }

@@ -32,14 +32,18 @@ export const useAuthStore = defineStore('auth', () => {
   // ── Actions ──────────────────────────────────────────
 
   /** 監聽 Firebase Auth 狀態（在 main.js 初始化時呼叫） */
+  let initPromise = null
   function init() {
-    return new Promise(async (resolve) => {
+    if (initPromise) return initPromise
+
+    initPromise = new Promise(async (resolve) => {
       // 強制等待持久化設定完成
       await setPersistence(auth, browserSessionPersistence)
-      
+
       onAuthStateChanged(auth, async (firebaseUser) => {
         user.value = firebaseUser
         if (firebaseUser) {
+          // 在結束 loading 前確保第一筆資料已經拿到
           await loadProfile(firebaseUser)
         } else {
           profile.value = null
@@ -49,6 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
         resolve()
       })
     })
+    return initPromise
   }
 
   let unsubscribeProfile = null
@@ -64,7 +69,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function loadProfile(firebaseUser) {
     stopProfileListener()
     const userRef = doc(db, 'users', firebaseUser.uid)
-    
+
     // 第一次先試著抓，如果不存在就建立
     const initialSnap = await getDoc(userRef)
     if (!initialSnap.exists()) {
@@ -80,9 +85,12 @@ export const useAuthStore = defineStore('auth', () => {
         createdAt:   serverTimestamp(),
       }
       await setDoc(userRef, newProfile)
+      profile.value = newProfile
+    } else {
+      profile.value = initialSnap.data()
     }
 
-    // 開始持續監聽
+    // 開啟監聽，後續變化即時同步
     unsubscribeProfile = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
         profile.value = snap.data()
@@ -93,12 +101,28 @@ export const useAuthStore = defineStore('auth', () => {
   /** Google 登入 */
   async function loginWithGoogle() {
     error.value = null
+    // 登入程序啟動時，直接顯示全螢幕 loading 遮罩
+    loading.value = true
     try {
       await signInWithPopup(auth, googleProvider)
-      // onAuthStateChanged 會自動處理後續
+      
+      // 如果 onAuthStateChanged 的 loadProfile 還沒填充 profile
+      // 我們在這裡停下來等它完成，避免提早跳轉被判定為 pending
+      if (!profile.value) {
+        await new Promise((resolve) => {
+          const unwatch = watch(profile, (newVal) => {
+            if (newVal) {
+              unwatch()
+              resolve()
+            }
+          })
+        })
+      }
     } catch (e) {
       error.value = e.message
       throw e
+    } finally {
+      loading.value = false
     }
   }
 
