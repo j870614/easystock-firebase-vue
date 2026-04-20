@@ -1,5 +1,5 @@
 <template>
-  <AppLayout title="品項管理" :show-location-picker="false">
+  <AppLayout title="品項管理" :show-location-picker="true">
     <div class="flex justify-end mb-4">
       <button class="btn-primary gap-2 text-base" @click="openForm()">
         <Plus class="w-5 h-5" /> 新增品項
@@ -37,10 +37,10 @@
                 <div class="text-[10px] sm:text-xs text-gray-500 bg-white px-2 py-1 rounded-lg border shadow-sm hidden xs:block">
                   {{ group.items.length }} 個規格
                 </div>
-                <!-- 新增：群組開關 -->
+                <!-- 新增：群組開關 (針對當前道場) -->
                 <div class="ml-2 mr-1 flex items-center" @click.stop v-if="authStore.isAdmin || authStore.isOwner">
                   <el-switch
-                    :model-value="group.items.some(i => i.isActive)"
+                    :model-value="getGroupActive(group)"
                     @change="(val) => toggleGroupActive(group, val)"
                   />
                 </div>
@@ -74,7 +74,7 @@
                     <div class="text-sm text-gray-400 break-words">單價: {{ p.price || 0 }} | 安全庫存: {{ p.minStock || 0 }}</div>
                   </div>
 
-                  <el-switch :model-value="p.isActive" @change="(val) => toggleActive(p, val)" />
+                  <el-switch :model-value="getItemActive(p)" @change="(val) => toggleActive(p, val)" />
                 </div>
               </div>
             </transition>
@@ -229,6 +229,16 @@ function toggleGroup(name) {
   expandedGroups.value = new Set(expandedGroups.value)
 }
 
+function getItemActive(p) {
+  const locId = appStore.selectedLocationId
+  if (!locId) return p.isActive
+  return p.overrides?.[locId]?.isActive ?? p.isActive
+}
+
+function getGroupActive(group) {
+  return group.items.some(p => getItemActive(p))
+}
+
 watch(() => appStore.products, (newVal) => {
   // 分組邏輯
   const map = new Map()
@@ -377,14 +387,28 @@ async function save() {
 }
 
 async function toggleActive(product, val) {
-  await updateDoc(doc(db, 'products', product.id), { isActive: val })
+  const locId = appStore.selectedLocationId
+  if (!locId) return
+
+  const newOverrides = { ...(product.overrides || {}) }
+  if (!newOverrides[locId]) newOverrides[locId] = {}
+  newOverrides[locId].isActive = val
+
+  await updateDoc(doc(db, 'products', product.id), { overrides: newOverrides })
 }
 
 async function toggleGroupActive(group, val) {
+  const locId = appStore.selectedLocationId
+  if (!locId) return
+
   const batch = writeBatch(db)
   group.items.forEach(p => {
+    const newOverrides = { ...(p.overrides || {}) }
+    if (!newOverrides[locId]) newOverrides[locId] = {}
+    newOverrides[locId].isActive = val
+
     const pRef = doc(db, 'products', p.id)
-    batch.update(pRef, { isActive: val })
+    batch.update(pRef, { overrides: newOverrides })
   })
   try {
     await batch.commit()
