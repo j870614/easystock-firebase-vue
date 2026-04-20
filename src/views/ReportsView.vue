@@ -304,10 +304,13 @@ async function buildReportData(locId) {
     
     // 如果是該年份的資料，準備一列 row
     let row = null
+    let relevantTxs = []
     if (isTargetYear) {
+      // 僅提取屬於有選擇的產品的 TX 紀錄
+      relevantTxs = txList.filter(t => selectedProductIds.value.includes(t.productId))
       row = {
         date: date,
-        note: [...new Set(txList.map(t => t.note).filter(Boolean))].join('、'),
+        note: [...new Set(relevantTxs.map(t => t.note).filter(Boolean))].join('、'),
         items: {}
       }
     }
@@ -327,7 +330,7 @@ async function buildReportData(locId) {
       }
     })
 
-    if (isTargetYear) {
+    if (isTargetYear && relevantTxs.length > 0) {
       rows.push(row)
     }
   }

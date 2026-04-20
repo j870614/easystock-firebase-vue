@@ -101,7 +101,8 @@
           </div>
           <div>
             <label class="label">數量 <span class="text-red-500">*</span></label>
-            <input v-model.number="editForm.qty" type="number" class="input text-lg" min="1" />
+            <input v-model.number="editForm.qty" type="number" class="input text-lg" :class="{'ring-2 ring-red-300 border-red-500 bg-red-50': showErrors && editForm.qty <= 0}" min="1" />
+            <div v-if="showErrors && editForm.qty <= 0" class="text-red-500 text-sm mt-1 font-medium">數量必須大於 0</div>
           </div>
           <div>
             <label class="label">備註事項</label>
@@ -109,11 +110,40 @@
           </div>
           <div>
             <label class="label">修改原因 <span class="text-red-500">*</span></label>
-            <textarea v-model="editForm.reason" class="input h-20 py-2 resize-none" placeholder="請詳細說明修改原因（例如：記錯數量、日期填錯等），此原因將會被系統記錄。"></textarea>
+            <textarea v-model="editForm.reason" class="input h-20 py-2 resize-none" :class="{'ring-2 ring-red-300 border-red-500 bg-red-50': showErrors && !editForm.reason.trim()}" placeholder="請詳細說明修改原因（例如：記錯數量、日期填錯等），此原因將會被系統記錄。"></textarea>
+            <div v-if="showErrors && !editForm.reason.trim()" class="text-red-500 text-sm mt-1 font-medium">請填寫修改原因</div>
           </div>
-          <button class="btn-primary w-full py-4 text-lg mt-4" :disabled="submitting || !editForm.reason.trim()" @click="submitEdit">
+          <button class="btn-primary w-full py-4 text-lg mt-4" :disabled="submitting" @click="submitEdit">
             {{ submitting ? '儲存中...' : '確認修改' }}
           </button>
+        </div>
+      </el-dialog>
+
+      <!-- 刪除確認 Dialog -->
+      <el-dialog
+        v-model="deleteDialog"
+        title="確認刪除"
+        width="400px"
+        align-center
+        destroy-on-close
+      >
+        <div class="space-y-4 pt-2">
+          <p class="text-gray-600">確定要刪除這筆【{{ txToDelete?.type === 'in' ? '入庫' : '出庫' }}】紀錄嗎？資料將會回推庫存。</p>
+          <div class="border p-3 rounded-xl bg-gray-50 flex justify-between items-center">
+            <div>
+               <div class="font-bold text-gray-800">{{ txToDelete?.productSnapshot?.name }}<span v-if="txToDelete?.productSnapshot?.spec"> ({{txToDelete?.productSnapshot?.spec}})</span></div>
+               <div class="text-sm text-gray-500">{{ txToDelete?.date }}</div>
+            </div>
+            <div class="font-bold text-lg" :class="txToDelete?.type === 'in' ? 'text-green-600' : 'text-red-600'">
+                {{ txToDelete?.type === 'in' ? '+' : '−' }}{{ txToDelete?.qty }}
+            </div>
+          </div>
+          <div class="flex gap-3 mt-6">
+            <button class="btn-ghost flex-1 py-3 border-gray-200" @click="deleteDialog = false">取消</button>
+            <button class="btn-primary flex-1 py-3 bg-red-500 hover:bg-red-600 shadow-red-200 border-red-500" :disabled="submitting" @click="confirmDelete">
+              {{ submitting ? '刪除中...' : '確認刪除' }}
+            </button>
+          </div>
         </div>
       </el-dialog>
     </template>
@@ -146,8 +176,13 @@ const filters = [
 
 // Edit States
 const editDialog = ref(false)
+const showErrors = ref(false)
 const editForm = ref({ id: null, qty: 0, date: '', note: '', reason: '', oldQty: 0, type: '', productId: '' })
 const selectedTxName = ref('')
+
+// Delete States
+const deleteDialog = ref(false)
+const txToDelete = ref(null)
 
 function stopListener() {
   if (unsubscribe) {
@@ -201,6 +236,7 @@ function listen() {
 }
 
 function openEdit(tx) {
+  showErrors.value = false
   selectedTxName.value = tx.productSnapshot?.name + (tx.productSnapshot?.spec ? ` (${tx.productSnapshot?.spec})` : '')
   editForm.value = {
     id: tx.id,
@@ -216,12 +252,8 @@ function openEdit(tx) {
 }
 
 async function submitEdit() {
-  if (!editForm.value.reason.trim()) {
-    alert('請填寫修改原因')
-    return
-  }
-  if (editForm.value.qty <= 0) {
-    alert('數量必須大於 0')
+  if (!editForm.value.reason.trim() || editForm.value.qty <= 0) {
+    showErrors.value = true
     return
   }
 
@@ -275,10 +307,13 @@ async function submitEdit() {
   }
 }
 
-async function deleteTx(tx) {
-  const confirmObj = prompt(`確定要刪除這筆【${tx.type==='in'?'入庫':'出庫'}】紀錄嗎？\n資料將會回推庫存。\n\n請輸入 "delete" 確認刪除：`)
-  if (confirmObj !== 'delete') return
+function deleteTx(tx) {
+  txToDelete.value = tx
+  deleteDialog.value = true
+}
 
+async function confirmDelete() {
+  const tx = txToDelete.value;
   submitting.value = true
   loading.value = true
   try {
@@ -307,6 +342,7 @@ async function deleteTx(tx) {
 
       t.delete(txRef)
     })
+    deleteDialog.value = false
     alert('已成功刪除')
   } catch(e) {
     alert(e.message || '刪除失敗')

@@ -197,7 +197,7 @@ function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
 }
 
 function checkGeofence() {
-  if (authStore.role !== 'staff') {
+  if (authStore.isAdmin) {
     isLocationLocked.value = false
     return
   }

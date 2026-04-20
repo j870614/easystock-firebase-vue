@@ -130,8 +130,8 @@
             </div>
           </div>
 
-          <!-- 備註（僅結緣模式顯示） -->
-          <div v-if="!appStore.isReplenishMode" class="px-4 pb-2">
+          <!-- 備註 -->
+          <div class="px-4 pb-2">
             <input
               v-model="cartNote"
               type="text"
@@ -395,7 +395,7 @@ async function submitCart() {
             price: item.price ?? 0,
           },
           qty: item.qty,
-          note: currentTxType === 'out' ? cartNote.value.trim() : '',
+          note: cartNote.value.trim(),
           operator: {
             uid: authStore.user.uid,
             name: authStore.user.displayName,
