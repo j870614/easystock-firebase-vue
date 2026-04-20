@@ -227,12 +227,13 @@ const cartTotalPrice = computed(() => {
   return cart.value.reduce((sum, item) => sum + (item.price * item.qty), 0)
 })
 
+const locationCountry = computed(() => appStore.selectedLocation?.country || '台灣')
+
 function getProductPrice(p) {
   const overrides = p.overrides || {}
-  const locId = appStore.selectedLocationId
-  const locOverride = overrides[locId]
-  if (locOverride && locOverride.price != null && locOverride.price !== '') {
-    return Number(locOverride.price)
+  const countryOverride = overrides[locationCountry.value]
+  if (countryOverride && countryOverride.price != null && countryOverride.price !== '') {
+    return Number(countryOverride.price)
   }
   return Number(p.price || 0)
 }
