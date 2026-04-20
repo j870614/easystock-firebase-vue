@@ -4,9 +4,17 @@
       "collectionGroup": "transactions",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
         { "fieldPath": "locationId", "order": "ASCENDING" },
-        { "fieldPath": "type",       "order": "ASCENDING" },
-        { "fieldPath": "timestamp",  "order": "DESCENDING" }
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "locationId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
       ]
     },
     {
