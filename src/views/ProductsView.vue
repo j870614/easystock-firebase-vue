@@ -275,7 +275,7 @@ watch(() => appStore.products, (newVal) => {
 const uniqueCountries = computed(() => {
   const map = new Set()
   appStore.locations.forEach(l => {
-    if (l.country) map.add(l.country)
+    map.add(l.country || '台灣')
   })
   return Array.from(map)
 })
