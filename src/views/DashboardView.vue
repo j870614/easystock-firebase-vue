@@ -40,52 +40,34 @@
       </div>
 
       <template v-else>
-        <!-- 庫存預警 -->
-        <div v-if="lowStockItems.length > 0" class="mb-6">
-          <h2 class="text-base font-semibold text-red-500 mb-3 flex items-center gap-2">
-            <AlertTriangle class="w-5 h-5 flex-shrink-0" /> 急需補貨
-          </h2>
-          <div class="grid grid-cols-2 gap-3">
-            <div
-              v-for="item in lowStockItems"
-              :key="item.id"
-              class="card bg-red-50 border-l-4 border-l-red-500 !p-3 flex flex-col gap-1"
-            >
-              <div class="text-sm text-red-900 leading-snug truncate">
-                {{ item.name }}
-                <span v-if="item.spec" class="font-medium">・{{ item.spec }}</span>
-              </div>
-              <div class="flex items-end justify-between mt-1">
-                <div class="text-2xl font-bold text-red-600 leading-none">
-                  {{ item.currentStock }}
-                </div>
-                <div class="text-xs text-red-400">
-                  安全: {{ item.minStock || 0 }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <h2 class="text-base font-semibold text-gray-500 mb-3">各品項庫存</h2>
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div
             v-for="item in stockItems"
             :key="item.id"
-            class="card flex flex-col gap-1"
-            :class="item.currentStock <= 0 ? 'border-l-4 border-l-red-400' : 'border-l-4 border-l-green-500'"
+            class="card flex flex-col gap-1 relative overflow-hidden"
+            :class="item.currentStock <= (item.minStock || 0)
+              ? 'border-l-4 border-l-red-500 bg-red-50'
+              : 'border-l-4 border-l-green-500'"
           >
-            <div class="text-sm text-gray-500 leading-snug">
+            <!-- 低庫存角標 -->
+            <span
+              v-if="item.currentStock <= (item.minStock || 0)"
+              class="absolute top-2 right-2 text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none"
+            >注補</span>
+            <div class="text-sm leading-snug pr-8" :class="item.currentStock <= (item.minStock || 0) ? 'text-red-900' : 'text-gray-500'">
               {{ item.name }}
               <span v-if="item.spec" class="font-medium">・{{ item.spec }}</span>
             </div>
             <div
               class="text-3xl font-bold mt-1"
-              :class="item.currentStock <= 0 ? 'text-red-500' : 'text-gray-800'"
+              :class="item.currentStock <= (item.minStock || 0) ? 'text-red-600' : 'text-gray-800'"
             >
               {{ item.currentStock }}
             </div>
-            <div class="text-xs text-gray-400">件</div>
+            <div class="text-xs" :class="item.currentStock <= (item.minStock || 0) ? 'text-red-400' : 'text-gray-400'">
+              件（安全: {{ item.minStock || 0 }}）
+            </div>
           </div>
         </div>
 
@@ -111,7 +93,7 @@
 <script setup>
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore'
-import { Building2, MapPin, AlertTriangle } from 'lucide-vue-next'
+import { Building2, MapPin } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -142,10 +124,6 @@ const stockItems = computed(() => {
     ...p,
     currentStock: stockMap.value[p.id] ?? 0,
   }))
-})
-
-const lowStockItems = computed(() => {
-  return stockItems.value.filter(item => item.currentStock <= (item.minStock || 0))
 })
 
 function stopListeners() {

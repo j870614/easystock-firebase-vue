@@ -114,6 +114,16 @@
                </button>
             </div>
           </div>
+
+          <!-- 備註（僅結緣模式顯示） -->
+          <div v-if="!appStore.isReplenishMode" class="px-4 pb-2">
+            <input
+              v-model="cartNote"
+              type="text"
+              class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
+              placeholder="備註（例：法名：普某 請購）"
+            />
+          </div>
           
           <div class="p-4 pt-2">
              <button class="w-full text-xl py-4 rounded-2xl transition-transform active:scale-95 font-bold flex justify-center items-center gap-2"
@@ -167,8 +177,10 @@ const selectDialog = ref(false)
 const selectedGroupName = ref('')
 const selectedGroupItems = ref([])
 
+const cartNote = ref('')
 const cart = ref([])
 let unsubscribeStocks = null
+
 
 // 購物車總數計算
 const cartTotalQty = computed(() => {
@@ -311,6 +323,7 @@ async function submitCart() {
             price: item.product.price ?? 0,
           },
           qty: item.qty,
+          note: currentTxType === 'out' ? cartNote.value.trim() : '',
           operator: {
             uid: authStore.user.uid,
             name: authStore.user.displayName,
@@ -325,8 +338,9 @@ async function submitCart() {
       stockMap.value[item.product.id] = (stockMap.value[item.product.id] ?? 0) + delta
     })
 
-    // 清空購物車
+    // 清空購物車與備註
     cart.value = []
+    cartNote.value = ''
 
     successMsgType.value = currentTxType
     successMsg.value = currentTxType === 'in'

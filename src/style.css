@@ -140,6 +140,19 @@
     opacity: 0;
     transform: translateY(-8px);
   }
+
+  /* 收合動畫 */
+  .collapse-enter-active,
+  .collapse-leave-active {
+    transition: max-height 0.25s ease, opacity 0.2s ease;
+    overflow: hidden;
+    max-height: 1000px;
+  }
+  .collapse-enter-from,
+  .collapse-leave-to {
+    max-height: 0;
+    opacity: 0;
+  }
 }
 
 /* ── Element Plus 客製化 ─────────────────────────────── */

@@ -2,7 +2,7 @@
   <div class="min-h-dvh transition-colors duration-300" :class="appStore.isReplenishMode ? 'bg-green-50' : 'bg-stock-bg'">
     <!-- 頂部導航 -->
     <header class="top-nav" :class="appStore.isReplenishMode ? 'bg-green-100 shadow-green-200/50' : ''">
-      <div class="flex items-center gap-3 flex-1">
+      <div class="flex items-center gap-3 flex-1 w-full max-w-[960px] mx-auto">
         <!-- 左側：返回或漢堡 -->
         <slot name="header-left">
           <button
@@ -56,24 +56,28 @@
 
     <!-- 主內容 -->
     <main class="page-content px-4 py-4">
-      <slot />
+      <div class="max-w-[960px] mx-auto">
+        <slot />
+      </div>
     </main>
 
     <!-- 底部導航 -->
-    <nav
-      class="bottom-nav"
-      :style="{ gridTemplateColumns: `repeat(${navItems.length}, 1fr)` }"
-    >
-      <router-link
-        v-for="item in navItems"
-        :key="item.to"
-        :to="item.to"
-        class="bottom-nav-item"
-        :class="{ active: $route.path.startsWith(item.to) }"
+    <nav class="bottom-nav">
+      <div
+        class="w-full max-w-[960px] mx-auto grid h-full"
+        :style="{ gridTemplateColumns: `repeat(${navItems.length}, 1fr)` }"
       >
-        <component :is="item.icon" class="w-6 h-6" />
-        <span class="text-xs">{{ item.label }}</span>
-      </router-link>
+        <router-link
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          class="bottom-nav-item"
+          :class="{ active: $route.path.startsWith(item.to) }"
+        >
+          <component :is="item.icon" class="w-6 h-6" />
+          <span class="text-xs">{{ item.label }}</span>
+        </router-link>
+      </div>
     </nav>
 
     <!-- 道場選擇 Dialog -->

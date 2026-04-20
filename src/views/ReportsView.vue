@@ -40,26 +40,35 @@
           </div>
           
           <div class="pt-4 border-t border-gray-100">
-            <div class="flex items-center justify-between mb-2">
-              <h3 class="font-medium text-gray-700 text-sm">匯出品項</h3>
-              <button class="text-brand-600 text-xs hover:underline" @click="selectAllProducts" v-if="selectedProductIds.length !== appStore.activeProducts.length">全選</button>
-              <button class="text-brand-600 text-xs hover:underline" @click="selectedProductIds = []" v-else>清除全部</button>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-medium text-gray-700 text-sm">品項選擇</h3>
+              <div class="flex gap-2">
+                <button
+                  class="text-brand-600 text-xs hover:underline"
+                  @click="selectAllProducts"
+                  v-if="selectedProductIds.length !== appStore.activeProducts.length"
+                >全選</button>
+                <button
+                  class="text-gray-400 text-xs hover:underline"
+                  @click="selectedProductIds = []"
+                  v-else
+                >取消全選</button>
+              </div>
             </div>
-            <el-select
-              v-model="selectedProductIds"
-              multiple
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="請選擇要匯出的品項"
-              class="w-full"
-            >
-              <el-option
+            <!-- 標籤式多選 -->
+            <div class="flex flex-wrap gap-2">
+              <button
                 v-for="item in appStore.activeProducts"
                 :key="item.id"
-                :label="`${item.name} ${item.spec || ''}`"
-                :value="item.id"
-              />
-            </el-select>
+                class="px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all"
+                :class="selectedProductIds.includes(item.id)
+                  ? 'border-brand-500 bg-brand-50 text-brand-700'
+                  : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'"
+                @click="toggleProduct(item.id)"
+              >
+                {{ item.name }}<span v-if="item.spec" class="opacity-70"> · {{ item.spec }}</span>
+              </button>
+            </div>
             <p v-if="selectedProductIds.length > 10" class="text-amber-600 text-xs mt-2 flex items-center gap-1">
               <AlertTriangle class="w-4 h-4" /> 選擇過多品項可能導致 Excel 寬度過大，閱讀不易。
             </p>
@@ -202,6 +211,15 @@ watch(() => appStore.activeProducts, (newVal) => {
 
 function selectAllProducts() {
   selectedProductIds.value = appStore.activeProducts.map(p => p.id)
+}
+
+function toggleProduct(id) {
+  const idx = selectedProductIds.value.indexOf(id)
+  if (idx === -1) {
+    selectedProductIds.value.push(id)
+  } else {
+    selectedProductIds.value.splice(idx, 1)
+  }
 }
 
 watch(() => [appStore.selectedLocationId, exportType.value, selectedYear.value, selectedMonth.value, selectedRange.value, selectedProductIds.value], loadPreview, { deep: true })

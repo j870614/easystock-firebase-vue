@@ -24,41 +24,50 @@
         <template #item="{ element: group }">
           <div class="card p-0 overflow-hidden border-2" :class="group.items.some(i => i.isActive) ? 'border-transparent' : 'opacity-50 border-gray-200'">
             <!-- 群組標頭 -->
-            <div class="flex items-center gap-3 p-3 bg-gray-50 border-b">
-              <button class="drag-handle p-2 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0">
+            <div
+              class="flex items-center gap-3 p-3 bg-gray-50 border-b cursor-pointer select-none"
+              @click="toggleGroup(group.name)"
+            >
+              <button class="drag-handle p-2 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0" @click.stop>
                 <GripVertical class="w-5 h-5" />
               </button>
-              <div class="font-bold text-gray-800 flex-1">{{ group.name }}</div>
-              
-              <div class="flex items-center gap-2">
-                <div class="text-sm text-gray-500 bg-white px-2 py-1 rounded-lg border shadow-sm">
+              <div class="font-bold text-gray-800 flex-1 break-words min-w-0">{{ group.name }}</div>
+
+              <div class="flex items-center gap-2 shrink-0">
+                <div class="text-sm text-gray-500 bg-white px-2 py-1 rounded-lg border shadow-sm whitespace-nowrap">
                   {{ group.items.length }} 個規格
                 </div>
-                <button class="p-2 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click="openForm(group)">
+                <button class="p-2 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click.stop="openForm(group)">
                   <Pencil class="w-5 h-5" />
+                </button>
+                <!-- 收合圖示 -->
+                <button class="p-1.5 text-gray-400 hover:text-gray-600 transition-transform duration-200" :class="expandedGroups.has(group.name) ? 'rotate-180' : ''" @click.stop="toggleGroup(group.name)">
+                  <ChevronDown class="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            <!-- 群組內品項 -->
-            <div class="divide-y opacity-70">
-              <div
-                v-for="p in group.items"
-                :key="p.id"
-                class="flex items-center gap-3 p-3 pl-12 bg-white transition-colors"
-                :class="!p.isActive ? 'opacity-50' : ''"
-              >
-                <!-- 品項資訊 -->
-                <div class="flex-1 min-w-0">
-                  <div class="font-semibold text-gray-800 truncate">
-                    {{ p.spec || '預設規格' }}
+            <!-- 群組內品項（可收合） -->
+            <transition name="collapse">
+              <div v-show="expandedGroups.has(group.name)" class="divide-y opacity-70">
+                <div
+                  v-for="p in group.items"
+                  :key="p.id"
+                  class="flex items-center gap-3 p-3 pl-12 bg-white transition-colors"
+                  :class="!p.isActive ? 'opacity-50' : ''"
+                >
+                  <!-- 品項資訊 -->
+                  <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-gray-800 break-words">
+                      {{ p.spec || '預設規格' }}
+                    </div>
+                    <div class="text-sm text-gray-400 break-words">單價: {{ p.price || 0 }} | 安全庫存: {{ p.minStock || 0 }}</div>
                   </div>
-                  <div class="text-sm text-gray-400">單價: {{ p.price || 0 }} | 安全庫存: {{ p.minStock || 0 }}</div>
+
+                  <el-switch :model-value="p.isActive" @change="(val) => toggleActive(p, val)" />
                 </div>
-                
-                <el-switch :model-value="p.isActive" @change="(val) => toggleActive(p, val)" />
               </div>
-            </div>
+            </transition>
           </div>
         </template>
       </VueDraggable>
@@ -155,7 +164,7 @@ import { ref, watch } from 'vue'
 import {
   collection, addDoc, updateDoc, doc, writeBatch, deleteDoc
 } from 'firebase/firestore'
-import { Plus, Pencil, GripVertical, X, Trash2 } from 'lucide-vue-next'
+import { Plus, Pencil, GripVertical, X, Trash2, ChevronDown } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -170,6 +179,17 @@ const dialogVisible = ref(false)
 const editingId = ref(null)
 
 const draggableGroups = ref([])
+const expandedGroups = ref(new Set())
+
+function toggleGroup(name) {
+  if (expandedGroups.value.has(name)) {
+    expandedGroups.value.delete(name)
+  } else {
+    expandedGroups.value.add(name)
+  }
+  // trigger reactivity
+  expandedGroups.value = new Set(expandedGroups.value)
+}
 
 watch(() => appStore.products, (newVal) => {
   // 分組邏輯
