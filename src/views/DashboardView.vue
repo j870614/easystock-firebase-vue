@@ -40,7 +40,7 @@
       </div>
 
       <template v-else>
-        <h2 class="text-base font-semibold text-gray-500 mb-3">各品項庫存</h2>
+        <h2 class="font-semibold text-gray-500 mb-3" :style="{ fontSize: 'var(--fs-main)' }">各品項庫存</h2>
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div
             v-for="item in stockItems"
@@ -55,7 +55,7 @@
               v-if="item.currentStock <= (item.minStock || 0)"
               class="absolute top-2 right-2 text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none"
             >注補</span>
-            <div class="text-sm leading-snug pr-8" :class="item.currentStock <= (item.minStock || 0) ? 'text-red-900' : 'text-gray-500'">
+            <div class="leading-snug pr-8 break-words" :class="item.currentStock <= (item.minStock || 0) ? 'text-red-900' : 'text-gray-500'" :style="{ fontSize: 'var(--fs-main)' }">
               {{ item.name }}
               <span v-if="item.spec" class="font-medium">・{{ item.spec }}</span>
             </div>
@@ -72,7 +72,7 @@
         </div>
 
         <!-- 今日統計 -->
-        <h2 class="text-base font-semibold text-gray-500 mb-3">今日交易</h2>
+        <h2 class="font-semibold text-gray-500 mb-3" :style="{ fontSize: 'var(--fs-main)' }">今日交易</h2>
         <div class="grid grid-cols-2 gap-3">
           <div class="card text-center">
             <div class="text-sm text-green-600 font-medium mb-1">入庫</div>
@@ -85,6 +85,7 @@
             <div class="text-xs text-gray-400">筆</div>
           </div>
         </div>
+      </template>
       </template>
     </template>
   </AppLayout>

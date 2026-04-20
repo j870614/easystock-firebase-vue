@@ -1,11 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── 字體縮放 CSS 變數 ─────────────────────────────── */
+:root {
+  --fs-main: 1.1rem;
+  --fs-name: 1.25rem;
+}
+
+/* 全域字體過渡 */
+* {
+  transition: font-size 0.3s ease;
+}
+
+/* 字級縮放覆蓋 */
+[data-fs="0"] {
+  --fs-main: 0.935rem;  /* 1.1 × 0.85 */
+  --fs-name: 1.0625rem; /* 1.25 × 0.85 */
+}
+[data-fs="1"] {
+  --fs-main: 1.1rem;
+  --fs-name: 1.25rem;
+}
+[data-fs="2"] {
+  --fs-main: 1.32rem;  /* 1.1 × 1.2 */
+  --fs-name: 1.5rem;   /* 1.25 × 1.2 */
+}
 
 /* ── 全域排版基底 ─────────────────────────────────────── */
 @layer base {
   html {
     font-size: 18px;
+    font-family: 'Noto Sans TC', system-ui, sans-serif;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -81,7 +109,10 @@
     @apply fixed top-0 left-0 right-0 z-50
            bg-white/90 backdrop-blur-md
            border-b border-gray-100
-           flex items-center px-4 h-14;
+           flex items-center px-4;
+    height: calc(3.5rem + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   /* 底部導航列 */
@@ -113,7 +144,7 @@
 
   /* 頁面主內容區域（避開頂底導航）*/
   .page-content {
-    padding-top: 3.5rem; /* top-nav height */
+    padding-top: calc(3.5rem + env(safe-area-inset-top));
     padding-bottom: calc(4rem + env(safe-area-inset-bottom));
     min-height: 100dvh;
   }
@@ -164,10 +195,10 @@
 
 .el-button {
   min-height: 48px !important;
-  font-size: 16px !important;
+  font-size: var(--fs-main) !important;
 }
 
 .el-input__inner {
   min-height: 48px !important;
-  font-size: 16px !important;
+  font-size: var(--fs-main) !important;
 }

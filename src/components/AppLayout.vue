@@ -1,9 +1,10 @@
 <template>
-  <div class="min-h-dvh transition-colors duration-300" :class="appStore.isReplenishMode ? 'bg-green-50' : 'bg-stock-bg'">
+  <div class="min-h-dvh transition-colors duration-300" :class="appStore.isReplenishMode ? 'bg-green-50' : 'bg-stock-bg'" :data-fs="appStore.fontScale">
     <!-- 頂部導航 -->
     <header class="top-nav" :class="appStore.isReplenishMode ? 'bg-green-100 shadow-green-200/50' : ''">
       <div class="flex items-center gap-3 flex-1 w-full max-w-[960px] mx-auto">
         <!-- 左側：返回或漢堡 -->
+        <div class="flex-shrink-0 w-10">
         <slot name="header-left">
           <button
             v-if="showBack"
@@ -13,43 +14,41 @@
             <ChevronLeft class="w-6 h-6 text-gray-600" />
           </button>
         </slot>
+      </div>
 
-        <!-- 標題 -->
-        <h1 class="text-lg font-bold text-gray-800 flex-1 truncate">
-          {{ title }}
-        </h1>
+      <!-- 標題 -->
+      <h1 class="text-lg font-bold text-gray-800 flex-1 min-w-0 truncate text-center">
+        {{ title }}
+      </h1>
 
-        <!-- 右側：道場選擇器與登出 -->
+      <!-- 右側：道場選擇器與登出 -->
+      <div class="flex-none flex items-center gap-2 justify-end">
         <slot name="header-right">
-          <div class="flex items-center gap-2">
-            <!-- 補貨模式開關 -->
-            <div
-              v-if="$route.name === 'offering'"
-              class="flex items-center gap-1.5 mr-1"
-            >
-              <span class="text-xs font-bold transition-colors" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-gray-400'">補貨<br>開關</span>
-              <el-switch v-model="appStore.isReplenishMode" style="--el-switch-on-color: #22c55e;" />
-            </div>
-
-            <button
-              v-if="showLocationPicker && appStore.activeLocations.length > 0"
-              class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors"
-              :class="authStore.isAdmin ? 'bg-brand-50 text-brand-700 hover:bg-brand-100' : 'bg-gray-100 text-gray-700'"
-              @click="authStore.isAdmin && (showLocationDialog = true)"
-            >
-              <MapPin class="w-4 h-4" />
-              <span class="max-w-20 truncate">
-                {{ appStore.selectedLocation?.name ?? '選擇道場' }}
-              </span>
-              <ChevronDown v-if="authStore.isAdmin" class="w-3 h-3" />
-            </button>
-            <button
-              class="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-              @click="handleLogout"
-            >
-              <LogOut class="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            v-if="showLocationPicker && appStore.activeLocations.length > 0"
+            class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors bg-gray-100 text-gray-700 flex-shrink-0"
+            :class="{ 'bg-brand-50 text-brand-700': authStore.isOwner }"
+            @click="authStore.isOwner && (showLocationDialog = true)"
+          >
+            <MapPin class="w-4 h-4 flex-shrink-0" />
+            <span class="max-w-[80px] truncate">
+              {{ appStore.selectedLocation?.name ?? '選擇道場' }}
+            </span>
+            <ChevronDown v-if="authStore.isOwner" class="w-3 h-3 flex-shrink-0" />
+          </button>
+          
+          <router-link
+            to="/profile"
+            class="flex flex-shrink-0 w-9 h-9 items-center justify-center rounded-full hover:ring-2 hover:ring-brand-300 transition-all bg-gray-200 overflow-hidden"
+          >
+            <img
+              v-if="authStore.user?.photoURL"
+              :src="authStore.user.photoURL"
+              class="block w-full h-full object-cover"
+              :alt="authStore.user.displayName"
+            />
+            <User v-else class="w-5 h-5 flex-shrink-0 text-gray-500" />
+          </router-link>
         </slot>
       </div>
     </header>
@@ -72,7 +71,7 @@
           :key="item.to"
           :to="item.to"
           class="bottom-nav-item"
-          :class="{ active: $route.path.startsWith(item.to) }"
+          :class="{ active: isNavActive(item.to) }"
         >
           <component :is="item.icon" class="w-6 h-6" />
           <span class="text-xs">{{ item.label }}</span>
@@ -162,7 +161,7 @@ import { useRoute } from 'vue-router'
 import {
   ChevronLeft, ChevronDown, MapPin, Check,
   LayoutDashboard, ArrowLeftRight, History,
-  Package, Building2, FileBarChart2, Users, LogOut, Settings, MapPinOff, Store
+  Package, Building2, FileBarChart2, Users, LogOut, Settings, MapPinOff, Store, LayoutGrid, User
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -246,14 +245,88 @@ async function handleLogout() {
   router.push('/login')
 }
 
+// ── 閒置自動登出 ──────────────────────────────────────
+let idleTimer = null
+const IDLE_EVENTS = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click']
+let lastActivityTime = Date.now()
+
+function resetIdleTimer() {
+  lastActivityTime = Date.now()
+  if (!appStore.idleTimeout || appStore.idleTimeout <= 0) return
+  
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(async () => {
+    // 檢查最後一次活動時間
+    const now = Date.now()
+    const diff = now - lastActivityTime
+    const limit = appStore.idleTimeout * 60 * 1000
+    
+    // 確保真的超過時間且使用者已登入
+    if (diff >= limit && authStore.isAuthenticated) {
+      console.log('[IdleTimeout] User idle, signing out...')
+      await authStore.signOut()
+      appStore.stop()
+      router.push('/login')
+    } else if (authStore.isAuthenticated) {
+      // 若因某些原因未達時間，重新設定剩餘時間的 Timer
+      resetIdleTimer()
+    }
+  }, appStore.idleTimeout * 60 * 1000)
+}
+
+function startIdleTimer() {
+  if (!authStore.isAuthenticated || appStore.idleTimeout <= 0) return
+  IDLE_EVENTS.forEach(evt => window.addEventListener(evt, resetIdleTimer, { passive: true }))
+  resetIdleTimer()
+}
+
+function stopIdleTimer() {
+  if (idleTimer) {
+    clearTimeout(idleTimer)
+    idleTimer = null
+  }
+  IDLE_EVENTS.forEach(evt => window.removeEventListener(evt, resetIdleTimer))
+}
+
+// 當設定值或登入狀態變化時，重新啟動偵測器
+watch(() => appStore.idleTimeout, () => {
+  stopIdleTimer()
+  startIdleTimer()
+})
+
+watch(() => authStore.isAuthenticated, (val) => {
+  if (val) {
+    startIdleTimer()
+  } else {
+    stopIdleTimer()
+    // 跨分頁同步：若另一分頁登出，此分頁也應跳轉
+    if (route.path !== '/login' && route.path !== '/pending') {
+      router.push('/login')
+    }
+  }
+}, { immediate: true })
+
 onMounted(() => {
   appStore.init()
+  appStore.applyFontScale()
   setTimeout(checkGeofence, 1500)
   geofenceInterval = setInterval(checkGeofence, 3 * 60 * 1000)
+  startIdleTimer()
 })
 onUnmounted(() => {
   if (geofenceInterval) clearInterval(geofenceInterval)
+  stopIdleTimer()
 })
+
+// 管理中心涵蓋的子頁面（這些頁面也應讓「管理」tab active）
+const ADMIN_SUB_PATHS = ['/locations', '/products', '/users', '/settings', '/import', '/admin']
+
+function isNavActive(to) {
+  const path = route.path
+  if (to === '/admin') return ADMIN_SUB_PATHS.some(p => path.startsWith(p))
+  if (to === '/') return path === '/'
+  return path.startsWith(to)
+}
 
 // 根據角色動態生成底部導航項目
 const navItems = computed(() => {
@@ -263,10 +336,8 @@ const navItems = computed(() => {
     { to: '/transactions', label: '出入庫', icon: History },
   ]
   if (authStore.isOwner) {
-    items.push({ to: '/locations', label: '道場',   icon: Building2 })
-    items.push({ to: '/reports',  label: '報表',   icon: FileBarChart2 })
-    items.push({ to: '/products', label: '品項',   icon: Package })
-    items.push({ to: '/users',    label: '成員',   icon: Users })
+    items.push({ to: '/reports', label: '報表',   icon: FileBarChart2 })
+    items.push({ to: '/admin',   label: '管理',   icon: LayoutGrid })
   } else if (authStore.isAdmin) {
     items.push({ to: '/reports',  label: '報表',   icon: FileBarChart2 })
     items.push({ to: '/products', label: '品項',   icon: Package })

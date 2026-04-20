@@ -128,7 +128,7 @@
       </div>
 
       <router-link
-        v-if="authStore.isOwner"
+        v-if="authStore.isAdmin || authStore.isOwner"
         to="/import"
         class="btn-ghost w-full text-lg py-5 gap-3 flex items-center justify-center"
       >
@@ -161,6 +161,7 @@ const selectedRange = ref([
   `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}-28`
 ])
 
+// 品項選擇
 const selectedProductIds = ref([])
 
 const exporting = ref(false)
@@ -202,12 +203,6 @@ async function loadPreview() {
     loadingPreview.value = false
   }
 }
-
-watch(() => appStore.activeProducts, (newVal) => {
-  if (newVal.length > 0 && selectedProductIds.value.length === 0) {
-    selectedProductIds.value = newVal.map(p => p.id)
-  }
-}, { immediate: true })
 
 function selectAllProducts() {
   selectedProductIds.value = appStore.activeProducts.map(p => p.id)

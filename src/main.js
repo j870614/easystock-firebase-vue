@@ -24,8 +24,7 @@ async function bootstrap() {
     app.component(key, component)
   }
 
-  // 等待 Auth 狀態初始化完成，再掛載 App
-  // 這樣 router guard 就不會在 loading 狀態下做錯誤的跳轉
+  // 等待 Auth 狀態初始化完成
   const authStore = useAuthStore()
   await authStore.init()
 

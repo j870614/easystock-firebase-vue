@@ -48,6 +48,10 @@
           <input v-model="form.name" type="text" class="input" placeholder="例如：本會道場" />
         </div>
         <div>
+          <label class="label">國度 (地區定價用) *</label>
+          <input v-model="form.country" type="text" class="input" placeholder="例如：台灣" />
+        </div>
+        <div>
           <label class="label">地址（選填）</label>
           <div class="flex gap-2">
             <input v-model="form.address" type="text" class="input" placeholder="例如：香港XX區XX路XX號" />
@@ -113,13 +117,13 @@ watch(() => appStore.locations, (newVal) => {
   draggableLocations.value = [...newVal].sort((a, b) => (a.order || 0) - (b.order || 0))
 }, { immediate: true })
 
-const form = ref({ name: '', address: '', lat: null, lng: null, isActive: true })
+const form = ref({ name: '', country: '台灣', address: '', lat: null, lng: null, isActive: true })
 
 function openForm(loc = null) {
   editingId.value = loc?.id ?? null
   form.value = loc
-    ? { name: loc.name, address: loc.address ?? '', lat: loc.lat ?? null, lng: loc.lng ?? null, isActive: loc.isActive }
-    : { name: '', address: '', lat: null, lng: null, isActive: true }
+    ? { name: loc.name, country: loc.country || '台灣', address: loc.address ?? '', lat: loc.lat ?? null, lng: loc.lng ?? null, isActive: loc.isActive }
+    : { name: '', country: '台灣', address: '', lat: null, lng: null, isActive: true }
   geocoding.value = false
   dialogVisible.value = true
 }

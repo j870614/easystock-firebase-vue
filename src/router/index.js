@@ -1,5 +1,5 @@
 // src/router/index.js
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const routes = [
@@ -7,12 +7,6 @@ const routes = [
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),
-    meta: { public: true },
-  },
-  {
-    path: '/auth/line/callback',
-    name: 'line-callback',
-    component: () => import('@/views/LineCallbackView.vue'),
     meta: { public: true },
   },
   {
@@ -55,7 +49,7 @@ const routes = [
     path: '/reports',
     name: 'reports',
     component: () => import('@/views/ReportsView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'admin' },
+    meta: { requiresAuth: true, requiredRole: 'staff' },
   },
   {
     path: '/settings',
@@ -76,13 +70,25 @@ const routes = [
     meta: { requiresAuth: true, requiredRole: 'owner' },
   },
   {
+    path: '/admin',
+    name: 'admin',
+    component: () => import('@/views/AdminHubView.vue'),
+    meta: { requiresAuth: true, requiredRole: 'owner' },
+  },
+  {
+    path: '/profile',
+    name: 'profile',
+    component: () => import('@/views/ProfileView.vue'),
+    meta: { requiresAuth: true, requiredRole: 'staff' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
 ]
 
 const router = createRouter({
-  history: createWebHashHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes,
 })
 

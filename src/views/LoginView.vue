@@ -12,8 +12,8 @@
       <div class="w-24 h-24 bg-white rounded-3xl shadow-2xl flex items-center justify-center mb-6">
         <span class="text-5xl">📦</span>
       </div>
-      <h1 class="text-4xl font-bold text-white tracking-tight">彌陀之家</h1>
-      <p class="text-white/70 text-lg mt-1">東林寺庫存管理系統</p>
+      <h1 class="text-4xl font-bold text-white tracking-tight">彌陀之家東林寺</h1>
+      <p class="text-white/70 text-lg mt-1">庫存管理系統</p>
     </div>
 
     <!-- 登入卡片 -->
@@ -35,24 +35,6 @@
           alt="Google"
         />
         <span>使用 Google 帳號登入</span>
-      </button>
-
-      <!-- LINE 登入 -->
-      <button
-        class="btn w-full text-lg text-white gap-3"
-        style="background:#06C755; box-shadow: 0 8px 20px rgba(6,199,85,0.35);"
-        :disabled="loading"
-        @click="handleLine"
-      >
-        <svg class="w-6 h-6" viewBox="0 0 48 48" fill="none">
-          <path d="M24 4C13 4 4 12.1 4 22.2c0 8.6 7.2 15.9 17 17.7.7.1 1.6.5 1.8 1.1.2.5.1 1.3 0 1.8l-.3 1.7c-.1.5-.4 2 1.8 1.1 2.2-.9 11.7-6.9 16-11.8C43.5 30 44 26.3 44 22.2 44 12.1 35 4 24 4z" fill="white"/>
-          <path d="M36 26.5h-6.5c-.3 0-.5-.2-.5-.5v-9.5c0-.3.2-.5.5-.5s.5.2.5.5V25.5H36c.3 0 .5.2.5.5s-.2.5-.5.5z" fill="#06C755"/>
-          <path d="M19.5 26.5c-.3 0-.5-.2-.5-.5V16.5c0-.3.2-.5.5-.5s.5.2.5.5V26c0 .3-.2.5-.5.5z" fill="#06C755"/>
-          <path d="M27 26.5h-5c-.3 0-.5-.2-.5-.5V16.5c0-.3.2-.5.5-.5H27c.3 0 .5.2.5.5s-.2.5-.5.5h-4.5V21H27c.3 0 .5.2.5.5s-.2.5-.5.5h-4.5v3.5H27c.3 0 .5.2.5.5s-.2.5-.5.5z" fill="#06C755"/>
-          <path d="M16.5 26.5c-.2 0-.4-.1-.4-.3l-5-9c-.1-.2 0-.5.2-.6.2-.1.5 0 .6.2v.1L17 26c.1.2 0 .5-.2.6-.1 0-.2.0-.3 0z" fill="#06C755"/>
-          <path d="M11.5 26.5c-.3 0-.5-.2-.5-.5V16.5c0-.3.2-.5.5-.5s.5.2.5.5V26c0 .3-.2.5-.5.5z" fill="#06C755"/>
-        </svg>
-        <span>使用 LINE 帳號登入</span>
       </button>
 
       <!-- 錯誤訊息 -->
@@ -97,14 +79,5 @@ async function handleGoogle() {
   } finally {
     loading.value = false
   }
-}
-
-function handleLine() {
-  errorMsg.value = ''
-  if (!import.meta.env.VITE_LINE_CHANNEL_ID) {
-    errorMsg.value = 'LINE Login 尚未設定，請聯絡管理員。'
-    return
-  }
-  authStore.loginWithLine()
 }
 </script>

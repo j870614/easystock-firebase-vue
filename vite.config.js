@@ -4,7 +4,7 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/easystock-firebase-vue/',
+  base: '/',
   plugins: [vue()],
   resolve: {
     alias: {

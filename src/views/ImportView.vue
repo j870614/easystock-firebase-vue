@@ -266,8 +266,14 @@ async function doImport() {
   const locId = targetLoc.id
 
   try {
-    // Firestore writeBatch 最多 500 筆，但初期庫存不會超過
     const batch = writeBatch(db)
+
+    // 取得現有庫存
+    const stocksSnap = await getDocs(query(collection(db, 'stocks'), where('locationId', '==', locId)))
+    const existingStocks = {}
+    stocksSnap.forEach(d => {
+      existingStocks[d.data().productId] = d.data().currentStock || 0
+    })
 
     for (const row of validRows) {
       const stockDocId = `${locId}_${row.productId}`
@@ -278,26 +284,32 @@ async function doImport() {
         currentStock: row.qty,
       }, { merge: false }) // 強制覆蓋
 
-      // 新增一筆 adjust 類型的交易紀錄作為稽核軌跡
-      const txRef = doc(collection(db, 'transactions'))
-      batch.set(txRef, {
-        locationId: locId,
-        date:       new Date().toISOString().slice(0, 10),
-        timestamp:  serverTimestamp(),
-        type:       'in',
-        productId:  row.productId,
-        productSnapshot: {
-          name:  row.productName,
-          spec:  row.spec,
-          price: 0,
-        },
-        qty:      row.qty,
-        note:     '期初庫存匯入',
-        operator: {
-          uid:  authStore.user.uid,
-          name: authStore.user.displayName,
-        },
-      })
+      const oldStock = existingStocks[row.productId] || 0
+      const diff = row.qty - oldStock
+
+      if (diff !== 0) {
+        // 新增一筆 adjust 類型的交易紀錄作為稽核軌跡
+        const txRef = doc(collection(db, 'transactions'))
+        batch.set(txRef, {
+          locationId: locId,
+          date:       new Date().toISOString().slice(0, 10),
+          timestamp:  serverTimestamp(),
+          type:       diff > 0 ? 'in' : 'out',
+          productId:  row.productId,
+          productSnapshot: {
+            name:  row.productName,
+            spec:  row.spec,
+            price: 0,
+          },
+          qty:      Math.abs(diff),
+          note:     '期初庫存匯入 (差異調整)',
+          operator: {
+            uid:  authStore.user.uid,
+            name: authStore.user.displayName,
+            dharmaName: authStore.profile?.dharmaName || '',
+          },
+        })
+      }
       count++
     }
 

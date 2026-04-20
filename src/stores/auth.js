@@ -5,6 +5,8 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signOut as firebaseSignOut,
+  setPersistence,
+  browserSessionPersistence,
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
 import { auth, googleProvider, db } from '@/firebase'
@@ -31,11 +33,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** 監聽 Firebase Auth 狀態（在 main.js 初始化時呼叫） */
   function init() {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
+      // 強制等待持久化設定完成
+      await setPersistence(auth, browserSessionPersistence)
+      
       onAuthStateChanged(auth, async (firebaseUser) => {
         user.value = firebaseUser
         if (firebaseUser) {
-          await loadProfile(firebaseUser) // 這裡必須 await，確保角色資料回來才放行路由
+          await loadProfile(firebaseUser)
         } else {
           profile.value = null
           stopProfileListener()
@@ -97,24 +102,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** LINE Login OAuth 跳頁 */
-  function loginWithLine() {
-    const channelId = import.meta.env.VITE_LINE_CHANNEL_ID
-    const redirectUri = encodeURIComponent(`${location.origin}/auth/line/callback`)
-    const state = crypto.randomUUID()
-    sessionStorage.setItem('line_oauth_state', state)
-
-    const lineAuthUrl =
-      `https://access.line.me/oauth2/v2.1/authorize?` +
-      `response_type=code` +
-      `&client_id=${channelId}` +
-      `&redirect_uri=${redirectUri}` +
-      `&state=${state}` +
-      `&scope=profile%20openid%20email`
-
-    location.href = lineAuthUrl
-  }
-
   /** 登出 */
   async function signOut() {
     stopProfileListener()
@@ -137,7 +124,6 @@ export const useAuthStore = defineStore('auth', () => {
     assignedLocationId,
     init,
     loginWithGoogle,
-    loginWithLine,
     signOut,
   }
 })

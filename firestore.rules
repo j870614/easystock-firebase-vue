@@ -7,20 +7,19 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function myRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
     function isOwner() {
-      return isAuth() && myRole() == 'owner';
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
     }
 
     function isAdmin() {
-      return isAuth() && myRole() in ['owner', 'admin'];
+      return isAuth() && (
+        request.auth.uid == 'j1LNiIEkZY61JDVytWFuQWfogB3' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin']
+      );
     }
 
     function isStaff() {
-      return isAuth() && myRole() in ['owner', 'admin', 'staff'];
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'staff'];
     }
 
     // ── users 集合 ────────────────────────────────────────────
@@ -32,6 +31,10 @@ service cloud.firestore {
       // 自己新增自己（首次登入）
       allow create: if isAuth() && request.auth.uid == uid
                     && request.resource.data.role == 'pending';
+
+      // 自己更新自己的個人資料（僅限 profileSubmitted 流程欄位）
+      allow update: if isAuth() && request.auth.uid == uid
+                    && request.resource.data.role == resource.data.role;
 
       // owner 可更新任何欄位（包含 role）
       allow update: if isOwner();
@@ -79,6 +82,13 @@ service cloud.firestore {
     match /settings/{docId} {
       allow read:   if isAuth();
       allow write:  if isOwner();
+    }
+
+    // ── duties 集合（執事選項）───────────────────────────
+    // 所有已登入用戶可讀（PendingView 需要），只有管理員以上可管理
+    match /duties/{dutyId} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
     }
 
   }
