@@ -17,7 +17,9 @@
           <span v-else>🙏 認供結緣</span>
         </div>
         <div class="flex items-center gap-1.5 ml-auto">
-          <span class="text-xs font-bold transition-colors whitespace-nowrap" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-gray-400'">補貨</span>
+          <span class="text-xs font-bold transition-colors whitespace-nowrap text-gray-500">
+            {{ appStore.isReplenishMode ? '切換成結緣模式' : '切換成入庫模式' }}
+          </span>
           <el-switch v-model="appStore.isReplenishMode" style="--el-switch-on-color: #22c55e;" />
         </div>
         <div class="w-full sm:w-auto">

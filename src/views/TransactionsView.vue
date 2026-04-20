@@ -207,6 +207,7 @@ async function submitEdit() {
   }
 
   submitting.value = true
+  loading.value = true
   try {
     await runTransaction(db, async (t) => {
       const locId = appStore.selectedLocationId
@@ -251,6 +252,7 @@ async function submitEdit() {
     alert(e.message || '修改失敗')
   } finally {
     submitting.value = false
+    loading.value = false
   }
 }
 
@@ -259,6 +261,7 @@ async function deleteTx(tx) {
   if (confirmObj !== 'delete') return
 
   submitting.value = true
+  loading.value = true
   try {
     await runTransaction(db, async (t) => {
       const locId = appStore.selectedLocationId
@@ -290,6 +293,7 @@ async function deleteTx(tx) {
     alert(e.message || '刪除失敗')
   } finally {
     submitting.value = false
+    loading.value = false
   }
 }
 
