@@ -5,18 +5,56 @@
       <p class="text-gray-500">請先選擇道場</p>
     </div>
     <template v-else>
-      <!-- 篩選列 -->
-      <div class="flex gap-2 mb-4 overflow-x-auto pb-1">
-        <button
-          v-for="f in filters"
-          :key="f.value"
-          class="flex-shrink-0 px-4 py-2 rounded-xl border-2 font-medium transition-all"
-          :style="{ fontSize: 'var(--fs-main)' }"
-          :class="activeFilter === f.value
-            ? 'border-brand-500 bg-brand-50 text-brand-700'
-            : 'border-gray-200 bg-white text-gray-600'"
-          @click="activeFilter = f.value; listen()"
-        >{{ f.label }}</button>
+      <!-- 篩選列：類型與日期 -->
+      <div class="flex flex-col gap-3 mb-4">
+        <!-- 交易類型 -->
+        <div class="flex gap-2 overflow-x-auto pb-1">
+          <button
+            v-for="f in filters"
+            :key="f.value"
+            class="flex-shrink-0 px-4 py-2 rounded-xl border-2 font-medium transition-all"
+            :style="{ fontSize: 'var(--fs-main)' }"
+            :class="activeFilter === f.value
+              ? 'border-brand-500 bg-brand-50 text-brand-700'
+              : 'border-gray-200 bg-white text-gray-600'"
+            @click="activeFilter = f.value; resetPageAndListen()"
+          >{{ f.label }}</button>
+        </div>
+        
+        <!-- 時段篩選 (與報表類似) -->
+        <div class="flex flex-wrap items-center gap-2">
+           <div class="flex gap-1 overflow-x-auto">
+             <button class="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm border font-medium transition-all" :class="dateFilterType === 'all' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="dateFilterType = 'all'; resetPageAndListen()">全部時間</button>
+             <button class="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm border font-medium transition-all" :class="dateFilterType === 'month' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="dateFilterType = 'month'; resetPageAndListen()">按月份</button>
+             <button class="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm border font-medium transition-all" :class="dateFilterType === 'custom' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="dateFilterType = 'custom'; resetPageAndListen()">自訂區間</button>
+           </div>
+           
+           <div class="w-full sm:w-auto flex-1 min-w-[200px]">
+              <el-date-picker
+                v-if="dateFilterType === 'month'"
+                v-model="selectedMonth"
+                type="month"
+                placeholder="選擇月份"
+                value-format="YYYY-MM"
+                class="w-full h-10"
+                :clearable="false"
+                @change="resetPageAndListen"
+              />
+              <el-config-provider v-else-if="dateFilterType === 'custom'" :locale="zhTwLocale">
+                <el-date-picker
+                  v-model="selectedRange"
+                  type="daterange"
+                  range-separator="-"
+                  start-placeholder="開始"
+                  end-placeholder="結束"
+                  value-format="YYYY-MM-DD"
+                  class="w-full h-10"
+                  :clearable="false"
+                  @change="resetPageAndListen"
+                />
+              </el-config-provider>
+           </div>
+        </div>
       </div>
 
       <div v-if="loading" class="flex justify-center py-12">
@@ -75,6 +113,34 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- 分頁操作區 -->
+      <div v-if="transactions.length > 0 || currentPage > 0" class="flex justify-between items-center mt-6 pt-4 pb-32 border-t border-gray-100">
+        <button
+          class="px-4 py-2 flex items-center justify-center rounded-xl bg-white border border-gray-200 font-medium text-gray-600 transition-all hover:bg-gray-50 active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:bg-gray-100"
+          :disabled="currentPage === 0 || loading"
+          @click="changePage(-1)"
+        >
+          上一頁
+        </button>
+        <div class="flex items-center gap-2">
+          <select v-model="pageSize" @change="resetPageAndListen" class="border flex-shrink-0 border-gray-200 rounded-lg text-sm bg-white py-1.5 pl-2 pr-1 shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-500">
+            <option :value="10">10 筆/頁</option>
+            <option :value="20">20 筆/頁</option>
+            <option :value="50">50 筆/頁</option>
+          </select>
+          <div class="text-sm text-gray-500 whitespace-nowrap">
+            第 {{ currentPage + 1 }} 頁
+          </div>
+        </div>
+        <button
+          class="px-4 py-2 flex items-center justify-center rounded-xl bg-white border border-gray-200 font-medium text-brand-600 transition-all hover:bg-brand-50 hover:border-brand-200 active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:bg-gray-100 disabled:text-gray-400"
+          :disabled="!hasMore || loading"
+          @click="changePage(1)"
+        >
+          下一頁
+        </button>
       </div>
       
       <!-- 編輯 Dialog -->
@@ -152,12 +218,15 @@
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { collection, query, where, onSnapshot, orderBy, limit, doc, runTransaction, serverTimestamp } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, orderBy, limit, doc, runTransaction, serverTimestamp, startAfter } from 'firebase/firestore'
 import { Building2, History, ArrowDownCircle, ArrowUpCircle, MoreVertical, Edit2, Trash2 } from 'lucide-vue-next'
+import zhTw from 'element-plus/es/locale/lang/zh-tw'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/components/AppLayout.vue'
+
+const zhTwLocale = zhTw
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -173,6 +242,20 @@ const filters = [
   { value: 'in',  label: '入庫' },
   { value: 'out', label: '出庫' },
 ]
+
+// Date Filters
+const dateFilterType = ref('all')
+const selectedMonth = ref(`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}`)
+const selectedRange = ref([
+  `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}-01`,
+  `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}-28`
+])
+
+// Pagination
+const pageSize = ref(10)
+const currentPage = ref(0)
+const hasMore = ref(false)
+let pageCursors = [null] // Use a plain array (not ref!) to prevent Vue from proxying Firebase DocumentSnapshot
 
 // Edit States
 const editDialog = ref(false)
@@ -195,6 +278,22 @@ function stopListener() {
   }
 }
 
+function resetPageAndListen() {
+  currentPage.value = 0
+  pageCursors = [null]
+  hasMore.value = false
+  listen()
+}
+
+function changePage(delta) {
+  const newPage = currentPage.value + delta
+  if (newPage < 0) return
+  if (delta === 1 && !hasMore.value) return
+  
+  currentPage.value = newPage
+  listen()
+}
+
 function listen() {
   stopListener()
   transactions.value = [] // 切換條件時先清空資料
@@ -203,16 +302,37 @@ function listen() {
   loading.value = true
   const constraints = [
     where('locationId', '==', appStore.selectedLocationId),
-    orderBy('timestamp', 'desc'),
-    limit(20), // 增加至20筆
   ]
   
   if (activeFilter.value !== 'all') {
-    constraints.unshift(where('type', '==', activeFilter.value))
+    constraints.push(where('type', '==', activeFilter.value))
   }
   
-  // 設定一個 3 秒的 timeout，如果 3 秒內都拿不到伺服器最新資料(可能因為網路不穩/斷線)
-  // 還是要強制關閉 loading，讓使用者能看到快取資料
+  if (dateFilterType.value === 'month') {
+    const monthStart = selectedMonth.value + '-01'
+    const monthEnd = selectedMonth.value + '-31' // 字串比對，31可以涵蓋所有月份結束
+    constraints.push(where('date', '>=', monthStart), where('date', '<=', monthEnd))
+  } else if (dateFilterType.value === 'custom') {
+    constraints.push(where('date', '>=', selectedRange.value[0]), where('date', '<=', selectedRange.value[1]))
+  }
+
+  // 若有 date 區間篩選，Firestore 會要求 orderBy 必須先排 date。為了簡單相容，我們不加 date 排序，而是使用 timestamp 來代替 date 來查詢，或是請使用者補齊 index。
+  // 注意：若沒有額外 index，加入 date range 的 query 若沒有 orderBy date 且與 orderBy timestamp 衝突，會報錯。
+  // 在此我們保留原本的 orderBy('timestamp', 'desc') 但配合上述會報錯，所以改寫邏輯：
+  // "如果有日期篩選，Firestore 強制必須 orderBy('date')"
+  // 因此動態加入 orderBy
+  if (dateFilterType.value !== 'all') {
+    constraints.push(orderBy('date', 'desc'))
+  }
+  constraints.push(orderBy('timestamp', 'desc'))
+  constraints.push(limit(pageSize.value + 1)) // Fetch +1 to check if there is a next page
+
+  // Pagination Cursor
+  const cursor = pageCursors[currentPage.value]
+  if (cursor) {
+    constraints.push(startAfter(cursor))
+  }
+  
   fallbackTimer = setTimeout(() => {
     loading.value = false
   }, 3000)
@@ -220,16 +340,28 @@ function listen() {
   const q = query(collection(db, 'transactions'), ...constraints)
   
   unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
-    transactions.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    // Pagination logic: check if we got the extra doc
+    hasMore.value = snap.docs.length > pageSize.value
     
-    // 如果資料真的來到了，而且是來自伺服器的最新資料 (!fromCache) 
-    // 或是剛剛才在設備上做出的本地變更 (hasPendingWrites) => 關閉 loading
+    // Slice off the extra doc for display
+    const visibleDocs = snap.docs.slice(0, pageSize.value)
+    transactions.value = visibleDocs.map(d => ({ id: d.id, ...d.data() }))
+    
+    // Store cursor for the next page
+    if (hasMore.value) {
+      pageCursors[currentPage.value + 1] = visibleDocs[visibleDocs.length - 1]
+    }
+    
     if (!snap.metadata.fromCache || snap.metadata.hasPendingWrites) {
       loading.value = false
       if (fallbackTimer) clearTimeout(fallbackTimer)
     }
   }, (err) => {
     console.error('Transactions listener error:', err)
+    // Here we can alert the admin to create the missing index if needed
+    if (err.message.includes('index')) {
+      console.warn("Missing index for query. Please check Firebase Console.")
+    }
     loading.value = false
     if (fallbackTimer) clearTimeout(fallbackTimer)
   })
@@ -352,7 +484,7 @@ async function confirmDelete() {
   }
 }
 
-watch(() => [appStore.selectedLocationId, activeFilter.value], listen)
-onMounted(listen)
+watch(() => appStore.selectedLocationId, resetPageAndListen)
+onMounted(resetPageAndListen)
 onUnmounted(stopListener)
 </script>

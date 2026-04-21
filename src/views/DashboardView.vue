@@ -40,8 +40,89 @@
       </div>
 
       <template v-else>
-        <h2 class="font-semibold text-gray-500 mb-3" :style="{ fontSize: 'var(--fs-main)' }">各品項庫存</h2>
-        <div class="grid grid-cols-2 gap-3 mb-4">
+        <!-- 顯示選項與篩選 -->
+        <div class="mb-5 space-y-3">
+          <!-- 標題與切換 -->
+          <div class="flex items-center justify-between">
+            <h2 class="font-semibold text-gray-500" :style="{ fontSize: 'var(--fs-main)' }">各品項庫存</h2>
+            <div class="flex items-center gap-3">
+              <div class="flex gap-2 text-xs">
+                <button
+                  class="text-brand-600 hover:underline"
+                  @click="selectAllProducts"
+                  v-if="selectedGroupNames.length !== productGroups.length"
+                >全選</button>
+                <button
+                  class="text-gray-400 hover:underline"
+                  @click="selectedGroupNames = []"
+                  v-else
+                >取消全選</button>
+              </div>
+              <div class="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg p-1">
+                 <button class="p-1 rounded-md transition-colors" :class="viewMode === 'card' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'" @click="viewMode = 'card'">
+                   <LayoutGrid class="w-4 h-4"/>
+                 </button>
+                 <button class="p-1 rounded-md transition-colors" :class="viewMode === 'list' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'" @click="viewMode = 'list'">
+                   <List class="w-4 h-4"/>
+                 </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 篩選標籤 -->
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="name in productGroups"
+              :key="name"
+              class="px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all"
+              :class="selectedGroupNames.includes(name)
+                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'"
+              @click="toggleProduct(name)"
+            >
+              {{ name }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 清單模式 -->
+        <div v-if="viewMode === 'list'" class="flex flex-col gap-2 mb-4">
+          <div
+            v-for="item in stockItems"
+            :key="item.id"
+            class="card flex items-center justify-between p-3 relative overflow-hidden"
+            :class="item.currentStock <= (item.minStock || 0) ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-green-500'"
+          >
+            <div class="flex items-center gap-3">
+              <div
+                class="w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold text-white shadow-sm flex-shrink-0"
+                :class="item.currentStock <= (item.minStock || 0) ? 'bg-red-400' : 'bg-green-500'"
+              >
+                {{ String(item.name).charAt(0) }}
+              </div>
+              <div class="leading-snug break-words" :class="item.currentStock <= (item.minStock || 0) ? 'text-red-900' : 'text-gray-800'" :style="{ fontSize: 'var(--fs-name)' }">
+                <span class="font-bold">{{ item.name }}</span>
+                <div v-if="item.spec" class="text-sm text-gray-500">{{ item.spec }}</div>
+              </div>
+            </div>
+            
+            <div class="text-right">
+              <div
+                class="text-xl font-bold"
+                :class="item.currentStock <= (item.minStock || 0) ? 'text-red-600' : 'text-gray-800'"
+              >
+                {{ item.currentStock }}
+              </div>
+              <div v-if="item.currentStock <= (item.minStock || 0)" class="text-[10px] text-red-500 font-bold bg-red-50 px-1 rounded">
+                注補 (安全: {{ item.minStock || 0 }})
+              </div>
+            </div>
+          </div>
+          <div v-if="stockItems.length === 0" class="py-10 text-center text-gray-400">目前沒有符合的品項</div>
+        </div>
+
+        <!-- 卡片模式 -->
+        <div v-else class="grid grid-cols-2 gap-3 mb-4">
           <div
             v-for="item in stockItems"
             :key="item.id"
@@ -69,6 +150,7 @@
               件（安全: {{ item.minStock || 0 }}）
             </div>
           </div>
+          <div v-if="stockItems.length === 0" class="col-span-2 py-10 text-center text-gray-400">目前沒有符合的品項</div>
         </div>
 
         <!-- 今日統計 -->
@@ -93,7 +175,7 @@
 <script setup>
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore'
-import { Building2, MapPin } from 'lucide-vue-next'
+import { Building2, MapPin, LayoutGrid, List } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -109,6 +191,26 @@ const todayOut = ref(0)
 let unsubscribeStocks = null
 let unsubscribeTx = null
 
+const viewMode = ref('card')
+const selectedGroupNames = ref([])
+
+const productGroups = computed(() => {
+  const names = []
+  const seen = new Set()
+  appStore.activeProducts.forEach(p => {
+    // 檢查是不是在目前道場停用
+    const locId = appStore.selectedLocationId
+    const locOverride = p.overrides?.[locId]
+    if (locOverride && locOverride.isActive === false) return
+    
+    if (!seen.has(p.name)) {
+      seen.add(p.name)
+      names.push(p.name)
+    }
+  })
+  return names
+})
+
 const today = computed(() =>
   new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
 )
@@ -120,11 +222,39 @@ const roleLabel = computed(() => ({
 }[authStore.role] ?? '待審核'))
 
 const stockItems = computed(() => {
-  return appStore.activeProducts.map(p => ({
+  let items = appStore.activeProducts.map(p => ({
     ...p,
     currentStock: stockMap.value[p.id] ?? 0,
   }))
+  
+  // 先過濾被目前道場停用的
+  const locId = appStore.selectedLocationId
+  items = items.filter(p => {
+    const locOverride = p.overrides?.[locId]
+    if (locOverride && locOverride.isActive === false) return false
+    return true
+  })
+  
+  // 篩選選中的標籤 (如果有選)
+  if (selectedGroupNames.value.length > 0) {
+    items = items.filter(p => selectedGroupNames.value.includes(p.name))
+  }
+  
+  return items
 })
+
+function selectAllProducts() {
+  selectedGroupNames.value = [...productGroups.value]
+}
+
+function toggleProduct(name) {
+  const idx = selectedGroupNames.value.indexOf(name)
+  if (idx === -1) {
+    selectedGroupNames.value.push(name)
+  } else {
+    selectedGroupNames.value.splice(idx, 1)
+  }
+}
 
 function stopListeners() {
   if (unsubscribeStocks) {

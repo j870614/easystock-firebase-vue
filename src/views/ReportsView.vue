@@ -124,6 +124,16 @@
               </template>
             </tr>
           </tbody>
+          <tfoot>
+            <tr v-if="previewData.length > 0" class="bg-brand-50 border-t-2 border-brand-200">
+              <td colspan="2" class="border p-2 text-center font-bold text-gray-700">合計總數</td>
+              <template v-for="p in groupedProducts" :key="'sum_'+p.id">
+                <td class="border p-2 text-center text-green-600 font-semibold">{{ totalSums[p.id]?.in > 0 ? totalSums[p.id].in : '' }}</td>
+                <td class="border p-2 text-center text-red-600 font-semibold">{{ totalSums[p.id]?.out > 0 ? totalSums[p.id].out : '' }}</td>
+                <td class="border p-2 text-center text-gray-400">—</td>
+              </template>
+            </tr>
+          </tfoot>
         </table>
       </div>
 
@@ -196,6 +206,29 @@ const isDataReady = computed(() => {
   if (exportType.value === 'month') return !!selectedMonth.value
   if (exportType.value === 'custom') return !!(selectedRange.value && selectedRange.value.length === 2)
   return false
+})
+
+const timeLabel = computed(() => {
+  if (exportType.value === 'year') return `${selectedYear.value}年`
+  if (exportType.value === 'month') return `${selectedMonth.value}`
+  if (exportType.value === 'custom') return `${selectedRange.value[0]}至${selectedRange.value[1]}`
+  return ''
+})
+
+const totalSums = computed(() => {
+  const sums = {}
+  groupedProducts.value.forEach(p => {
+    sums[p.id] = { in: 0, out: 0 }
+  })
+  
+  previewData.value.forEach(row => {
+    Object.keys(row.items).forEach(pid => {
+      if (!sums[pid]) sums[pid] = { in: 0, out: 0 }
+      sums[pid].in += (row.items[pid].in || 0)
+      sums[pid].out += (row.items[pid].out || 0)
+    })
+  })
+  return sums
 })
 
 const reportTitle = computed(() => {
@@ -349,10 +382,7 @@ async function exportExcel() {
     }
 
     const locName = appStore.selectedLocation?.name ?? '道場'
-    let timeLabel = selectedYear.value + '年'
-    if (exportType.value === 'month') timeLabel = selectedMonth.value
-    if (exportType.value === 'custom') timeLabel = selectedRange.value[0] + '至' + selectedRange.value[1]
-
+    
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('出入庫明細', { views: [{ state: 'frozen', xSplit: 2, ySplit: 3 }] })
 
@@ -427,6 +457,41 @@ async function exportExcel() {
       ws.getColumn(3 + i * 3 + 1).width = 8
       ws.getColumn(3 + i * 3 + 2).width = 10
     }
+    
+    // ── 合計列
+    ws.mergeCells(rowIdx, 1, rowIdx, 2)
+    const sumLabelCell = ws.getCell(rowIdx, 1)
+    sumLabelCell.value = '合計總數'
+    sumLabelCell.font = { bold: true, size: 12 }
+    sumLabelCell.alignment = { horizontal: 'center', vertical: 'middle' }
+    sumLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F0FA' } }
+    
+    if (products.length > 0) {
+      products.forEach((p, i) => {
+        const startCol = 3 + i * 3
+        const sums = totalSums.value[p.id] || { in: 0, out: 0 }
+        
+        const inCell = ws.getCell(rowIdx, startCol)
+        inCell.value = sums.in > 0 ? sums.in : ''
+        inCell.font = { bold: true, size: 12, color: { argb: 'FF166534' } }
+        inCell.alignment = { horizontal: 'center', vertical: 'middle' }
+        inCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F0FA' } }
+        
+        const outCell = ws.getCell(rowIdx, startCol + 1)
+        outCell.value = sums.out > 0 ? sums.out : ''
+        outCell.font = { bold: true, size: 12, color: { argb: 'FFDC2626' } }
+        outCell.alignment = { horizontal: 'center', vertical: 'middle' }
+        outCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F0FA' } }
+        
+        const stockCell = ws.getCell(rowIdx, startCol + 2)
+        stockCell.value = '—'
+        stockCell.font = { bold: true, size: 12, color: { argb: 'FF9CA3AF' } }
+        stockCell.alignment = { horizontal: 'center', vertical: 'middle' }
+        stockCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6F0FA' } }
+      })
+    }
+    ws.getRow(rowIdx).height = 25
+    rowIdx++
 
     // ── 外框設置
     ws.eachRow((row, rowNumber) => {
@@ -450,7 +515,7 @@ async function exportExcel() {
     const url    = URL.createObjectURL(blob)
     const a      = document.createElement('a')
     a.href = url
-    a.download = `${locName}_${timeLabel}_出入庫明細.xlsx`
+    a.download = `${locName}_${timeLabel.value}_出入庫明細.xlsx`
     a.click()
     URL.revokeObjectURL(url)
   } catch (e) {

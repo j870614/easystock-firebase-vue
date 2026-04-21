@@ -35,8 +35,88 @@
         </div>
       </div>
 
-      <!-- POS 品項網格 -->
+      <!-- 篩選列：標題與切換 -->
+      <div class="mb-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="flex gap-2 text-xs">
+              <button
+                class="text-brand-600 hover:underline"
+                @click="selectAllProducts"
+                v-if="selectedGroupNames.length !== productGroups.length"
+              >全選</button>
+              <button
+                class="text-gray-400 hover:underline"
+                @click="selectedGroupNames = []"
+                v-else
+              >取消全選</button>
+            </div>
+            <div class="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg p-1">
+               <button class="p-1 rounded-md transition-colors" :class="viewMode === 'card' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'" @click="viewMode = 'card'">
+                 <LayoutGrid class="w-4 h-4"/>
+               </button>
+               <button class="p-1 rounded-md transition-colors" :class="viewMode === 'list' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'" @click="viewMode = 'list'">
+                 <List class="w-4 h-4"/>
+               </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 面包屑式的篩選標籤 -->
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="name in productGroups"
+            :key="name"
+            class="px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all"
+            :class="selectedGroupNames.includes(name)
+              ? 'border-brand-500 bg-brand-50 text-brand-700'
+              : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'"
+            @click="toggleProduct(name)"
+          >
+            {{ name }}
+          </button>
+        </div>
+      </div>
+
+      <!-- POS 品項顯示 -->
       <div v-if="loadingProducts" class="text-gray-400 py-10 text-center">載入中…</div>
+      
+      <!-- 清單模式 -->
+      <div v-else-if="viewMode === 'list'" class="flex flex-col gap-2 pb-32" :class="{'pb-72': cart.length > 0}">
+        <button
+          v-for="(group, name) in groupedProducts"
+          :key="name"
+          class="card flex items-center p-3 gap-4 transition-all active:scale-95 border-2 text-left relative"
+          :class="appStore.isReplenishMode ? 'border-transparent hover:border-green-300' : 'border-transparent hover:border-brand-300'"
+          @click="openProductSelect(name, group)"
+        >
+          <div v-if="hasLowStock(group)" class="absolute top-1 left-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-sm"></div>
+          <div
+            class="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold text-white shadow-sm flex-shrink-0"
+            :class="appStore.isReplenishMode ? 'bg-green-400' : 'bg-brand-500'"
+          >
+            {{ String(name).charAt(0) }}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-gray-800 break-words" :style="{ fontSize: 'var(--fs-name)' }">{{ name }}</div>
+            <div v-if="group.length > 1" class="text-gray-400 text-sm mt-0.5">
+              {{ group.length }} 種規格
+            </div>
+          </div>
+          <div v-if="group.length === 1" class="text-right">
+             <div class="text-sm font-bold" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-brand-600'">
+               <span v-if="!appStore.isReplenishMode">${{ getProductPrice(group[0]) }}</span>
+             </div>
+             <div class="text-xs text-gray-500 mt-0.5">總庫存 {{ getStock(group[0].id) }}</div>
+          </div>
+          <div v-else class="text-gray-400 pl-2 border-l border-gray-100 flex items-center justify-center h-full">
+            <ChevronRight class="w-5 h-5"/>
+          </div>
+        </button>
+        <div v-if="Object.keys(groupedProducts).length === 0" class="py-10 text-center text-gray-400">目前沒有符合的品項</div>
+      </div>
+
+      <!-- 卡片模式 (原版網格) -->
       <div v-else class="grid gap-3 pb-32" :class="[appStore.fontScale === 2 ? 'grid-cols-1' : 'grid-cols-2', { 'pb-72': cart.length > 0 }]">
         <button
           v-for="(group, name) in groupedProducts"
@@ -70,6 +150,7 @@
             </div>
           </div>
         </button>
+        <div v-if="Object.keys(groupedProducts).length === 0" class="col-span-2 py-10 text-center text-gray-400">目前沒有符合的品項</div>
       </div>
 
       <!-- 選擇規格加入清單的 Dialog -->
@@ -120,7 +201,7 @@
                
                <div class="flex items-center gap-1">
                  <button class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 active:bg-gray-200" @click="updateCartQty(idx, -1)"><Minus class="w-4 h-4"/></button>
-                 <span class="w-10 text-center font-bold text-lg">{{ item.qty }}</span>
+                 <input type="number" inputmode="numeric" v-model.number="item.qty" @change="validateCartQty(idx)" class="w-12 text-center font-bold text-lg border border-gray-200 rounded-md focus:outline-none focus:border-brand-400 py-1" min="1" />
                  <button class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 active:bg-gray-200" @click="updateCartQty(idx, 1)"><Plus class="w-4 h-4"/></button>
                </div>
                
@@ -141,10 +222,45 @@
           </div>
           
           <div class="p-4 pt-2">
-             <div class="flex justify-between items-center px-2 mb-3 text-lg font-bold text-gray-800" v-if="!appStore.isReplenishMode">
-                <span>總計金額</span>
-                <span class="text-brand-600">${{ cartTotalPrice }}</span>
+             <div v-if="!appStore.isReplenishMode" class="mb-4 space-y-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+               <!-- 小計 -->
+               <div class="flex justify-between items-center text-gray-600">
+                  <span>小計</span>
+                  <span class="font-bold text-lg">${{ cartTotalPrice }}</span>
+               </div>
+               
+               <!-- 實收金額 -->
+               <div class="flex justify-between items-center">
+                  <span class="font-bold text-gray-800">實收金額</span>
+                  <div class="relative">
+                    <span class="absolute left-3 top-2 text-gray-500 font-bold">$</span>
+                    <input
+                      type="number"
+                      inputmode="numeric"
+                      v-model.number="receivedAmount"
+                      class="w-32 pl-7 pr-3 py-1.5 text-right font-bold text-xl text-brand-600 border-2 border-brand-200 rounded-xl focus:outline-none focus:border-brand-500 bg-white"
+                      min="0"
+                    />
+                  </div>
+               </div>
+
+               <!-- 支付方式 -->
+               <div class="flex gap-2 pt-2 border-t border-gray-200">
+                  <label class="flex-1 cursor-pointer">
+                    <input type="radio" v-model="paymentMethod" value="cash" class="peer sr-only" />
+                    <div class="text-center py-2 rounded-lg border-2 text-sm font-bold transition-all peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-700 border-gray-200 text-gray-500 bg-white">現金</div>
+                  </label>
+                  <label class="flex-1 cursor-pointer">
+                    <input type="radio" v-model="paymentMethod" value="card" class="peer sr-only" />
+                    <div class="text-center py-2 rounded-lg border-2 text-sm font-bold transition-all peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-700 border-gray-200 text-gray-500 bg-white">刷卡</div>
+                  </label>
+                  <label class="flex-1 cursor-pointer">
+                    <input type="radio" v-model="paymentMethod" value="transfer" class="peer sr-only" />
+                    <div class="text-center py-2 rounded-lg border-2 text-sm font-bold transition-all peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-700 border-gray-200 text-gray-500 bg-white">匯款</div>
+                  </label>
+               </div>
              </div>
+             
              <button class="w-full text-xl py-4 rounded-2xl transition-transform active:scale-95 font-bold flex justify-center items-center gap-2"
               :class="appStore.isReplenishMode ? 'bg-green-500 text-white shadow-lg shadow-green-200 hover:bg-green-600' : 'bg-brand-500 text-white shadow-lg shadow-brand-200 hover:bg-brand-600'"
               :disabled="submitting"
@@ -172,7 +288,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { Building2, Minus, Plus, Trash2 } from 'lucide-vue-next'
+import { Building2, Minus, Plus, Trash2, LayoutGrid, List, ChevronRight } from 'lucide-vue-next'
 import {
   collection, query, where, onSnapshot, doc, runTransaction,
   serverTimestamp
@@ -196,8 +312,43 @@ const selectDialog = ref(false)
 const selectedGroupName = ref('')
 const selectedGroupItems = ref([])
 
+const viewMode = ref('card')
+const selectedGroupNames = ref([])
+
+const productGroups = computed(() => {
+  const names = []
+  const seen = new Set()
+  appStore.activeProducts.forEach(p => {
+    // 檢查是不是在目前道場停用
+    const locId = appStore.selectedLocationId
+    const locOverride = p.overrides?.[locId]
+    if (locOverride && locOverride.isActive === false) return
+    
+    if (!seen.has(p.name)) {
+      seen.add(p.name)
+      names.push(p.name)
+    }
+  })
+  return names
+})
+
+function selectAllProducts() {
+  selectedGroupNames.value = [...productGroups.value]
+}
+
+function toggleProduct(name) {
+  const idx = selectedGroupNames.value.indexOf(name)
+  if (idx === -1) {
+    selectedGroupNames.value.push(name)
+  } else {
+    selectedGroupNames.value.splice(idx, 1)
+  }
+}
+
 const cartNote = ref('')
 const cart = ref([])
+const paymentMethod = ref('cash')
+const receivedAmount = ref(0)
 let unsubscribeStocks = null
 
 
@@ -206,7 +357,7 @@ const cartTotalQty = computed(() => {
   return cart.value.reduce((sum, item) => sum + item.qty, 0)
 })
 
-// 分組品項：依據名稱歸類，並過濾掉在該道場停用的品項
+// 分組品項：依據名稱歸類，並過濾掉在該道場停用的品項與不符合搜尋的品項
 const groupedProducts = computed(() => {
   const groups = {}
   const locId = appStore.selectedLocationId
@@ -216,6 +367,11 @@ const groupedProducts = computed(() => {
     // 如果道場有獨立設定不啟用，則略過
     const locOverride = p.overrides?.[locId]
     if (locOverride && locOverride.isActive === false) {
+      return
+    }
+    
+    // 如果有使用標籤過濾，檢查品項名稱是否在過濾名單內
+    if (selectedGroupNames.value.length > 0 && !selectedGroupNames.value.includes(p.name)) {
       return
     }
 
@@ -306,6 +462,18 @@ function updateCartQty(index, delta) {
   }
 }
 
+function validateCartQty(index) {
+  const item = cart.value[index]
+  if (typeof item.qty !== 'number' || isNaN(item.qty) || item.qty < 1) {
+    item.qty = 1
+  }
+}
+
+// 監聽購物車變化以更新實收金額預設值
+watch(cartTotalPrice, (newTotal) => {
+  receivedAmount.value = newTotal
+})
+
 // 監聽模式切換，清空購物車
 watch(() => appStore.isReplenishMode, () => {
   cart.value = []
@@ -382,8 +550,7 @@ async function submitCart() {
         }
 
         // 產生交易紀錄
-        const txDocRef = doc(collection(db, 'transactions'))
-        tx.set(txDocRef, {
+        const txPayload = {
           locationId: locId,
           date: currentDate,
           timestamp: serverTimestamp(),
@@ -401,7 +568,16 @@ async function submitCart() {
             name: authStore.user.displayName,
             dharmaName: authStore.profile?.dharmaName || '',
           },
-        })
+        }
+
+        if (currentTxType === 'out') {
+          txPayload.orderSubtotal = cartTotalPrice.value
+          txPayload.orderReceivedAmount = receivedAmount.value
+          txPayload.paymentMethod = paymentMethod.value
+        }
+
+        const txDocRef = doc(collection(db, 'transactions'))
+        tx.set(txDocRef, txPayload)
       }
     })
 
