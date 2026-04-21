@@ -1,4 +1,4 @@
-import{an as a}from"./index-CrFcEPBc.js";/**
+import{aq as a}from"./index-Cnrrgkc_.js";/**
  * @license lucide-vue-next v0.477.0 - ISC
  *
  * This source code is licensed under the ISC license.
@@ -13,7 +13,7 @@ import{an as a}from"./index-CrFcEPBc.js";/**
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const h=({size:e,strokeWidth:t=2,absoluteStrokeWidth:r,color:s,iconNode:c,name:i,class:w,...l},{slots:n})=>a("svg",{...o,width:e||o.width,height:e||o.height,stroke:s||o.stroke,"stroke-width":r?Number(t)*24/Number(e):t,class:["lucide",`lucide-${d(i??"icon")}`],...l},[...c.map(u=>a(...u)),...n.default?[n.default()]:[]]);/**
+ */const h=({size:e,strokeWidth:t=2,absoluteStrokeWidth:r,color:s,iconNode:n,name:i,class:w,...l},{slots:c})=>a("svg",{...o,width:e||o.width,height:e||o.height,stroke:s||o.stroke,"stroke-width":r?Number(t)*24/Number(e):t,class:["lucide",`lucide-${d(i??"icon")}`],...l},[...n.map(u=>a(...u)),...c.default?[c.default()]:[]]);/**
  * @license lucide-vue-next v0.477.0 - ISC
  *
  * This source code is licensed under the ISC license.
