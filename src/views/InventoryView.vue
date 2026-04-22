@@ -183,115 +183,123 @@
 
       <!-- 購物車 Bottom Sheet -->
       <transition name="slide-up">
-        <div v-if="cart.length > 0" class="fixed left-0 right-0 z-40 mx-auto max-w-[480px] bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col max-h-[80vh] overflow-y-auto" style="bottom: calc(64px + env(safe-area-inset-bottom));">
-          <div class="p-4 rounded-t-3xl border-b flex justify-between items-center" :class="appStore.isReplenishMode ? 'bg-green-500 text-white' : 'bg-brand-500 text-white'">
-            <div class="font-bold text-lg">
-              待{{ appStore.isReplenishMode ? '入庫' : '結緣' }}清單
+        <div v-if="cart.length > 0" class="fixed left-0 right-0 z-40 mx-auto max-w-[480px] bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col transition-all duration-300 ease-in-out" :class="isCartCollapsed ? 'max-h-[64px]' : 'max-h-[calc(100dvh-160px)]'" style="bottom: calc(4.5rem + env(safe-area-inset-bottom));">
+          <!-- 固定頭部 -->
+          <div class="p-4 rounded-t-3xl border-b flex justify-between items-center cursor-pointer select-none" :class="appStore.isReplenishMode ? 'bg-green-500 text-white' : 'bg-brand-500 text-white'" @click="isCartCollapsed = !isCartCollapsed">
+            <div class="flex items-center gap-2">
+              <ChevronDown v-if="!isCartCollapsed" class="w-5 h-5 transition-transform" />
+              <ChevronUp v-else class="w-5 h-5 transition-transform" />
+              <div class="font-bold text-lg">
+                待{{ appStore.isReplenishMode ? '入庫' : '結緣' }}清單
+              </div>
             </div>
-            <button class="text-sm font-medium opacity-80 hover:opacity-100 px-2 py-1" @click="clearCart">全部清空</button>
+            
+            <div v-if="isCartCollapsed" class="text-sm font-bold bg-white/20 px-3 py-1 rounded-full flex items-center gap-2 animate-in fade-in slide-in-from-right-4">
+              <span>共 {{ cartTotalQty }} 件</span>
+              <span class="opacity-60">|</span>
+              <span>${{ cartTotalPrice }}</span>
+            </div>
+            <button v-else class="text-sm font-medium bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg transition-colors" @click.stop="clearCart">全部清空</button>
           </div>
           
-          <div class="max-h-60 overflow-y-auto p-4 space-y-3 pb-2">
-            <div v-for="(item, idx) in cart" :key="idx" class="flex items-center gap-3 bg-white border p-3 rounded-xl shadow-sm">
-               <div class="flex-1">
-                 <div class="font-bold text-gray-800">{{ item.product.name }}</div>
-                 <div v-if="item.product.spec" class="text-sm text-gray-500">{{ item.product.spec }}</div>
-                 <div class="text-sm text-brand-600 font-bold mt-1" v-if="!appStore.isReplenishMode">{{ item.price }} x {{ item.qty }} = {{ item.price * item.qty }}</div>
-               </div>
-               
-               <div class="flex items-center gap-1">
-                 <button class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 active:bg-gray-200" @click="updateCartQty(idx, -1)"><Minus class="w-4 h-4"/></button>
-                 <input type="number" inputmode="numeric" v-model.number="item.qty" @change="validateCartQty(idx)" class="w-12 text-center font-bold text-lg border border-gray-200 rounded-md focus:outline-none focus:border-brand-400 py-1" min="1" />
-                 <button class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 active:bg-gray-200" @click="updateCartQty(idx, 1)"><Plus class="w-4 h-4"/></button>
-               </div>
-               
-               <button class="p-2 ml-1 text-gray-400 hover:text-red-500 active:scale-90 transition-transform" @click="cart.splice(idx, 1)">
-                 <Trash2 class="w-5 h-5"/>
-               </button>
-            </div>
-          </div>
+          <div v-show="!isCartCollapsed" class="flex flex-col overflow-hidden animate-in slide-in-from-bottom-2 duration-300">
+            <!-- 中間滾動區 -->
+            <div class="overflow-y-auto px-4 py-3 space-y-4 max-h-[calc(100dvh-320px)]">
+              <!-- 品項清單 -->
+              <div class="space-y-3">
+                <div v-for="(item, idx) in cart" :key="idx" class="flex items-center gap-3 bg-white border p-3 rounded-xl shadow-sm">
+                   <div class="flex-1">
+                     <div class="font-bold text-gray-800">{{ item.product.name }}</div>
+                     <div v-if="item.product.spec" class="text-sm text-gray-500">{{ item.product.spec }}</div>
+                     <div class="text-sm text-brand-600 font-bold mt-1" v-if="!appStore.isReplenishMode">{{ item.price }} x {{ item.qty }} = {{ item.price * item.qty }}</div>
+                   </div>
+                   
+                   <div class="flex items-center gap-1">
+                     <button class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 active:bg-gray-200" @click="updateCartQty(idx, -1)"><Minus class="w-4 h-4"/></button>
+                     <input type="number" inputmode="numeric" v-model.number="item.qty" @change="validateCartQty(idx)" class="w-12 text-center font-bold text-lg border border-gray-200 rounded-md focus:outline-none focus:border-brand-400 py-1" min="1" />
+                     <button class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 active:bg-gray-200" @click="updateCartQty(idx, 1)"><Plus class="w-4 h-4"/></button>
+                   </div>
+                   
+                   <button class="p-2 ml-1 text-gray-400 hover:text-red-500 active:scale-90 transition-transform" @click="cart.splice(idx, 1)">
+                     <Trash2 class="w-5 h-5"/>
+                   </button>
+                </div>
+              </div>
 
-          <!-- 備註 -->
-          <div class="px-4 pb-2">
-            <div class="grid grid-cols-2 gap-2">
-              <input
-                v-model="buyerName"
-                type="text"
-                class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
-                placeholder="認購人 (選填)"
-              />
-              <input
-                v-model="buyerPhone"
-                type="tel"
-                class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
-                placeholder="電話 (選填)"
-              />
-            </div>
-            <input
-              v-model="cartNote"
-              type="text"
-              class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300 mt-2"
-              placeholder="備註（例：法名：普某 請購）"
-            />
-          </div>
-          
-          <div class="p-4 pt-2">
-             <div v-if="!appStore.isReplenishMode" class="mb-4 space-y-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
-               <!-- 小計 -->
-               <div class="flex justify-between items-center text-gray-600">
-                  <span>小計</span>
-                  <span class="font-bold text-lg">${{ cartTotalPrice }}</span>
-               </div>
-               
-               <!-- 實收金額 -->
-               <div class="flex justify-between items-center">
-                  <span class="font-bold text-gray-800">實收金額</span>
-                  <div class="flex items-center gap-2">
-                    <button
-                      type="button"
-                      class="text-xs text-gray-400 hover:text-brand-500 transition-colors px-1.5 py-1 rounded-lg hover:bg-brand-50 whitespace-nowrap"
-                      :class="{ 'opacity-0 pointer-events-none': receivedAmount === cartTotalPrice }"
-                      @click="receivedAmount = cartTotalPrice"
-                      title="還原小計金額"
-                    >↺ 還原</button>
-                    <div class="relative">
-                      <span class="absolute left-3 top-2 text-gray-500 font-bold">$</span>
-                      <input
-                        type="number"
-                        inputmode="numeric"
-                        v-model.number="receivedAmount"
-                        class="w-32 pl-7 pr-3 py-1.5 text-right font-bold text-xl text-brand-600 border-2 border-brand-200 rounded-xl focus:outline-none focus:border-brand-500 bg-white"
-                        min="0"
-                        @focus="receivedAmount = 0"
-                      />
-                    </div>
-                  </div>
-               </div>
+              <!-- 備註與表單 -->
+              <div class="space-y-3 border-t pt-4">
+                <div class="grid grid-cols-2 gap-2">
+                  <input
+                    v-model="buyerName"
+                    type="text"
+                    class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                    placeholder="認購人 (選填)"
+                  />
+                  <input
+                    v-model="buyerPhone"
+                    type="tel"
+                    class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                    placeholder="電話 (選填)"
+                  />
+                </div>
+                <input
+                  v-model="cartNote"
+                  type="text"
+                  class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                  placeholder="備註（例：法名：普某 請購）"
+                />
+              </div>
 
-               <!-- 支付方式 -->
-               <div class="flex gap-2 pt-2 border-t border-gray-200">
-                  <label class="flex-1 cursor-pointer">
-                    <input type="radio" v-model="paymentMethod" value="cash" class="peer sr-only" />
-                    <div class="text-center py-2 rounded-lg border-2 text-sm font-bold transition-all peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-700 border-gray-200 text-gray-500 bg-white">現金</div>
-                  </label>
-                  <label class="flex-1 cursor-pointer">
-                    <input type="radio" v-model="paymentMethod" value="card" class="peer sr-only" />
-                    <div class="text-center py-2 rounded-lg border-2 text-sm font-bold transition-all peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-700 border-gray-200 text-gray-500 bg-white">刷卡</div>
-                  </label>
-                  <label class="flex-1 cursor-pointer">
-                    <input type="radio" v-model="paymentMethod" value="transfer" class="peer sr-only" />
-                    <div class="text-center py-2 rounded-lg border-2 text-sm font-bold transition-all peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-700 border-gray-200 text-gray-500 bg-white">匯款</div>
-                  </label>
-               </div>
-             </div>
-             
-             <button class="w-full text-xl py-4 rounded-2xl transition-transform active:scale-95 font-bold flex justify-center items-center gap-2"
-              :class="appStore.isReplenishMode ? 'bg-green-500 text-white shadow-lg shadow-green-200 hover:bg-green-600' : 'bg-brand-500 text-white shadow-lg shadow-brand-200 hover:bg-brand-600'"
-              :disabled="submitting"
-              @click="submitCart">
-               <span v-if="submitting">處理中…</span>
-               <span v-else>確認{{ appStore.isReplenishMode ? '入庫' : '結緣' }} (共 {{ cartTotalQty }} 件)</span>
-             </button>
+              <!-- 收款與支付 (僅結緣模式) -->
+              <div v-if="!appStore.isReplenishMode" class="space-y-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                <div class="flex justify-between items-center text-gray-600">
+                   <span>小計</span>
+                   <span class="font-bold text-lg">${{ cartTotalPrice }}</span>
+                </div>
+                
+                <div class="flex justify-between items-center">
+                   <span class="font-bold text-gray-800">實收金額</span>
+                   <div class="flex items-center gap-2">
+                     <button
+                       type="button"
+                       class="text-xs text-brand-600 hover:bg-brand-100 transition-colors px-2 py-1 rounded-lg"
+                       :class="{ 'opacity-0 pointer-events-none': receivedAmount === cartTotalPrice }"
+                       @click="receivedAmount = cartTotalPrice"
+                     >還原</button>
+                     <div class="relative">
+                       <span class="absolute left-3 top-2.5 text-gray-400 font-bold">$</span>
+                       <input
+                         type="number"
+                         inputmode="numeric"
+                         v-model.number="receivedAmount"
+                         class="w-32 pl-7 pr-3 py-2 text-right font-bold text-xl text-brand-600 border-2 border-brand-200 rounded-xl focus:outline-none focus:border-brand-500 bg-white"
+                         min="0"
+                       />
+                     </div>
+                   </div>
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                   <label v-for="(label, method) in { cash:'現金', card:'刷卡', transfer:'匯款' }" :key="method" class="flex-1 cursor-pointer">
+                     <input type="radio" v-model="paymentMethod" :value="method" class="peer sr-only" />
+                     <div class="text-center py-2.5 rounded-xl border-2 text-sm font-bold transition-all peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-700 border-gray-200 text-gray-400 bg-white">{{ label }}</div>
+                   </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- 固定底部按鈕 -->
+            <div class="p-4 border-t bg-white">
+              <button class="w-full text-xl py-4 rounded-2xl transition-transform active:scale-95 font-bold flex justify-center items-center gap-2 shadow-lg"
+               :class="appStore.isReplenishMode 
+                  ? 'bg-green-500 text-white shadow-green-100 hover:bg-green-600' 
+                  : 'bg-brand-500 text-white shadow-brand-100 hover:bg-brand-600'"
+               :disabled="submitting"
+               @click="submitCart">
+                <span v-if="submitting">處理中…</span>
+                <span v-else>確認{{ appStore.isReplenishMode ? '入庫' : '結緣' }} (共 {{ cartTotalQty }} 件)</span>
+              </button>
+            </div>
           </div>
         </div>
       </transition>
@@ -312,7 +320,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { Building2, Minus, Plus, Trash2, LayoutGrid, List, ChevronRight } from 'lucide-vue-next'
+import { LayoutDashboard, Users, History, FileBarChart, Settings, Package, Plus, Minus, Trash2, ShoppingCart, ArrowLeft, Send, CheckCircle2, ChevronUp, ChevronDown } from 'lucide-vue-next'
 import {
   collection, query, where, onSnapshot, doc, runTransaction,
   serverTimestamp
@@ -371,6 +379,7 @@ function toggleProduct(name) {
 
 const cartNote = ref('')
 const cart = ref([])
+const isCartCollapsed = ref(false)
 const paymentMethod = ref('cash')
 const receivedAmount = ref(0)
 const buyerName = ref('')
