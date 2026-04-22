@@ -2,7 +2,7 @@
   <AppLayout title="庫存總覽" show-location-picker>
     <!-- 無道場提示 -->
     <div
-      v-if="!appStore.selectedLocation"
+      v-if="!appStore.selectedLocationId"
       class="flex flex-col items-center justify-center py-20 text-center"
     >
       <Building2 class="w-16 h-16 text-gray-300 mb-4" />

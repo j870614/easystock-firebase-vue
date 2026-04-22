@@ -25,10 +25,10 @@
       <div class="flex-none flex items-center gap-2 justify-end">
         <slot name="header-right">
           <button
-            v-if="showLocationPicker && appStore.activeLocations.length > 0"
+            v-if="showLocationPicker && (appStore.activeLocations.length > 0 || authStore.isOwner)"
             class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors bg-gray-100 text-gray-700 flex-shrink-0"
             :class="{ 'bg-brand-50 text-brand-700': authStore.isOwner }"
-            @click="authStore.isOwner && (showLocationDialog = true)"
+            @click="showLocationDialog = true"
           >
             <MapPin class="w-4 h-4 flex-shrink-0" />
             <span class="max-w-[80px] truncate">

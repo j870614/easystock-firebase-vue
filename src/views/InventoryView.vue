@@ -2,7 +2,7 @@
   <AppLayout title="認供結緣" show-location-picker>
     <!-- 無道場提示 -->
     <div
-      v-if="!appStore.selectedLocation"
+      v-if="!appStore.selectedLocationId"
       class="flex flex-col items-center justify-center py-20 text-center"
     >
       <Building2 class="w-16 h-16 text-gray-300 mb-4" />
@@ -35,47 +35,14 @@
         </div>
       </div>
 
-      <!-- 篩選列：標題與切換 -->
-      <div class="mb-5 space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="flex gap-2 text-xs">
-              <button
-                class="text-brand-600 hover:underline"
-                @click="selectAllProducts"
-                v-if="selectedGroupNames.length !== productGroups.length"
-              >全選</button>
-              <button
-                class="text-gray-400 hover:underline"
-                @click="selectedGroupNames = []"
-                v-else
-              >取消全選</button>
-            </div>
-            <div class="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg p-1">
-               <button class="p-1 rounded-md transition-colors" :class="viewMode === 'card' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'" @click="viewMode = 'card'">
-                 <LayoutGrid class="w-4 h-4"/>
-               </button>
-               <button class="p-1 rounded-md transition-colors" :class="viewMode === 'list' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'" @click="viewMode = 'list'">
-                 <List class="w-4 h-4"/>
-               </button>
-            </div>
-          </div>
-        </div>
-        
-        <!-- 面包屑式的篩選標籤 -->
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="name in productGroups"
-            :key="name"
-            class="px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all"
-            :class="selectedGroupNames.includes(name)
-              ? 'border-brand-500 bg-brand-50 text-brand-700'
-              : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'"
-            @click="toggleProduct(name)"
-          >
-            {{ name }}
-          </button>
-        </div>
+      <!-- 檢視模式切換 -->
+      <div class="mb-4 flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg p-1 w-fit">
+        <button class="p-1 rounded-md transition-colors" :class="viewMode === 'card' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'" @click="viewMode = 'card'">
+          <LayoutGrid class="w-4 h-4"/>
+        </button>
+        <button class="p-1 rounded-md transition-colors" :class="viewMode === 'list' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400 hover:text-gray-600'" @click="viewMode = 'list'">
+          <List class="w-4 h-4"/>
+        </button>
       </div>
 
       <!-- POS 品項顯示 -->
@@ -226,22 +193,8 @@
                 </div>
               </div>
 
-              <!-- 備註與表單 -->
-              <div class="space-y-3 border-t pt-4">
-                <div class="grid grid-cols-2 gap-2">
-                  <input
-                    v-model="buyerName"
-                    type="text"
-                    class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
-                    placeholder="認購人 (選填)"
-                  />
-                  <input
-                    v-model="buyerPhone"
-                    type="tel"
-                    class="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
-                    placeholder="電話 (選填)"
-                  />
-                </div>
+              <!-- 備註 -->
+              <div class="border-t pt-4">
                 <input
                   v-model="cartNote"
                   type="text"
@@ -320,11 +273,12 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { LayoutDashboard, Users, History, FileBarChart, Settings, Package, Plus, Minus, Trash2, ShoppingCart, ArrowLeft, Send, CheckCircle2, ChevronUp, ChevronDown } from 'lucide-vue-next'
+import { LayoutDashboard, Users, History, FileBarChart, Settings, Package, Plus, Minus, Trash2, ShoppingCart, ArrowLeft, Send, CheckCircle2, ChevronUp, ChevronDown, LayoutGrid, List, ChevronRight, Building2 } from 'lucide-vue-next'
 import {
   collection, query, where, onSnapshot, doc, runTransaction,
   serverTimestamp
 } from 'firebase/firestore'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -333,8 +287,10 @@ import AppLayout from '@/components/AppLayout.vue'
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
-const date       = ref(new Date().toISOString().slice(0, 10))
-const stockMap   = ref({})
+const viewMode = ref('card')
+
+const date = ref(new Date().toISOString().slice(0, 10))
+const stockMap = ref({})
 const loadingProducts = ref(false)
 const submitting = ref(false)
 const successMsg = ref('')
@@ -343,39 +299,6 @@ const successMsgType = ref('')
 const selectDialog = ref(false)
 const selectedGroupName = ref('')
 const selectedGroupItems = ref([])
-
-const viewMode = ref('card')
-const selectedGroupNames = ref([])
-
-const productGroups = computed(() => {
-  const names = []
-  const seen = new Set()
-  appStore.activeProducts.forEach(p => {
-    // 檢查是不是在目前道場停用
-    const locId = appStore.selectedLocationId
-    const locOverride = p.overrides?.[locId]
-    if (locOverride && locOverride.isActive === false) return
-    
-    if (!seen.has(p.name)) {
-      seen.add(p.name)
-      names.push(p.name)
-    }
-  })
-  return names
-})
-
-function selectAllProducts() {
-  selectedGroupNames.value = [...productGroups.value]
-}
-
-function toggleProduct(name) {
-  const idx = selectedGroupNames.value.indexOf(name)
-  if (idx === -1) {
-    selectedGroupNames.value.push(name)
-  } else {
-    selectedGroupNames.value.splice(idx, 1)
-  }
-}
 
 const cartNote = ref('')
 const cart = ref([])
@@ -405,11 +328,6 @@ const groupedProducts = computed(() => {
       return
     }
     
-    // 如果有使用標籤過濾，檢查品項名稱是否在過濾名單內
-    if (selectedGroupNames.value.length > 0 && !selectedGroupNames.value.includes(p.name)) {
-      return
-    }
-
     if (!groups[p.name]) groups[p.name] = []
     groups[p.name].push(p)
   })
@@ -550,6 +468,22 @@ function listenStocks() {
 
 async function submitCart() {
   if (cart.value.length === 0) return
+  
+  try {
+    await ElMessageBox.confirm(
+      `確定要提交這 ${cartTotalQty.value} 件物品嗎？`,
+      '操作確認',
+      {
+        confirmButtonText: '確定提交',
+        cancelButtonText: '返回修改',
+        type: appStore.isReplenishMode ? 'success' : 'warning',
+        roundButton: true
+      }
+    )
+  } catch {
+    return
+  }
+
   submitting.value = true
 
   const locId = appStore.selectedLocationId

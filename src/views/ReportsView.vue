@@ -21,13 +21,17 @@
         <div class="card no-print">
           <h2 class="font-semibold text-gray-700 mb-3">報表類型與時段</h2>
           <div class="space-y-3">
-            <div class="flex gap-2">
-               <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="exportType === 'year' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="exportType = 'year'">年度</button>
+            <div class="flex flex-wrap gap-2">
+               <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="exportType === 'today' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="exportType = 'today'">今日</button>
                <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="exportType === 'month' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="exportType = 'month'">月份</button>
+               <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="exportType === 'year' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="exportType = 'year'">年度</button>
                <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="exportType === 'custom' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="exportType = 'custom'">自訂區間</button>
             </div>
             <div>
-              <el-date-picker v-if="exportType === 'year'" v-model="selectedYear" type="year" placeholder="選擇年份" value-format="YYYY" class="w-full" />
+              <div v-if="exportType === 'today'" class="text-sm text-gray-500 px-2 py-1 bg-gray-50 rounded-lg border">
+                篩選日期：{{ new Date().toLocaleDateString() }}
+              </div>
+              <el-date-picker v-else-if="exportType === 'year'" v-model="selectedYear" type="year" placeholder="選擇年份" value-format="YYYY" class="w-full" />
               <el-date-picker v-else-if="exportType === 'month'" v-model="selectedMonth" type="month" placeholder="選擇月份" value-format="YYYY-MM" class="w-full" />
               <el-config-provider v-else-if="exportType === 'custom'" :locale="zhTwLocale">
                 <el-date-picker v-model="selectedRange" type="daterange" range-separator="-" start-placeholder="開始日期" end-placeholder="結束日期" value-format="YYYY-MM-DD" class="w-full" />
@@ -132,8 +136,8 @@
               </el-config-provider>
             </div>
             
-            <!-- 道場多選 -->
-            <div>
+            <!-- 道場多選 (僅結緣明細表需要) -->
+            <div v-if="activeTab === 'orderDetail'">
               <h3 class="text-sm font-medium text-gray-700 mb-2">道場名稱 (可多選)</h3>
               <div class="flex flex-wrap gap-2">
                 <button
@@ -143,6 +147,26 @@
                   :class="commonLocs.includes(loc.id) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'"
                   @click="toggleCommonLoc(loc.id)"
                 >{{ loc.name }}</button>
+              </div>
+            </div>
+
+            <!-- 付款方式多選 -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-medium text-gray-700">付款方式</h3>
+                <div class="flex gap-2 text-xs">
+                  <button class="text-brand-600 hover:underline" @click="commonPaymentMethods = ['cash', 'card', 'transfer', 'pending']" v-if="commonPaymentMethods.length < 4">全選</button>
+                  <button class="text-gray-400 hover:underline" @click="commonPaymentMethods = []" v-else>取消</button>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="(label, value) in { cash:'現金', card:'刷卡', transfer:'匯款', pending: '等後' }"
+                  :key="value"
+                  class="px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all"
+                  :class="commonPaymentMethods.includes(value) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'"
+                  @click="togglePaymentMethod(value)"
+                >{{ label }}</button>
               </div>
             </div>
 
@@ -217,35 +241,30 @@
               <thead>
                 <tr class="bg-gray-100">
                   <th class="border p-2 text-center">認購日期</th>
-                  <th class="border p-2 text-center">認購人</th>
+                  <th class="border p-2 text-center">摘要</th>
                   <th class="border p-2 text-center">種類</th>
                   <th class="border p-2 text-center">數量</th>
                   <th class="border p-2 text-center">金額</th>
                   <th class="border p-2 text-center">付款日期</th>
                   <th class="border p-2 text-center">付款方式</th>
-                  <th class="border p-2 text-center">電話</th>
                   <th class="border p-2 text-center">經手人</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="row in sharedRows" :key="row.id" class="hover:bg-gray-50">
                   <td class="border p-2 text-center">{{ row.date }}</td>
-                  <td class="border p-2 text-center">{{ row.buyerName || '—' }}</td>
+                  <td class="border p-2">{{ row.note || '—' }}</td>
                   <td class="border p-2">{{ row.productSnapshot?.name }} {{ row.productSnapshot?.spec }}</td>
                   <td class="border p-2 text-center">{{ row.qty }}</td>
                   <td class="border p-2 text-center font-bold">${{ row.calculatedAmount }}</td>
                   <td class="border p-2 text-center">{{ row.accountantReceivedDate || '—' }}</td>
                   <td class="border p-2 text-center">{{ paymentLabel(row.paymentMethod) }}</td>
-                  <td class="border p-2 text-center">{{ row.buyerPhone || '—' }}</td>
                   <td class="border p-2 text-center text-xs">{{ row.operator?.dharmaName || row.operator?.name }}</td>
                 </tr>
               </tbody>
               <tfoot class="bg-gray-50 font-bold text-base">
                 <tr>
-                  <td colspan="3" class="border p-3 text-right">總計</td>
-                  <td class="border p-3 text-center text-brand-600">{{ sharedTotals.qty }}</td>
-                  <td class="border p-3 text-center text-brand-600">${{ sharedTotals.amount }}</td>
-                  <td colspan="4" class="border p-3"></td>
+                    <td colspan="5" class="border p-3 text-right">總計</td>
                 </tr>
               </tfoot>
             </table>
@@ -274,16 +293,11 @@ const authStore = useAuthStore()
 // ─── Tab ───────────────────────────────────────────────
 const activeTab = ref('stockReport')
 const visibleTabs = computed(() => {
-  const allTabs = [
+  return [
     { key: 'stockReport', label: '出入庫明細' },
     { key: 'orderDetail', label: '結緣明細表' },
     { key: 'orderReg',    label: '認購登記表' },
   ]
-  // 僅會計可看 結緣明細表
-  return allTabs.filter(tab => {
-    if (tab.key === 'orderDetail') return authStore.isAccountant
-    return true
-  })
 })
 
 // 權限檢查：若當前分頁被過濾，自動跳回第一個可見分頁
@@ -317,8 +331,8 @@ const exportType = ref('year')
 const selectedYear = ref(String(new Date().getFullYear()))
 const selectedMonth = ref(`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}`)
 const selectedRange = ref([
-  `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}-01`, 
-  `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}-28`
+  new Date().toISOString().slice(0, 10),
+  new Date().toISOString().slice(0, 10)
 ])
 const selectedGroupNames = ref([])
 const exporting = ref(false)
@@ -346,6 +360,7 @@ const selectedProductIds = computed(() => {
 const isDataReady = computed(() => {
   if (!appStore.selectedLocationId) return false
   if (selectedProductIds.value.length === 0) return false
+  if (exportType.value === 'today') return true
   if (exportType.value === 'year') return !!selectedYear.value
   if (exportType.value === 'month') return !!selectedMonth.value
   if (exportType.value === 'custom') return !!(selectedRange.value && selectedRange.value.length === 2)
@@ -354,6 +369,7 @@ const isDataReady = computed(() => {
 
 const reportTitle = computed(() => {
   const loc = appStore.selectedLocation?.name ?? '道場'
+  if (exportType.value === 'today') return `${loc} ${new Date().toLocaleDateString()} 出入庫明細表`
   if (exportType.value === 'year') return `${loc} ${selectedYear.value}年 出入庫明細表`
   if (exportType.value === 'month') return `${loc} ${selectedMonth.value} 出入庫明細表`
   if (exportType.value === 'custom') return `${loc} ${selectedRange.value[0]}至${selectedRange.value[1]} 出入庫明細表`
@@ -361,7 +377,12 @@ const reportTitle = computed(() => {
 })
 
 async function loadPreview() {
-  if (!isDataReady.value) { previewData.value = []; return }
+  if (!isDataReady.value) { 
+    if (selectedProductIds.value.length === 0 && appStore.selectedLocationId && (selectedYear.value || selectedMonth.value || selectedRange.value)) {
+      // 這裡不顯示 alert 避免過於頻繁，但在 Export 時會檢查
+    }
+    previewData.value = []; return 
+  }
   loadingPreview.value = true
   try {
     const data = await buildReportData(appStore.selectedLocationId)
@@ -405,7 +426,9 @@ async function buildReportData(locId) {
   for (const date of Object.keys(dateGroups).sort()) {
     const txList = dateGroups[date]
     let isMatch = false
-    if (exportType.value === 'year') isMatch = date.startsWith(selectedYear.value)
+    const today = new Date().toISOString().slice(0, 10)
+    if (exportType.value === 'today') isMatch = date === today
+    else if (exportType.value === 'year') isMatch = date.startsWith(selectedYear.value)
     else if (exportType.value === 'month') isMatch = date.startsWith(selectedMonth.value)
     else if (exportType.value === 'custom') isMatch = date >= selectedRange.value[0] && date <= selectedRange.value[1]
     
@@ -423,6 +446,9 @@ async function buildReportData(locId) {
 }
 
 async function exportExcel() {
+  if (selectedProductIds.value.length === 0) {
+    alert('請先選擇品項名稱'); return
+  }
   exporting.value = true
   try {
     const { products, rows } = await buildReportData(appStore.selectedLocationId)
@@ -450,9 +476,14 @@ const commonRange = ref([
 ])
 const commonLocs = ref([])
 const commonProds = ref([])
+const commonPaymentMethods = ref(['cash', 'card', 'transfer', 'pending'])
 const sharedRows = ref([])
 const loadingShared = ref(false)
 const exportingShared = ref(false)
+
+function togglePaymentMethod(val) {
+  const i = commonPaymentMethods.value.indexOf(val); i === -1 ? commonPaymentMethods.value.push(val) : commonPaymentMethods.value.splice(i, 1)
+}
 
 const sharedTotals = computed(() => {
   return sharedRows.value.reduce((acc, row) => ({
@@ -516,9 +547,10 @@ async function loadSharedData() {
       else if (commonFilterType.value === 'month') matchPeriod = r.date?.startsWith(commonMonth.value)
       else if (commonFilterType.value === 'custom') matchPeriod = r.date >= commonRange.value[0] && r.date <= commonRange.value[1]
       
-      const matchLoc = commonLocs.value.length === 0 || commonLocs.value.includes(r.locationId)
+      const matchLoc = activeTab.value === 'orderDetail' ? (commonLocs.value.length === 0 || commonLocs.value.includes(r.locationId)) : true
       const matchProd = commonProds.value.length === 0 || commonProds.value.includes(r.productSnapshot?.name)
-      return matchPeriod && matchLoc && matchProd
+      const matchPayment = commonPaymentMethods.value.length === 0 || commonPaymentMethods.value.includes(r.paymentMethod)
+      return matchPeriod && matchLoc && matchProd && matchPayment
     })
 
     // 排序：認購日期
@@ -532,6 +564,9 @@ async function loadSharedData() {
 }
 
 async function exportSharedExcel() {
+  if (commonProds.value.length === 0) {
+    alert('請先選擇品項名稱'); return
+  }
   exportingShared.value = true
   try {
     const wb = new ExcelJS.Workbook()
@@ -563,25 +598,23 @@ async function exportSharedExcel() {
     } else {
       ws.columns = [
         { header: '認購日期', key: 'date', width: 12 },
-        { header: '認購人', key: 'buyer', width: 15 },
+        { header: '摘要', key: 'note', width: 25 },
         { header: '種類', key: 'type', width: 25 },
         { header: '數量', key: 'qty', width: 8 },
         { header: '金額', key: 'amount', width: 10 },
         { header: '付款日期', key: 'pdate', width: 12 },
         { header: '付款方式', key: 'pmethod', width: 10 },
-        { header: '電話', key: 'phone', width: 15 },
         { header: '經手人', key: 'handler', width: 12 },
       ]
       sharedRows.value.forEach(r => {
         ws.addRow({
           date: r.date,
-          buyer: r.buyerName || '',
+          note: r.note || '',
           type: `${r.productSnapshot?.name} ${r.productSnapshot?.spec}`,
           qty: r.qty,
           amount: r.calculatedAmount,
           pdate: r.accountantReceivedDate || '',
           pmethod: paymentLabel(r.paymentMethod),
-          phone: r.buyerPhone || '',
           handler: r.operator?.dharmaName || r.operator?.name
         })
       })
@@ -605,7 +638,7 @@ async function exportSharedExcel() {
   }
 }
 
-watch([activeTab, commonFilterType, commonYear, commonMonth, commonRange, commonLocs, commonProds], () => {
+watch([activeTab, commonFilterType, commonYear, commonMonth, commonRange, commonLocs, commonProds, commonPaymentMethods], () => {
   if (activeTab.value !== 'stockReport') loadSharedData()
 }, { deep: true })
 

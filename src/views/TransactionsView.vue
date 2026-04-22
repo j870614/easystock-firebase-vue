@@ -1,6 +1,6 @@
 <template>
   <AppLayout title="出入庫紀錄" show-location-picker>
-    <div v-if="!appStore.selectedLocation" class="flex flex-col items-center justify-center py-20 text-center">
+    <div v-if="!appStore.selectedLocationId" class="flex flex-col items-center justify-center py-20 text-center">
       <Building2 class="w-16 h-16 text-gray-300 mb-4" />
       <p class="text-gray-500">請先選擇道場</p>
     </div>
@@ -88,13 +88,14 @@
                 </span>
               </span>
               <span
-                class="ml-auto flex-shrink-0 font-bold text-lg"
+                class="ml-auto flex-shrink-0 font-bold"
+                :style="{ fontSize: 'calc(var(--fs-name) * 1.1)' }"
                 :class="tx.type === 'in' ? 'text-green-600' : 'text-red-600'"
               >
                 {{ tx.type === 'in' ? '+' : '−' }}{{ tx.qty }}
               </span>
             </div>
-            <div class="text-sm text-gray-500 mt-0.5">
+            <div class="text-gray-500 mt-1 leading-relaxed" :style="{ fontSize: 'var(--fs-main)' }">
               {{ tx.note || '—' }}
               <span v-if="tx.editReason" class="text-xs text-amber-600 ml-2" :title="'修改原因: ' + tx.editReason">(曾修改)</span>
             </div>
@@ -103,16 +104,16 @@
               <span>{{ tx.operator?.dharmaName || tx.operator?.name }}</span>
             </div>
 
-            <!-- 會計收款日期顯示 -->
-            <div v-if="tx.type === 'out'" class="mt-1 flex flex-wrap gap-2">
-              <span v-if="tx.buyerName" class="inline-flex items-center gap-1 text-xs bg-brand-50 text-brand-700 border border-brand-200 px-2 py-0.5 rounded-full font-medium">
-                認供人：{{ tx.buyerName }}
-              </span>
-              <span class="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+            <!-- 會計快捷資訊顯示 -->
+            <div v-if="tx.type === 'out'" class="mt-1.5 flex flex-wrap gap-2">
+              <span class="inline-flex items-center gap-1 bg-brand-50 text-brand-700 border border-brand-200 px-2.5 py-1 rounded-full font-bold" :style="{ fontSize: 'var(--fs-main)' }">
                 實付：${{ getDisplayAmount(tx) }}
               </span>
-              <span v-if="tx.accountantReceivedDate" class="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
-                <CheckCircle2 class="w-3 h-3" /> 已收款：{{ tx.accountantReceivedDate }}
+              <span v-if="tx.paymentMethod" class="inline-flex items-center gap-1 bg-gray-50 text-gray-600 border border-gray-200 px-2.5 py-1 rounded-full font-medium" :style="{ fontSize: 'var(--fs-main)' }">
+                💳 {{ paymentLabel(tx.paymentMethod) }}
+              </span>
+              <span v-if="tx.accountantReceivedDate" class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-medium" :style="{ fontSize: 'var(--fs-main)' }">
+                <CheckCircle2 class="w-3.5 h-3.5" /> 已收款：{{ tx.accountantReceivedDate }}
               </span>
             </div>
             
@@ -201,14 +202,19 @@
           </div>
           <template v-if="editForm.type === 'out'">
             <div>
-              <label class="label">認供人姓名</label>
-              <input v-model="editForm.buyerName" type="text" class="input" placeholder="選填" />
+              <label class="label">付款方式</label>
+              <el-select v-model="editForm.paymentMethod" class="w-full h-12">
+                <el-option label="現金" value="cash" />
+                <el-option label="刷卡" value="card" />
+                <el-option label="匯款" value="transfer" />
+                <el-option label="等後" value="pending" />
+              </el-select>
             </div>
             <div>
               <label class="label">實付金額</label>
               <div class="relative">
-                <span class="absolute left-3 top-2.5 text-gray-400">$</span>
-                <input v-model.number="editForm.orderReceivedAmount" type="number" class="input pl-7" placeholder="0" />
+                <span class="absolute left-3 top-2.5 text-gray-400 font-bold">$</span>
+                <input v-model.number="editForm.orderReceivedAmount" type="number" class="input pl-8 text-lg font-bold text-brand-600" placeholder="0" />
               </div>
             </div>
           </template>
@@ -309,6 +315,11 @@ const loading = ref(false)
 const transactions = ref([])
 const activeFilter = ref('all')
 const submitting = ref(false)
+
+function paymentLabel(method) {
+  return { cash: '現金', card: '刷卡', transfer: '匯款', pending: '等後' }[method] || method
+}
+
 let unsubscribe = null
 let fallbackTimer = null
 
@@ -335,7 +346,7 @@ let pageCursors = [null] // Use a plain array (not ref!) to prevent Vue from pro
 // Edit States
 const editDialog = ref(false)
 const showErrors = ref(false)
-const editForm = ref({ id: null, qty: 0, date: '', note: '', reason: '', oldQty: 0, type: '', productId: '', buyerName: '', orderReceivedAmount: 0 })
+const editForm = ref({ id: null, qty: 0, date: '', note: '', reason: '', oldQty: 0, type: '', productId: '', buyerName: '', orderReceivedAmount: 0, paymentMethod: '' })
 const selectedTxName = ref('')
 
 // Delete States
@@ -476,7 +487,8 @@ function openEdit(tx) {
     type: tx.type,
     productId: tx.productId,
     buyerName: tx.buyerName || '',
-    orderReceivedAmount: tx.orderReceivedAmount ?? 0
+    orderReceivedAmount: tx.orderReceivedAmount ?? 0,
+    paymentMethod: tx.paymentMethod || 'cash'
   }
   editDialog.value = true
 }
@@ -527,8 +539,8 @@ async function submitEdit() {
       }
       
       if (editForm.value.type === 'out') {
-        updateData.buyerName = editForm.value.buyerName
         updateData.orderReceivedAmount = Number(editForm.value.orderReceivedAmount || 0)
+        updateData.paymentMethod = editForm.value.paymentMethod
       }
       
       t.update(txRef, updateData)

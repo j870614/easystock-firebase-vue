@@ -43,15 +43,14 @@ export const useAppStore = defineStore('app', () => {
     const authStore = useAuthStore()
     const locs = locations.value.filter(l => l.isActive)
 
-    // 僅系統總管可看到並切換所有道場
+    // 系統總管可看到並切換所有啟用中的道場
     if (authStore.isOwner) return locs
 
-    // 其他角色（含 admin）只能看到被指派的道場
+    // 其他角色只能看到被指派的道場
     if (authStore.assignedLocationId) {
       return locs.filter(l => l.id === authStore.assignedLocationId)
     }
 
-    // 尚未指派者，看不到任何道場
     return []
   })
 
@@ -64,7 +63,7 @@ export const useAppStore = defineStore('app', () => {
   function init() {
     const authStore = useAuthStore()
 
-    // 1. 監聽系統設定 (所有已登入者皆可讀)
+    // 1. 監聽系統設定
     if (!unsubscribeSys) {
       const sysRef = doc(db, 'settings', 'system')
       unsubscribeSys = onSnapshot(sysRef, (snap) => {
@@ -77,7 +76,7 @@ export const useAppStore = defineStore('app', () => {
       })
     }
 
-    // 2. 監聽執事選項 (所有已登入者皆可讀，PendingView 需要)
+    // 2. 監聽執事選項
     if (!unsubscribeDuties) {
       const qDuties = query(collection(db, 'duties'), orderBy('order'))
       unsubscribeDuties = onSnapshot(qDuties, (snap) => {
@@ -87,9 +86,25 @@ export const useAppStore = defineStore('app', () => {
       })
     }
 
-    // 3. 監聽道場與品項 (僅限具有角色權限者)
-    // 我們使用一個簡單的檢查，並配合 watch 處理角色動態變更
+    // 3. 監聽道場與品項
     checkAndStartStaffListeners()
+  }
+
+  function handleAutoLocationSelection() {
+    const authStore = useAuthStore()
+    if (!authStore.isStaff) return
+
+    // 優先權 1：若有指派道場，強制使用該道場 (特別適合 Staff/Admin)
+    if (authStore.assignedLocationId) {
+      selectLocation(authStore.assignedLocationId)
+      return
+    }
+
+    // 優先權 2：若無明確指派（如總管），確保目前選取值存在於可用清單中
+    const currentValid = activeLocations.value.find(l => l.id === selectedLocationId.value)
+    if (!currentValid && activeLocations.value.length > 0) {
+      selectLocation(activeLocations.value[0].id)
+    }
   }
 
   function checkAndStartStaffListeners() {
@@ -101,20 +116,7 @@ export const useAppStore = defineStore('app', () => {
       const qLoc = query(collection(db, 'locations'), orderBy('order'))
       unsubscribeLocs = onSnapshot(qLoc, (snap) => {
         locations.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-
-        // 優先強制選取 profile 中指派的道場（忽略 localStorage 記憶）
-        const assigned = authStore.assignedLocationId
-        if (assigned && activeLocations.value.find(l => l.id === assigned)) {
-          selectLocation(assigned)
-        } else {
-          // 指派道場不可用時，從允許清單中選第一個
-          const currentAllowed = activeLocations.value.find(l => l.id === selectedLocationId.value)
-          if (!currentAllowed && activeLocations.value.length > 0) {
-            selectLocation(activeLocations.value[0].id)
-          } else if (!selectedLocationId.value && activeLocations.value.length > 0) {
-            selectLocation(activeLocations.value[0].id)
-          }
-        }
+        handleAutoLocationSelection()
       }, (err) => {
         console.error('[AppStore] Locations listener error:', err.message)
       })
@@ -131,33 +133,25 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  // 監聽角色變化，如果從 pending 變成 staff，自動啟動監聽器
+  // 監聽角色變化
   watch(() => useAuthStore().isStaff, (isStaff) => {
-    if (isStaff) {
-      checkAndStartStaffListeners()
-    }
+    if (isStaff) checkAndStartStaffListeners()
+  })
+
+  // 關鍵監聽：當個人檔案中的指派道場變化時，立即切換選取
+  watch(() => useAuthStore().assignedLocationId, (newId) => {
+    if (newId) selectLocation(newId)
   })
 
   function stop() {
-    if (unsubscribeSys) {
-      unsubscribeSys()
-      unsubscribeSys = null
-    }
-    if (unsubscribeLocs) {
-      unsubscribeLocs()
-      unsubscribeLocs = null
-    }
-    if (unsubscribeProds) {
-      unsubscribeProds()
-      unsubscribeProds = null
-    }
-    if (unsubscribeDuties) {
-      unsubscribeDuties()
-      unsubscribeDuties = null
-    }
+    if (unsubscribeSys) { unsubscribeSys(); unsubscribeSys = null }
+    if (unsubscribeLocs) { unsubscribeLocs(); unsubscribeLocs = null }
+    if (unsubscribeProds) { unsubscribeProds(); unsubscribeProds = null }
+    if (unsubscribeDuties) { unsubscribeDuties(); unsubscribeDuties = null }
   }
 
   function selectLocation(id) {
+    if (selectedLocationId.value === id) return // 防止重複執行導致的反應循環
     selectedLocationId.value = id
     localStorage.setItem('selectedLocationId', id)
   }
@@ -169,7 +163,6 @@ export const useAppStore = defineStore('app', () => {
     document.documentElement.setAttribute('data-fs', clamped)
   }
 
-  // 初始化時套用儲存的字體偏好
   function applyFontScale() {
     document.documentElement.setAttribute('data-fs', fontScale.value)
   }

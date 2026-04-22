@@ -4,13 +4,32 @@
       ⚠️ 僅系統總管可以變更成員角色
     </div>
 
+    <!-- 篩選列 -->
+    <div class="card mb-4 space-y-3">
+      <div v-for="group in filterGroups" :key="group.key" class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-bold text-gray-400">{{ group.label }}</h3>
+          <button class="text-[10px] text-brand-600 hover:underline" @click="toggleGroupAll(group)">{{ isGroupAll(group) ? '取消全選' : '全選' }}</button>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            v-for="item in group.options"
+            :key="item.value"
+            class="px-2.5 py-1 rounded-full text-xs font-medium border-2 transition-all"
+            :class="group.selected.value.includes(item.value) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'"
+            @click="toggleFilter(group.selected.value, item.value)"
+          >{{ item.label }}</button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="flex justify-center py-12">
       <div class="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
     </div>
 
     <div v-else class="space-y-2">
       <div
-        v-for="u in users"
+        v-for="u in filteredUsers"
         :key="u.uid"
         class="card flex flex-col gap-2"
       >
@@ -63,10 +82,11 @@
         </div>
 
         <!-- 第二行：owner 可編輯的下拉選單 -->
-        <div v-if="authStore.isOwner && u.uid !== selfUid" class="grid grid-cols-1 gap-2">
+        <div v-if="authStore.isOwner" class="grid grid-cols-1 gap-2">
           <el-select
             v-model="u.role"
             class="w-full"
+            :disabled="u.uid === selfUid && u.role === 'owner'"
             @change="changeRole(u)"
           >
             <el-option label="待審核" value="pending" />
@@ -145,6 +165,40 @@ const users = ref([])
 const loading = ref(false)
 const editingUid = ref(null)
 const editForm = ref({ dharmaName: '', secularName: '' })
+
+// 篩選
+const selectedRoles = ref(['owner', 'admin', 'staff', 'pending'])
+const selectedLocs = ref([])
+const selectedDuties = ref([])
+
+const filterGroups = computed(() => [
+  { key: 'role', label: '權限角色', selected: selectedRoles, options: Object.entries(ROLE_MAP).map(([v, l]) => ({ value: v, label: l })) },
+  { key: 'loc', label: '所屬道場', selected: selectedLocs, options: [{ value: 'none', label: '未指派' }, ...appStore.locations.map(l => ({ value: l.id, label: l.name }))] },
+  { key: 'duty', label: '目前執事', selected: selectedDuties, options: [{ value: 'none', label: '無執事' }, ...appStore.activeDuties.map(d => ({ value: d.id, label: d.name }))] },
+])
+
+const filteredUsers = computed(() => {
+  return users.value.filter(u => {
+    const roleMatch = selectedRoles.value.includes(u.role)
+    const locMatch = selectedLocs.value.length === 0 || 
+                    (selectedLocs.value.includes('none') && !u.assignedLocationId) ||
+                    selectedLocs.value.includes(u.assignedLocationId)
+    const dutyMatch = selectedDuties.value.length === 0 || 
+                     (selectedDuties.value.includes('none') && !u.dutyId) ||
+                     selectedDuties.value.includes(u.dutyId)
+    return roleMatch && locMatch && dutyMatch
+  })
+})
+
+function toggleFilter(arr, val) {
+  const i = arr.indexOf(val); i === -1 ? arr.push(val) : arr.splice(i, 1)
+}
+function isGroupAll(g) { return g.selected.value.length === g.options.length }
+function toggleGroupAll(g) {
+  if (isGroupAll(g)) g.selected.value = []
+  else g.selected.value = g.options.map(o => o.value)
+}
+
 let unsubscribe = null
 
 const ROLE_MAP = {
