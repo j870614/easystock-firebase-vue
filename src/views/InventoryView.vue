@@ -178,7 +178,22 @@
                    <div class="flex-1">
                      <div class="font-bold text-gray-800">{{ item.product.name }}</div>
                      <div v-if="item.product.spec" class="text-sm text-gray-500">{{ item.product.spec }}</div>
-                     <div class="text-sm text-brand-600 font-bold mt-1" v-if="!appStore.isReplenishMode">{{ item.price }} x {{ item.qty }} = {{ item.price * item.qty }}</div>
+                     <div class="text-xs text-gray-400 font-medium mt-1" v-if="!appStore.isReplenishMode">
+                       應收：${{ item.price * item.qty }}
+                     </div>
+                     <div class="mt-2 flex items-center gap-2" v-if="!appStore.isReplenishMode">
+                       <span class="text-xs font-bold text-brand-600">實付：</span>
+                       <div class="relative flex-1 max-w-[120px]">
+                         <span class="absolute left-2 top-1/2 -translate-y-1/2 text-brand-600 font-bold text-xs">$</span>
+                         <input
+                           type="number"
+                           inputmode="numeric"
+                           v-model.number="item.receivedAmount"
+                           @focus="item.receivedAmount = 0"
+                           class="w-full pl-5 pr-2 py-0.5 text-right font-bold text-sm text-brand-600 border-b-2 border-brand-100 focus:outline-none focus:border-brand-500 bg-transparent"
+                         />
+                       </div>
+                     </div>
                    </div>
                    
                    <div class="flex items-center gap-1">
@@ -205,37 +220,30 @@
 
               <!-- 收款與支付 (僅結緣模式) -->
               <div v-if="!appStore.isReplenishMode" class="space-y-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                <div class="flex justify-between items-center text-gray-600">
-                   <span>小計</span>
-                   <span class="font-bold text-lg">${{ cartTotalPrice }}</span>
+                <div class="flex justify-between items-center text-gray-600 text-sm">
+                   <span>應收總計</span>
+                   <span class="font-bold">${{ cartTotalPrice }}</span>
                 </div>
                 
                 <div class="flex justify-between items-center">
-                   <span class="font-bold text-gray-800">實收金額</span>
                    <div class="flex items-center gap-2">
+                     <span class="font-bold text-gray-800">實收總計</span>
                      <button
                        type="button"
-                       class="text-xs text-brand-600 hover:bg-brand-100 transition-colors px-2 py-1 rounded-lg"
-                       :class="{ 'opacity-0 pointer-events-none': receivedAmount === cartTotalPrice }"
-                       @click="receivedAmount = cartTotalPrice"
-                     >還原</button>
-                     <div class="relative">
-                       <span class="absolute left-3 top-2.5 text-gray-400 font-bold">$</span>
-                       <input
-                         type="number"
-                         inputmode="numeric"
-                         v-model.number="receivedAmount"
-                         class="w-32 pl-7 pr-3 py-2 text-right font-bold text-xl text-brand-600 border-2 border-brand-200 rounded-xl focus:outline-none focus:border-brand-500 bg-white"
-                         min="0"
-                       />
-                     </div>
+                       class="text-[10px] bg-brand-50 text-brand-600 px-2 py-0.5 rounded-full hover:bg-brand-100 transition-colors border border-brand-100"
+                       @click="restoreAllAmounts"
+                     >全部還原</button>
+                   </div>
+                   <div class="flex items-center gap-1 text-2xl font-black text-brand-600">
+                     <span class="text-lg opacity-50">$</span>
+                     <span>{{ receivedAmount }}</span>
                    </div>
                 </div>
 
-                <div class="flex gap-2 pt-2">
+                <div class="flex gap-2 pt-1">
                    <label v-for="(label, method) in { cash:'現金', card:'刷卡', transfer:'匯款' }" :key="method" class="flex-1 cursor-pointer">
                      <input type="radio" v-model="paymentMethod" :value="method" class="peer sr-only" />
-                     <div class="text-center py-2.5 rounded-xl border-2 text-sm font-bold transition-all peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-700 border-gray-200 text-gray-400 bg-white">{{ label }}</div>
+                     <div class="text-center py-2 rounded-xl border-2 text-sm font-bold transition-all peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-700 border-gray-200 text-gray-400 bg-white">{{ label }}</div>
                    </label>
                 </div>
               </div>
@@ -304,7 +312,10 @@ const cartNote = ref('')
 const cart = ref([])
 const isCartCollapsed = ref(false)
 const paymentMethod = ref('cash')
-const receivedAmount = ref(0)
+// 實收總額改為運算屬性，根據各品項實收加總
+const receivedAmount = computed(() => {
+  return cart.value.reduce((sum, item) => sum + (Number(item.receivedAmount) || 0), 0)
+})
 const buyerName = ref('')
 const buyerPhone = ref('')
 let unsubscribeStocks = null
@@ -397,11 +408,13 @@ function addToCart(product) {
   const existing = cart.value.find(item => item.product.id === product.id)
   if (existing) {
     existing.qty += 1
+    existing.receivedAmount = existing.price * existing.qty
   } else {
     cart.value.push({
       product,
       price,
-      qty: 1
+      qty: 1,
+      receivedAmount: price
     })
   }
   selectDialog.value = false
@@ -412,7 +425,14 @@ function updateCartQty(index, delta) {
   const newQty = item.qty + delta
   if (newQty >= 1) {
     item.qty = newQty
+    item.receivedAmount = item.price * item.qty
   }
+}
+
+function restoreAllAmounts() {
+  cart.value.forEach(item => {
+    item.receivedAmount = item.price * item.qty
+  })
 }
 
 function validateCartQty(index) {
@@ -420,14 +440,10 @@ function validateCartQty(index) {
   if (typeof item.qty !== 'number' || isNaN(item.qty) || item.qty < 1) {
     item.qty = 1
   }
+  item.receivedAmount = item.price * item.qty
 }
 
-// 監聽購物車變化以更新實收金額預設值
-watch(cartTotalPrice, (newTotal) => {
-  if (cart.value.length > 0) {
-    receivedAmount.value = newTotal
-  }
-})
+// 移除舊有的全局實收金額監聽
 
 function clearCart() {
   cart.value = []
@@ -551,6 +567,8 @@ async function submitCart() {
         }
 
         if (currentTxType === 'out') {
+          txPayload.itemSubtotal = (item.price ?? 0) * item.qty
+          txPayload.itemReceivedAmount = Number(item.receivedAmount) || 0
           txPayload.orderSubtotal = cartTotalPrice.value
           txPayload.orderReceivedAmount = receivedAmount.value
           txPayload.paymentMethod = paymentMethod.value

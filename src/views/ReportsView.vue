@@ -512,22 +512,25 @@ async function loadSharedData() {
       const loc = locMap[data.locationId]
       const product = appStore.products.find(p => p.id === data.productId)
       
-      // 金額判定：優先使用實收，次之使用應收，最後才是系統定價計算
-      let amount = data.orderReceivedAmount;
-      if (amount === undefined || amount === null) {
-        amount = data.orderSubtotal;
-      }
+      // 金額判定：優先使用品項層級實收/小計 (新版數據)，若無則動態計算 (舊版或備援)
+      let amount = data.itemReceivedAmount ?? data.itemSubtotal;
 
-      // 如果依然沒有金額紀錄 (null 或 undefined)，才進入備援定價計算
       if (amount === undefined || amount === null) {
-        let price = product?.price || data.productSnapshot?.price || 0
-        if (loc?.country) {
-          const override = product?.overrides?.[loc.country]
-          if (override && override.price != null && override.price !== '') {
-            price = Number(override.price)
+        // 若快照有記錄單價，直接計算該品項總額，避免誤用整筆訂單總額
+        const snapshotPrice = data.productSnapshot?.price;
+        if (snapshotPrice != null) {
+          amount = snapshotPrice * (data.qty || 0);
+        } else {
+          // 最後備援：參考系統目前定價與道場加價
+          let price = product?.price || 0;
+          if (loc?.country) {
+            const override = product?.overrides?.[loc.country];
+            if (override && override.price != null && override.price !== '') {
+              price = Number(override.price);
+            }
           }
+          amount = price * (data.qty || 0);
         }
-        amount = price * (data.qty || 0)
       }
 
       return { 

@@ -360,17 +360,17 @@ const isAccountant = computed(() => authStore.isAccountant)
 
 function getDisplayAmount(tx) {
   if (!tx) return 0
-  // 1. 優先使用實收金額
-  if (tx.orderReceivedAmount !== undefined && tx.orderReceivedAmount !== null) {
-    return tx.orderReceivedAmount
+  // 1. 優先使用品項層級實收/小計 (新版數據)
+  let amount = tx.itemReceivedAmount ?? tx.itemSubtotal;
+  if (amount != null) return amount;
+
+  // 2. 舊資料處理：使用快照單價計算，以避免誤用整筆訂單總額
+  if (tx.productSnapshot?.price != null) {
+    return tx.productSnapshot.price * (tx.qty || 0);
   }
-  // 2. 次之使用整單總額 (如有)
-  if (tx.orderSubtotal !== undefined && tx.orderSubtotal !== null) {
-    return tx.orderSubtotal
-  }
-  // 3. 最後使用單價 * 數量計算
-  const price = tx.productSnapshot?.price || 0
-  return price * (tx.qty || 0)
+
+  // 3. 最後備援
+  return tx.orderReceivedAmount ?? tx.orderSubtotal ?? 0;
 }
 
 function stopListener() {
