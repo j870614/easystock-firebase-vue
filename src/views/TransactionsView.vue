@@ -207,7 +207,6 @@
                 <el-option label="現金" value="cash" />
                 <el-option label="刷卡" value="card" />
                 <el-option label="匯款" value="transfer" />
-                <el-option label="等後" value="pending" />
               </el-select>
             </div>
             <div>
@@ -317,7 +316,7 @@ const activeFilter = ref('all')
 const submitting = ref(false)
 
 function paymentLabel(method) {
-  return { cash: '現金', card: '刷卡', transfer: '匯款', pending: '等後' }[method] || method
+  return { cash: '現金', card: '刷卡', transfer: '匯款' }[method] || method
 }
 
 let unsubscribe = null

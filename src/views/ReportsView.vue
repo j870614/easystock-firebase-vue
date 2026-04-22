@@ -155,13 +155,13 @@
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-medium text-gray-700">付款方式</h3>
                 <div class="flex gap-2 text-xs">
-                  <button class="text-brand-600 hover:underline" @click="commonPaymentMethods = ['cash', 'card', 'transfer', 'pending']" v-if="commonPaymentMethods.length < 4">全選</button>
+                  <button class="text-brand-600 hover:underline" @click="commonPaymentMethods = ['cash', 'card', 'transfer']" v-if="commonPaymentMethods.length < 3">全選</button>
                   <button class="text-gray-400 hover:underline" @click="commonPaymentMethods = []" v-else>取消</button>
                 </div>
               </div>
               <div class="flex flex-wrap gap-2">
                 <button
-                  v-for="(label, value) in { cash:'現金', card:'刷卡', transfer:'匯款', pending: '等後' }"
+                  v-for="(label, value) in { cash:'現金', card:'刷卡', transfer:'匯款' }"
                   :key="value"
                   class="px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all"
                   :class="commonPaymentMethods.includes(value) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'"
@@ -321,7 +321,7 @@ const productGroups = computed(() => {
 })
 
 function paymentLabel(method) {
-  return { cash: '現金', card: '刷卡', transfer: '匯款', pending: '等後' }[method] || method
+  return { cash: '現金', card: '刷卡', transfer: '匯款' }[method] || method
 }
 
 // ──────────────────────────────────────────────────────
@@ -476,7 +476,7 @@ const commonRange = ref([
 ])
 const commonLocs = ref([])
 const commonProds = ref([])
-const commonPaymentMethods = ref(['cash', 'card', 'transfer', 'pending'])
+const commonPaymentMethods = ref(['cash', 'card', 'transfer'])
 const sharedRows = ref([])
 const loadingShared = ref(false)
 const exportingShared = ref(false)
