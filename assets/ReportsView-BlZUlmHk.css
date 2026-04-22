@@ -1,0 +1,1 @@
+.preview-table th,.preview-table td{border:1px solid #e5e7eb}.preview-table th{background-color:#f9fafb;font-weight:700}@keyframes fade-up{0%{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}.animate-fade-up{animation:fade-up .5s ease-out forwards}
