@@ -97,6 +97,16 @@
                 </template>
               </tr>
             </tbody>
+            <tfoot class="bg-gray-100 font-bold">
+              <tr>
+                <td colspan="2" class="border p-2 text-center">合計</td>
+                <template v-for="p in groupedProducts" :key="'foot_'+p.id">
+                  <td class="border p-2 text-center text-green-700">{{ previewTotals.items[p.id]?.in || '' }}</td>
+                  <td class="border p-2 text-center text-red-700">{{ previewTotals.items[p.id]?.out || '' }}</td>
+                  <td class="border p-2 text-center">—</td>
+                </template>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </template>
@@ -108,13 +118,18 @@
         <div class="card no-print">
           <h2 class="font-semibold text-gray-700 mb-3">篩選與時段</h2>
           <div class="space-y-3">
-            <div class="flex gap-2">
-              <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="commonFilterType === 'year' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="commonFilterType = 'year'">年度</button>
+            <div class="flex flex-wrap gap-2">
+              <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="commonFilterType === 'today' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="commonFilterType = 'today'">今日</button>
               <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="commonFilterType === 'month' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="commonFilterType = 'month'">月份</button>
+              <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="commonFilterType === 'year' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="commonFilterType = 'year'">年度</button>
+              <button class="px-4 py-2 rounded-xl text-sm border-2 font-medium flex-1 transition-all" :class="commonFilterType === 'custom' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="commonFilterType = 'custom'">自訂</button>
             </div>
             <div>
               <el-date-picker v-if="commonFilterType === 'year'" v-model="commonYear" type="year" placeholder="選擇年份" value-format="YYYY" class="w-full" />
-              <el-date-picker v-else v-model="commonMonth" type="month" placeholder="選擇月份" value-format="YYYY-MM" class="w-full" />
+              <el-date-picker v-else-if="commonFilterType === 'month'" v-model="commonMonth" type="month" placeholder="選擇月份" value-format="YYYY-MM" class="w-full" />
+              <el-config-provider v-else-if="commonFilterType === 'custom'" :locale="zhTwLocale">
+                <el-date-picker v-model="commonRange" type="daterange" range-separator="-" start-placeholder="自" end-placeholder="至" value-format="YYYY-MM-DD" class="w-full" />
+              </el-config-provider>
             </div>
             
             <!-- 道場多選 -->
@@ -185,9 +200,16 @@
                   <td class="border p-2 text-center">{{ row.locationName }}</td>
                   <td class="border p-2">{{ row.note || '—' }}</td>
                   <td class="border p-2 text-center">{{ row.qty }}</td>
-                  <td class="border p-2 text-center font-bold">${{ row.orderReceivedAmount ?? row.orderSubtotal ?? 0 }}</td>
+                  <td class="border p-2 text-center font-bold">${{ row.calculatedAmount }}</td>
                 </tr>
               </tbody>
+              <tfoot class="bg-gray-50 font-bold text-base">
+                <tr>
+                  <td colspan="5" class="border p-3 text-right">總計</td>
+                  <td class="border p-3 text-center text-brand-600">{{ sharedTotals.qty }}</td>
+                  <td class="border p-3 text-center text-brand-600">${{ sharedTotals.amount }}</td>
+                </tr>
+              </tfoot>
             </table>
 
             <!-- 報表 2 預覽 (認購登記表) -->
@@ -211,13 +233,21 @@
                   <td class="border p-2 text-center">{{ row.buyerName || '—' }}</td>
                   <td class="border p-2">{{ row.productSnapshot?.name }} {{ row.productSnapshot?.spec }}</td>
                   <td class="border p-2 text-center">{{ row.qty }}</td>
-                  <td class="border p-2 text-center font-bold">${{ row.orderReceivedAmount ?? row.orderSubtotal ?? 0 }}</td>
+                  <td class="border p-2 text-center font-bold">${{ row.calculatedAmount }}</td>
                   <td class="border p-2 text-center">{{ row.accountantReceivedDate || '—' }}</td>
                   <td class="border p-2 text-center">{{ paymentLabel(row.paymentMethod) }}</td>
                   <td class="border p-2 text-center">{{ row.buyerPhone || '—' }}</td>
                   <td class="border p-2 text-center text-xs">{{ row.operator?.dharmaName || row.operator?.name }}</td>
                 </tr>
               </tbody>
+              <tfoot class="bg-gray-50 font-bold text-base">
+                <tr>
+                  <td colspan="3" class="border p-3 text-right">總計</td>
+                  <td class="border p-3 text-center text-brand-600">{{ sharedTotals.qty }}</td>
+                  <td class="border p-3 text-center text-brand-600">${{ sharedTotals.amount }}</td>
+                  <td colspan="4" class="border p-3"></td>
+                </tr>
+              </tfoot>
             </table>
           </template>
         </div>
@@ -281,6 +311,17 @@ const exporting = ref(false)
 const loadingPreview = ref(false)
 const previewData = ref([])
 const groupedProducts = ref([])
+const previewTotals = computed(() => {
+  const totals = { items: {} }
+  groupedProducts.value.forEach(p => { totals.items[p.id] = { in: 0, out: 0 } })
+  previewData.value.forEach(row => {
+    groupedProducts.value.forEach(p => {
+      totals.items[p.id].in += (row.items[p.id]?.in || 0)
+      totals.items[p.id].out += (row.items[p.id]?.out || 0)
+    })
+  })
+  return totals
+})
 
 const selectedProductIds = computed(() => {
   return appStore.activeProducts
@@ -389,11 +430,22 @@ async function exportExcel() {
 const commonFilterType = ref('month')
 const commonYear = ref(String(new Date().getFullYear()))
 const commonMonth = ref(`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2, '0')}`)
+const commonRange = ref([
+  new Date().toISOString().slice(0, 10),
+  new Date().toISOString().slice(0, 10)
+])
 const commonLocs = ref([])
 const commonProds = ref([])
 const sharedRows = ref([])
 const loadingShared = ref(false)
 const exportingShared = ref(false)
+
+const sharedTotals = computed(() => {
+  return sharedRows.value.reduce((acc, row) => ({
+    qty: acc.qty + (row.qty || 0),
+    amount: acc.amount + (row.calculatedAmount || 0)
+  }), { qty: 0, amount: 0 })
+})
 
 function toggleCommonLoc(id) {
   const i = commonLocs.value.indexOf(id); i === -1 ? commonLocs.value.push(id) : commonLocs.value.splice(i, 1)
@@ -405,16 +457,51 @@ function toggleCommonProd(name) {
 async function loadSharedData() {
   loadingShared.value = true
   try {
-    const locMap = {}
-    appStore.locations.forEach(l => locMap[l.id] = l.name)
-
     const qBase = query(collection(db, 'transactions'), where('type', '==', 'out'))
     const snap = await getDocs(qBase)
-    let rows = snap.docs.map(d => ({ id: d.id, ...d.data(), locationName: locMap[d.data().locationId] }))
+    const locMap = {}
+    appStore.locations.forEach(l => locMap[l.id] = l)
+    
+    let rows = snap.docs.map(d => {
+      const data = d.data()
+      const loc = locMap[data.locationId]
+      const product = appStore.products.find(p => p.id === data.productId)
+      
+      // 金額判定：優先使用實收，次之使用應收，最後才是系統定價計算
+      let amount = data.orderReceivedAmount;
+      if (amount === undefined || amount === null) {
+        amount = data.orderSubtotal;
+      }
+
+      // 如果依然沒有金額紀錄 (null 或 undefined)，才進入備援定價計算
+      if (amount === undefined || amount === null) {
+        let price = product?.price || data.productSnapshot?.price || 0
+        if (loc?.country) {
+          const override = product?.overrides?.[loc.country]
+          if (override && override.price != null && override.price !== '') {
+            price = Number(override.price)
+          }
+        }
+        amount = price * (data.qty || 0)
+      }
+
+      return { 
+        id: d.id, 
+        ...data, 
+        locationName: loc?.name || '未知道場',
+        calculatedAmount: amount
+      }
+    })
 
     // 篩選
+    const today = new Date().toISOString().slice(0, 10)
     rows = rows.filter(r => {
-      const matchPeriod = commonFilterType.value === 'year' ? r.date?.startsWith(commonYear.value) : r.date?.startsWith(commonMonth.value)
+      let matchPeriod = false
+      if (commonFilterType.value === 'today') matchPeriod = r.date === today
+      else if (commonFilterType.value === 'year') matchPeriod = r.date?.startsWith(commonYear.value)
+      else if (commonFilterType.value === 'month') matchPeriod = r.date?.startsWith(commonMonth.value)
+      else if (commonFilterType.value === 'custom') matchPeriod = r.date >= commonRange.value[0] && r.date <= commonRange.value[1]
+      
       const matchLoc = commonLocs.value.length === 0 || commonLocs.value.includes(r.locationId)
       const matchProd = commonProds.value.length === 0 || commonProds.value.includes(r.productSnapshot?.name)
       return matchPeriod && matchLoc && matchProd
@@ -454,9 +541,11 @@ async function exportSharedExcel() {
           loc: r.locationName || '',
           note: r.note || '',
           qty: r.qty || 0,
-          amount: r.orderReceivedAmount ?? r.orderSubtotal ?? 0
+          amount: r.calculatedAmount
         })
       })
+      // 合計
+      ws.addRow({ note: '總計', qty: sharedTotals.value.qty, amount: sharedTotals.value.amount })
     } else {
       ws.columns = [
         { header: '認購日期', key: 'date', width: 12 },
@@ -475,14 +564,22 @@ async function exportSharedExcel() {
           buyer: r.buyerName || '',
           type: `${r.productSnapshot?.name} ${r.productSnapshot?.spec}`,
           qty: r.qty,
-          amount: r.orderReceivedAmount ?? r.orderSubtotal ?? 0,
+          amount: r.calculatedAmount,
           pdate: r.accountantReceivedDate || '',
           pmethod: paymentLabel(r.paymentMethod),
           phone: r.buyerPhone || '',
           handler: r.operator?.dharmaName || r.operator?.name
         })
       })
+      // 合計
+      ws.addRow({ type: '總計', qty: sharedTotals.value.qty, amount: sharedTotals.value.amount })
     }
+    
+    // 樣式
+    ws.getRow(1).font = { bold: true }
+    const lastRow = ws.lastRow
+    lastRow.font = { bold: true }
+    lastRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } }
     
     const buffer = await wb.xlsx.writeBuffer()
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -494,7 +591,7 @@ async function exportSharedExcel() {
   }
 }
 
-watch([activeTab, commonFilterType, commonYear, commonMonth, commonLocs, commonProds], () => {
+watch([activeTab, commonFilterType, commonYear, commonMonth, commonRange, commonLocs, commonProds], () => {
   if (activeTab.value !== 'stockReport') loadSharedData()
 }, { deep: true })
 

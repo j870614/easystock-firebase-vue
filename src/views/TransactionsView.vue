@@ -104,8 +104,14 @@
             </div>
 
             <!-- 會計收款日期顯示 -->
-            <div v-if="tx.type === 'out' && tx.accountantReceivedDate" class="mt-1 flex items-center gap-1.5">
-              <span class="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+            <div v-if="tx.type === 'out'" class="mt-1 flex flex-wrap gap-2">
+              <span v-if="tx.buyerName" class="inline-flex items-center gap-1 text-xs bg-brand-50 text-brand-700 border border-brand-200 px-2 py-0.5 rounded-full font-medium">
+                認供人：{{ tx.buyerName }}
+              </span>
+              <span v-if="tx.orderReceivedAmount !== undefined" class="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+                實付：${{ tx.orderReceivedAmount }}
+              </span>
+              <span v-if="tx.accountantReceivedDate" class="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
                 <CheckCircle2 class="w-3 h-3" /> 已收款：{{ tx.accountantReceivedDate }}
               </span>
             </div>
@@ -193,6 +199,19 @@
             <label class="label">備註事項</label>
             <input v-model="editForm.note" type="text" class="input" placeholder="選填" />
           </div>
+          <template v-if="editForm.type === 'out'">
+            <div>
+              <label class="label">認供人姓名</label>
+              <input v-model="editForm.buyerName" type="text" class="input" placeholder="選填" />
+            </div>
+            <div>
+              <label class="label">實付金額</label>
+              <div class="relative">
+                <span class="absolute left-3 top-2.5 text-gray-400">$</span>
+                <input v-model.number="editForm.orderReceivedAmount" type="number" class="input pl-7" placeholder="0" />
+              </div>
+            </div>
+          </template>
           <div>
             <label class="label">修改原因 <span class="text-red-500">*</span></label>
             <textarea v-model="editForm.reason" class="input h-20 py-2 resize-none" :class="{'ring-2 ring-red-300 border-red-500 bg-red-50': showErrors && !editForm.reason.trim()}" placeholder="請詳細說明修改原因（例如：記錯數量、日期填錯等），此原因將會被系統記錄。"></textarea>
@@ -308,7 +327,7 @@ let pageCursors = [null] // Use a plain array (not ref!) to prevent Vue from pro
 // Edit States
 const editDialog = ref(false)
 const showErrors = ref(false)
-const editForm = ref({ id: null, qty: 0, date: '', note: '', reason: '', oldQty: 0, type: '', productId: '' })
+const editForm = ref({ id: null, qty: 0, date: '', note: '', reason: '', oldQty: 0, type: '', productId: '', buyerName: '', orderReceivedAmount: 0 })
 const selectedTxName = ref('')
 
 // Delete States
@@ -432,7 +451,9 @@ function openEdit(tx) {
     reason: '',
     oldQty: tx.qty,
     type: tx.type,
-    productId: tx.productId
+    productId: tx.productId,
+    buyerName: tx.buyerName || '',
+    orderReceivedAmount: tx.orderReceivedAmount ?? 0
   }
   editDialog.value = true
 }
@@ -468,8 +489,8 @@ async function submitEdit() {
       } else {
         t.set(stockRef, { locationId: locId, productId: editForm.value.productId, currentStock: newStock })
       }
-
-      t.update(txRef, {
+      
+      const updateData = {
         qty: editForm.value.qty,
         date: editForm.value.date,
         note: editForm.value.note,
@@ -480,7 +501,14 @@ async function submitEdit() {
           name: authStore.user.displayName,
           dharmaName: authStore.profile?.dharmaName || '',
         }
-      })
+      }
+      
+      if (editForm.value.type === 'out') {
+        updateData.buyerName = editForm.value.buyerName
+        updateData.orderReceivedAmount = Number(editForm.value.orderReceivedAmount || 0)
+      }
+      
+      t.update(txRef, updateData)
     })
 
     editDialog.value = false

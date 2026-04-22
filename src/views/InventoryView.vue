@@ -183,12 +183,12 @@
 
       <!-- 購物車 Bottom Sheet -->
       <transition name="slide-up">
-        <div v-if="cart.length > 0" class="fixed left-0 right-0 z-40 mx-auto max-w-[480px] bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col" style="bottom: calc(64px + env(safe-area-inset-bottom));">
+        <div v-if="cart.length > 0" class="fixed left-0 right-0 z-40 mx-auto max-w-[480px] bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col max-h-[80vh] overflow-y-auto" style="bottom: calc(64px + env(safe-area-inset-bottom));">
           <div class="p-4 rounded-t-3xl border-b flex justify-between items-center" :class="appStore.isReplenishMode ? 'bg-green-500 text-white' : 'bg-brand-500 text-white'">
             <div class="font-bold text-lg">
               待{{ appStore.isReplenishMode ? '入庫' : '結緣' }}清單
             </div>
-            <button class="text-sm font-medium opacity-80 hover:opacity-100 px-2 py-1" @click="cart = []">全部清空</button>
+            <button class="text-sm font-medium opacity-80 hover:opacity-100 px-2 py-1" @click="clearCart">全部清空</button>
           </div>
           
           <div class="max-h-60 overflow-y-auto p-4 space-y-3 pb-2">
@@ -497,16 +497,22 @@ function validateCartQty(index) {
 
 // 監聽購物車變化以更新實收金額預設值
 watch(cartTotalPrice, (newTotal) => {
-  receivedAmount.value = newTotal
+  if (cart.value.length > 0) {
+    receivedAmount.value = newTotal
+  }
 })
 
-// 監聽模式切換，清空購物車
-watch(() => appStore.isReplenishMode, () => {
+function clearCart() {
   cart.value = []
+  cartNote.value = ''
   buyerName.value = ''
   buyerPhone.value = ''
   paymentMethod.value = 'cash'
-})
+  receivedAmount.value = 0
+}
+
+// 監聽模式切換，清空購物車
+watch(() => appStore.isReplenishMode, clearCart)
 
 function listenStocks() {
   if (unsubscribeStocks) {
@@ -619,9 +625,7 @@ async function submitCart() {
     })
 
     // 清空購物車、備註、付款方式
-    cart.value = []
-    cartNote.value = ''
-    paymentMethod.value = 'cash'
+    clearCart()
 
     successMsgType.value = currentTxType
     successMsg.value = currentTxType === 'in'
