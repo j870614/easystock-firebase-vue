@@ -67,9 +67,31 @@
         </div>
 
         <!-- 預覽表格 -->
-        <div class="card overflow-x-auto">
-          <div v-if="loadingPreview" class="py-10 text-center text-gray-400">載入報表資料中...</div>
-          <div v-else-if="previewData.length === 0" class="py-10 text-center text-gray-400">無資料可供預覽</div>
+        <div class="card overflow-x-auto min-h-[300px] flex flex-col justify-center">
+          <div v-if="loadingPreview" class="py-20 text-center text-gray-400">
+            <div class="animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            載入報表資料中...
+          </div>
+          <template v-else-if="selectedGroupNames.length === 0">
+            <div class="py-16 flex flex-col items-center justify-center text-center animate-fade-up">
+              <div class="bg-brand-50 p-4 rounded-2xl mb-4 text-brand-500">
+                <PackageSearch class="w-12 h-12" />
+              </div>
+              <h3 class="text-lg font-bold text-gray-800 mb-1">尚未選擇品項</h3>
+              <p class="text-gray-500 max-w-xs mx-auto mb-6 text-sm">
+                為了產生正確的報表內容，請先勾選您想要查看的產品項目。
+              </p>
+              <button @click="selectAllProducts" class="btn-ghost border-brand-200 text-brand-600 px-8 py-2 rounded-xl hover:bg-brand-50 transition-all active:scale-95">
+                一鍵全選所有品項
+              </button>
+            </div>
+          </template>
+          <div v-else-if="previewData.length === 0" class="py-20 text-center text-gray-400">
+            <div class="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileDown class="w-8 h-8 text-gray-300" />
+            </div>
+            無資料可供預覽
+          </div>
           <table v-else class="w-full text-left border-collapse min-w-max text-sm preview-table">
             <thead>
               <tr>
@@ -208,9 +230,31 @@
           </button>
         </div>
 
-        <div class="card overflow-x-auto">
-          <div v-if="loadingShared" class="py-10 text-center text-gray-400">載入資料中...</div>
-          <div v-else-if="sharedRows.length === 0" class="py-10 text-center text-gray-400">該篩選範圍內無交易紀錄</div>
+        <div class="card overflow-x-auto min-h-[300px] flex flex-col justify-center">
+          <div v-if="loadingShared" class="py-20 text-center text-gray-400">
+            <div class="animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            載入資料中...
+          </div>
+          <template v-else-if="commonProds.length === 0">
+            <div class="py-16 flex flex-col items-center justify-center text-center animate-fade-up">
+              <div class="bg-brand-50 p-4 rounded-2xl mb-4 text-brand-500">
+                <PackageSearch class="w-12 h-12" />
+              </div>
+              <h3 class="text-lg font-bold text-gray-800 mb-1">尚未選擇品項</h3>
+              <p class="text-gray-500 max-w-xs mx-auto mb-6 text-sm">
+                請從上方「品項名稱」勾選欲匯出的產品項目，即可預覽報表。
+              </p>
+              <button @click="commonProds = [...productGroups]" class="btn-ghost border-brand-200 text-brand-600 px-8 py-2 rounded-xl hover:bg-brand-50 transition-all active:scale-95">
+                一鍵全選所有品項
+              </button>
+            </div>
+          </template>
+          <div v-else-if="sharedRows.length === 0" class="py-20 text-center text-gray-400">
+            <div class="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileDown class="w-8 h-8 text-gray-300" />
+            </div>
+            該篩選範圍內無交易紀錄
+          </div>
           <template v-else>
             <!-- 報表 1 預覽 (結緣明細) -->
             <table v-if="activeTab === 'orderDetail'" class="w-full text-left border-collapse min-w-max text-sm preview-table">
@@ -292,7 +336,7 @@ import { ref, watch, onMounted, computed } from 'vue'
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'
 import zhTw from 'element-plus/es/locale/lang/zh-tw'
 import ExcelJS from 'exceljs'
-import { FileDown, Upload } from 'lucide-vue-next'
+import { FileDown, Upload, PackageSearch } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -676,4 +720,18 @@ onMounted(() => { if (appStore.activeProducts.length > 0) loadPreview() })
 <style>
 .preview-table th, .preview-table td { border: 1px solid #e5e7eb; }
 .preview-table th { background-color: #f9fafb; font-weight: bold; }
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fade-up 0.5s ease-out forwards;
+}
 </style>
