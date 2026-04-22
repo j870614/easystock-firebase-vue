@@ -30,8 +30,8 @@
              <button class="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm border font-medium transition-all" :class="dateFilterType === 'custom' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="dateFilterType = 'custom'; resetPageAndListen()">自訂區間</button>
            </div>
            
-           <div class="w-full sm:w-auto flex-1 min-w-[200px]">
-              <div v-if="dateFilterType === 'today'" class="h-10 flex items-center px-4 text-sm text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
+           <div class="w-full sm:w-auto min-w-[200px]">
+              <div v-if="dateFilterType === 'today'" class="h-10 w-fit flex items-center px-4 text-sm text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
                 篩選日期：{{ new Date().toLocaleDateString() }}
               </div>
               <el-date-picker

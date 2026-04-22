@@ -59,14 +59,10 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 no-print">
-          <button class="btn-primary text-lg py-4 gap-2" :disabled="!isDataReady || exporting" @click="exportExcel">
+        <div class="no-print">
+          <button class="btn-primary w-full text-lg py-4 gap-2" :disabled="!isDataReady || exporting" @click="exportExcel">
             <FileDown class="w-5 h-5" />
             <span>{{ exporting ? '匯出中…' : 'Excel 匯出' }}</span>
-          </button>
-          <button class="btn-ghost border-brand-200 text-brand-600 text-lg py-4 gap-2" @click="$router.push('/import')">
-            <Upload class="w-5 h-5" />
-            <span>初期庫存匯入</span>
           </button>
         </div>
 
@@ -116,6 +112,15 @@
               </tr>
             </tfoot>
           </table>
+        </div>
+
+        <!-- 初期庫存匯入（移至底部） -->
+        <div class="no-print pt-6 pb-12">
+          <button class="btn-ghost w-full border-brand-200 text-brand-600 text-lg py-4 gap-2" @click="$router.push('/import')">
+            <Upload class="w-5 h-5" />
+            <span>初期庫存匯入</span>
+          </button>
+          <p class="text-center text-gray-400 text-xs mt-3">若需調整過往日期之庫存基數，請使用此功能</p>
         </div>
       </template>
 
@@ -439,15 +444,28 @@ async function buildReportData(locId) {
     else if (exportType.value === 'month') isMatch = date.startsWith(selectedMonth.value)
     else if (exportType.value === 'custom') isMatch = date >= selectedRange.value[0] && date <= selectedRange.value[1]
     
-    let row = isMatch ? { date, note: [...new Set(txList.filter(t => selectedProductIds.value.includes(t.productId)).map(t => t.note).filter(Boolean))].join('、'), items: {} } : null
+    let row = null
+    let hasMovementOrNote = false
+
+    if (isMatch) {
+      const note = [...new Set(txList.filter(t => selectedProductIds.value.includes(t.productId)).map(t => t.note).filter(Boolean))].join('、')
+      row = { date, note, items: {} }
+      if (note) hasMovementOrNote = true
+    }
 
     products.forEach(p => {
       const inQty = txList.filter(t => t.productId === p.id && t.type === 'in').reduce((s, t) => s + t.qty, 0)
       const outQty = txList.filter(t => t.productId === p.id && t.type === 'out').reduce((s, t) => s + t.qty, 0)
       currentStocks[p.id] += (inQty - outQty)
-      if (isMatch) row.items[p.id] = { in: inQty, out: outQty, stock: currentStocks[p.id] }
+      if (isMatch) {
+        row.items[p.id] = { in: inQty, out: outQty, stock: currentStocks[p.id] }
+        if (inQty > 0 || outQty > 0) hasMovementOrNote = true
+      }
     })
-    if (isMatch && Object.keys(row.items).length > 0) rows.push(row)
+    
+    if (isMatch && hasMovementOrNote) {
+      rows.push(row)
+    }
   }
   return { products, rows }
 }
