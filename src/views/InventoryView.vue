@@ -183,14 +183,14 @@
                      </div>
                      <div class="mt-2 flex items-center gap-2" v-if="!appStore.isReplenishMode">
                        <span class="text-xs font-bold text-brand-600">實付：</span>
-                       <div class="relative flex-1 max-w-[120px]">
-                         <span class="absolute left-2 top-1/2 -translate-y-1/2 text-brand-600 font-bold text-xs">$</span>
+                       <div class="relative flex-1 max-w-[140px]">
+                         <span class="absolute left-1 top-1/2 -translate-y-1/2 text-brand-600 font-bold text-sm">$</span>
                          <input
                            type="number"
                            inputmode="numeric"
                            v-model.number="item.receivedAmount"
                            @focus="item.receivedAmount = 0"
-                           class="w-full pl-5 pr-2 py-0.5 text-right font-bold text-sm text-brand-600 border-b-2 border-brand-100 focus:outline-none focus:border-brand-500 bg-transparent"
+                           class="w-full pl-5 pr-1 py-0.5 text-right font-bold text-lg text-brand-600 border-b-2 border-brand-100 focus:outline-none focus:border-brand-500 bg-transparent"
                          />
                        </div>
                      </div>

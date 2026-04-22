@@ -213,7 +213,7 @@
               <label class="label">實付金額</label>
               <div class="relative">
                 <span class="absolute left-3 top-2.5 text-gray-400 font-bold">$</span>
-                <input v-model.number="editForm.orderReceivedAmount" type="number" class="input pl-8 text-lg font-bold text-brand-600" placeholder="0" />
+                <input v-model.number="editForm.itemReceivedAmount" type="number" class="input pl-8 text-lg font-bold text-brand-600" placeholder="0" />
               </div>
             </div>
           </template>
@@ -345,7 +345,7 @@ let pageCursors = [null] // Use a plain array (not ref!) to prevent Vue from pro
 // Edit States
 const editDialog = ref(false)
 const showErrors = ref(false)
-const editForm = ref({ id: null, qty: 0, date: '', note: '', reason: '', oldQty: 0, type: '', productId: '', buyerName: '', orderReceivedAmount: 0, paymentMethod: '' })
+const editForm = ref({ id: null, qty: 0, date: '', note: '', reason: '', oldQty: 0, type: '', productId: '', buyerName: '', orderReceivedAmount: 0, itemReceivedAmount: 0, paymentMethod: '' })
 const selectedTxName = ref('')
 
 // Delete States
@@ -487,6 +487,7 @@ function openEdit(tx) {
     productId: tx.productId,
     buyerName: tx.buyerName || '',
     orderReceivedAmount: tx.orderReceivedAmount ?? 0,
+    itemReceivedAmount: tx.itemReceivedAmount ?? getDisplayAmount(tx),
     paymentMethod: tx.paymentMethod || 'cash'
   }
   editDialog.value = true
@@ -507,7 +508,7 @@ async function submitEdit() {
       const stockRef = doc(db, 'stocks', stockDocId)
       const txRef = doc(db, 'transactions', editForm.value.id)
 
-      const stockSnap = await t.get(stockRef)
+      const [stockSnap, txSnap] = await Promise.all([t.get(stockRef), t.get(txRef)])
       const currentStock = stockSnap.exists() ? stockSnap.data().currentStock : 0
 
       const delta = editForm.value.qty - editForm.value.oldQty
@@ -538,7 +539,11 @@ async function submitEdit() {
       }
       
       if (editForm.value.type === 'out') {
-        updateData.orderReceivedAmount = Number(editForm.value.orderReceivedAmount || 0)
+        const snapshot = txSnap.data()
+        const price = snapshot?.productSnapshot?.price || 0
+        updateData.itemSubtotal = price * editForm.value.qty
+        updateData.itemReceivedAmount = Number(editForm.value.itemReceivedAmount ?? 0)
+        updateData.orderReceivedAmount = updateData.itemReceivedAmount // 回填以維持兼容
         updateData.paymentMethod = editForm.value.paymentMethod
       }
       
