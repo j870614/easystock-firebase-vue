@@ -102,14 +102,33 @@
               <span>{{ tx.date }}</span>
               <span>{{ tx.operator?.dharmaName || tx.operator?.name }}</span>
             </div>
+
+            <!-- 會計收款日期顯示 -->
+            <div v-if="tx.type === 'out' && tx.accountantReceivedDate" class="mt-1 flex items-center gap-1.5">
+              <span class="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                <CheckCircle2 class="w-3 h-3" /> 已收款：{{ tx.accountantReceivedDate }}
+              </span>
+            </div>
             
-            <div v-if="authStore.isAdmin" class="mt-2 pt-2 border-t border-gray-100 flex justify-end gap-4">
-               <button class="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-brand-600 active:scale-95 transition-all" @click="openEdit(tx)">
-                 <Edit2 class="w-4 h-4"/> 編輯
-               </button>
-               <button class="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-red-600 active:scale-95 transition-all" @click="deleteTx(tx)">
-                 <Trash2 class="w-4 h-4"/> 刪除
-               </button>
+            <div class="mt-2 pt-2 border-t border-gray-100 flex justify-end gap-4">
+              <!-- 會計快捷標記收款日期 -->
+              <button
+                v-if="isAccountant && tx.type === 'out'"
+                class="flex items-center gap-1.5 text-sm font-medium transition-all active:scale-95"
+                :class="tx.accountantReceivedDate ? 'text-emerald-600 hover:text-emerald-700' : 'text-amber-500 hover:text-amber-600'"
+                @click="openAccountantDatePicker(tx)"
+              >
+                <CalendarCheck class="w-4 h-4" />
+                {{ tx.accountantReceivedDate ? '修改收款日期' : '標記收款日期' }}
+              </button>
+              <template v-if="authStore.isAdmin">
+                <button class="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-brand-600 active:scale-95 transition-all" @click="openEdit(tx)">
+                  <Edit2 class="w-4 h-4"/> 編輯
+                </button>
+                <button class="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-red-600 active:scale-95 transition-all" @click="deleteTx(tx)">
+                  <Trash2 class="w-4 h-4"/> 刪除
+                </button>
+              </template>
             </div>
           </div>
         </div>
@@ -185,6 +204,35 @@
         </div>
       </el-dialog>
 
+      <!-- 會計收款日期 Dialog -->
+      <el-dialog
+        v-model="accountantDateDialog"
+        title="標記收款日期"
+        width="90%"
+        align-center
+        destroy-on-close
+      >
+        <div class="space-y-4 pt-2">
+          <div class="border p-3 rounded-xl bg-emerald-50 border-emerald-100">
+            <div class="text-sm text-emerald-700 font-medium">{{ selectedTxForDate?.productSnapshot?.name }}<span v-if="selectedTxForDate?.productSnapshot?.spec"> ({{ selectedTxForDate?.productSnapshot?.spec }})</span></div>
+            <div class="text-xs text-emerald-600 mt-0.5">出庫日期：{{ selectedTxForDate?.date }}</div>
+          </div>
+          <div>
+            <label class="label">會計收款日期</label>
+            <el-date-picker
+              v-model="accountantReceivedDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="選擇收款日期"
+              class="w-full h-12"
+            />
+          </div>
+          <button class="btn-primary w-full py-4 text-lg" :disabled="!accountantReceivedDate || submitting" @click="submitAccountantDate">
+            {{ submitting ? '儲存中...' : '確認標記' }}
+          </button>
+        </div>
+      </el-dialog>
+
       <!-- 刪除確認 Dialog -->
       <el-dialog
         v-model="deleteDialog"
@@ -217,9 +265,9 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { collection, query, where, onSnapshot, orderBy, limit, doc, runTransaction, serverTimestamp, startAfter } from 'firebase/firestore'
-import { Building2, History, ArrowDownCircle, ArrowUpCircle, MoreVertical, Edit2, Trash2 } from 'lucide-vue-next'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { collection, query, where, onSnapshot, orderBy, limit, doc, runTransaction, updateDoc, serverTimestamp, startAfter } from 'firebase/firestore'
+import { Building2, History, ArrowDownCircle, ArrowUpCircle, MoreVertical, Edit2, Trash2, CalendarCheck, CheckCircle2 } from 'lucide-vue-next'
 import zhTw from 'element-plus/es/locale/lang/zh-tw'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
@@ -266,6 +314,12 @@ const selectedTxName = ref('')
 // Delete States
 const deleteDialog = ref(false)
 const txToDelete = ref(null)
+
+// Accountant States
+const accountantDateDialog = ref(false)
+const selectedTxForDate = ref(null)
+const accountantReceivedDate = ref('')
+const isAccountant = computed(() => authStore.profile?.dutyName === '會計')
 
 function stopListener() {
   if (unsubscribe) {
@@ -481,6 +535,33 @@ async function confirmDelete() {
   } finally {
     submitting.value = false
     loading.value = false
+  }
+}
+
+function openAccountantDatePicker(tx) {
+  selectedTxForDate.value = tx
+  accountantReceivedDate.value = tx.accountantReceivedDate || ''
+  accountantDateDialog.value = true
+}
+
+async function submitAccountantDate() {
+  if (!accountantReceivedDate.value) return
+  submitting.value = true
+  try {
+    await updateDoc(doc(db, 'transactions', selectedTxForDate.value.id), {
+      accountantReceivedDate: accountantReceivedDate.value,
+      accountantMarkedBy: {
+        uid: authStore.user.uid,
+        name: authStore.user.displayName,
+        dharmaName: authStore.profile?.dharmaName || '',
+      },
+      accountantMarkedAt: serverTimestamp(),
+    })
+    accountantDateDialog.value = false
+  } catch (e) {
+    alert(e.message || '標記失敗，請重試')
+  } finally {
+    submitting.value = false
   }
 }
 

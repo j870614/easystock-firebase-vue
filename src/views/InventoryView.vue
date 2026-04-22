@@ -213,10 +213,24 @@
 
           <!-- 備註 -->
           <div class="px-4 pb-2">
+            <div class="grid grid-cols-2 gap-2">
+              <input
+                v-model="buyerName"
+                type="text"
+                class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                placeholder="認購人 (選填)"
+              />
+              <input
+                v-model="buyerPhone"
+                type="tel"
+                class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                placeholder="電話 (選填)"
+              />
+            </div>
             <input
               v-model="cartNote"
               type="text"
-              class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
+              class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-300 mt-2"
               placeholder="備註（例：法名：普某 請購）"
             />
           </div>
@@ -232,15 +246,25 @@
                <!-- 實收金額 -->
                <div class="flex justify-between items-center">
                   <span class="font-bold text-gray-800">實收金額</span>
-                  <div class="relative">
-                    <span class="absolute left-3 top-2 text-gray-500 font-bold">$</span>
-                    <input
-                      type="number"
-                      inputmode="numeric"
-                      v-model.number="receivedAmount"
-                      class="w-32 pl-7 pr-3 py-1.5 text-right font-bold text-xl text-brand-600 border-2 border-brand-200 rounded-xl focus:outline-none focus:border-brand-500 bg-white"
-                      min="0"
-                    />
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      class="text-xs text-gray-400 hover:text-brand-500 transition-colors px-1.5 py-1 rounded-lg hover:bg-brand-50 whitespace-nowrap"
+                      :class="{ 'opacity-0 pointer-events-none': receivedAmount === cartTotalPrice }"
+                      @click="receivedAmount = cartTotalPrice"
+                      title="還原小計金額"
+                    >↺ 還原</button>
+                    <div class="relative">
+                      <span class="absolute left-3 top-2 text-gray-500 font-bold">$</span>
+                      <input
+                        type="number"
+                        inputmode="numeric"
+                        v-model.number="receivedAmount"
+                        class="w-32 pl-7 pr-3 py-1.5 text-right font-bold text-xl text-brand-600 border-2 border-brand-200 rounded-xl focus:outline-none focus:border-brand-500 bg-white"
+                        min="0"
+                        @focus="receivedAmount = 0"
+                      />
+                    </div>
                   </div>
                </div>
 
@@ -349,6 +373,8 @@ const cartNote = ref('')
 const cart = ref([])
 const paymentMethod = ref('cash')
 const receivedAmount = ref(0)
+const buyerName = ref('')
+const buyerPhone = ref('')
 let unsubscribeStocks = null
 
 
@@ -477,6 +503,9 @@ watch(cartTotalPrice, (newTotal) => {
 // 監聽模式切換，清空購物車
 watch(() => appStore.isReplenishMode, () => {
   cart.value = []
+  buyerName.value = ''
+  buyerPhone.value = ''
+  paymentMethod.value = 'cash'
 })
 
 function listenStocks() {
@@ -563,6 +592,8 @@ async function submitCart() {
           },
           qty: item.qty,
           note: cartNote.value.trim(),
+          buyerName: buyerName.value.trim(),
+          buyerPhone: buyerPhone.value.trim(),
           operator: {
             uid: authStore.user.uid,
             name: authStore.user.displayName,
@@ -587,9 +618,10 @@ async function submitCart() {
       stockMap.value[item.product.id] = (stockMap.value[item.product.id] ?? 0) + delta
     })
 
-    // 清空購物車與備註
+    // 清空購物車、備註、付款方式
     cart.value = []
     cartNote.value = ''
+    paymentMethod.value = 'cash'
 
     successMsgType.value = currentTxType
     successMsg.value = currentTxType === 'in'

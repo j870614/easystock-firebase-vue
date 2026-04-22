@@ -22,6 +22,10 @@ service cloud.firestore {
       return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'staff'];
     }
 
+    function isAccountant() {
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.dutyName == '會計';
+    }
+
     // ── users 集合 ────────────────────────────────────────────
     // - 任何已登入使用者可讀取自己的文件
     // - 只有 owner 可以寫入或變更 role 欄位
@@ -74,7 +78,8 @@ service cloud.firestore {
       allow create: if isStaff()
                     && request.resource.data.operator.uid == request.auth.uid;
       // Admin 可以更新和刪除（補帳/正帳）
-      allow update: if isAdmin();
+      // 會計可以更新（為了標記收款日期）
+      allow update: if isAdmin() || isAccountant();
       allow delete: if isAdmin();
     }
 
