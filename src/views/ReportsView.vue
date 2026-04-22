@@ -59,10 +59,14 @@
           </div>
         </div>
 
-        <div class="flex gap-2 no-print">
-          <button class="btn-primary flex-1 text-lg py-4 gap-2" :disabled="!isDataReady || exporting" @click="exportExcel">
+        <div class="grid grid-cols-2 gap-2 no-print">
+          <button class="btn-primary text-lg py-4 gap-2" :disabled="!isDataReady || exporting" @click="exportExcel">
             <FileDown class="w-5 h-5" />
             <span>{{ exporting ? '匯出中…' : 'Excel 匯出' }}</span>
+          </button>
+          <button class="btn-ghost border-brand-200 text-brand-600 text-lg py-4 gap-2" @click="$router.push('/import')">
+            <Upload class="w-5 h-5" />
+            <span>初期庫存匯入</span>
           </button>
         </div>
 
@@ -264,7 +268,10 @@
               </tbody>
               <tfoot class="bg-gray-50 font-bold text-base">
                 <tr>
-                    <td colspan="5" class="border p-3 text-right">總計</td>
+                  <td colspan="3" class="border p-3 text-right">總計</td>
+                  <td class="border p-3 text-center text-brand-600">{{ sharedTotals.qty }}</td>
+                  <td class="border p-3 text-center text-brand-600">${{ sharedTotals.amount }}</td>
+                  <td colspan="3" class="border p-3 font-normal text-gray-400"></td>
                 </tr>
               </tfoot>
             </table>
@@ -280,7 +287,7 @@ import { ref, watch, onMounted, computed } from 'vue'
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'
 import zhTw from 'element-plus/es/locale/lang/zh-tw'
 import ExcelJS from 'exceljs'
-import { FileDown } from 'lucide-vue-next'
+import { FileDown, Upload } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'

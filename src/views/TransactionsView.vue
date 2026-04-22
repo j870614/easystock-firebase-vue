@@ -25,13 +25,17 @@
         <div class="flex flex-wrap items-center gap-2">
            <div class="flex gap-1 overflow-x-auto">
              <button class="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm border font-medium transition-all" :class="dateFilterType === 'all' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="dateFilterType = 'all'; resetPageAndListen()">全部時間</button>
+             <button class="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm border font-medium transition-all" :class="dateFilterType === 'today' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="dateFilterType = 'today'; resetPageAndListen()">今日</button>
              <button class="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm border font-medium transition-all" :class="dateFilterType === 'month' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="dateFilterType = 'month'; resetPageAndListen()">按月份</button>
              <button class="flex-shrink-0 px-3 py-1.5 rounded-lg text-sm border font-medium transition-all" :class="dateFilterType === 'custom' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'" @click="dateFilterType = 'custom'; resetPageAndListen()">自訂區間</button>
            </div>
            
            <div class="w-full sm:w-auto flex-1 min-w-[200px]">
+              <div v-if="dateFilterType === 'today'" class="h-10 flex items-center px-4 text-sm text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
+                篩選日期：{{ new Date().toLocaleDateString() }}
+              </div>
               <el-date-picker
-                v-if="dateFilterType === 'month'"
+                v-else-if="dateFilterType === 'month'"
                 v-model="selectedMonth"
                 type="month"
                 placeholder="選擇月份"
@@ -414,7 +418,10 @@ function listen() {
     constraints.push(where('type', '==', activeFilter.value))
   }
   
-  if (dateFilterType.value === 'month') {
+  if (dateFilterType.value === 'today') {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    constraints.push(where('date', '==', todayStr))
+  } else if (dateFilterType.value === 'month') {
     const monthStart = selectedMonth.value + '-01'
     const monthEnd = selectedMonth.value + '-31' // 字串比對，31可以涵蓋所有月份結束
     constraints.push(where('date', '>=', monthStart), where('date', '<=', monthEnd))
