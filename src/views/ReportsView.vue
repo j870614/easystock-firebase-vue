@@ -79,7 +79,7 @@
               </div>
               <h3 class="text-lg font-bold text-gray-800 mb-1">尚未選擇品項</h3>
               <p class="text-gray-500 max-w-xs mx-auto mb-6 text-sm">
-                為了產生正確的報表內容，請先勾選您想要查看的產品項目。
+                為了產生正確的報表內容，請先勾選您想要查看的品項名稱。
               </p>
               <button @click="selectAllProducts" class="btn-ghost border-brand-200 text-brand-600 px-8 py-2 rounded-xl hover:bg-brand-50 transition-all active:scale-95">
                 一鍵全選所有品項
