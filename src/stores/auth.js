@@ -27,6 +27,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isStaff   = computed(() => ['owner', 'admin', 'staff'].includes(role.value))
   const isPending = computed(() => role.value === 'pending')
 
+  const isAccountant = computed(() => profile.value?.dutyName === '會計')
+
   const assignedLocationId = computed(() => profile.value?.assignedLocationId ?? null)
 
   // ── Actions ──────────────────────────────────────────
@@ -145,6 +147,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     isStaff,
     isPending,
+    isAccountant,
     assignedLocationId,
     init,
     loginWithGoogle,

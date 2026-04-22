@@ -108,8 +108,8 @@
               <span v-if="tx.buyerName" class="inline-flex items-center gap-1 text-xs bg-brand-50 text-brand-700 border border-brand-200 px-2 py-0.5 rounded-full font-medium">
                 認供人：{{ tx.buyerName }}
               </span>
-              <span v-if="tx.orderReceivedAmount !== undefined" class="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
-                實付：${{ tx.orderReceivedAmount }}
+              <span class="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+                實付：${{ getDisplayAmount(tx) }}
               </span>
               <span v-if="tx.accountantReceivedDate" class="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
                 <CheckCircle2 class="w-3 h-3" /> 已收款：{{ tx.accountantReceivedDate }}
@@ -119,7 +119,7 @@
             <div class="mt-2 pt-2 border-t border-gray-100 flex justify-end gap-4">
               <!-- 會計快捷標記收款日期 -->
               <button
-                v-if="isAccountant && tx.type === 'out'"
+                v-if="authStore.isAccountant && tx.type === 'out'"
                 class="flex items-center gap-1.5 text-sm font-medium transition-all active:scale-95"
                 :class="tx.accountantReceivedDate ? 'text-emerald-600 hover:text-emerald-700' : 'text-amber-500 hover:text-amber-600'"
                 @click="openAccountantDatePicker(tx)"
@@ -233,8 +233,16 @@
       >
         <div class="space-y-4 pt-2">
           <div class="border p-3 rounded-xl bg-emerald-50 border-emerald-100">
-            <div class="text-sm text-emerald-700 font-medium">{{ selectedTxForDate?.productSnapshot?.name }}<span v-if="selectedTxForDate?.productSnapshot?.spec"> ({{ selectedTxForDate?.productSnapshot?.spec }})</span></div>
-            <div class="text-xs text-emerald-600 mt-0.5">出庫日期：{{ selectedTxForDate?.date }}</div>
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-sm text-emerald-800 font-bold">{{ selectedTxForDate?.productSnapshot?.name }}<span v-if="selectedTxForDate?.productSnapshot?.spec" class="font-normal opacity-70"> ({{ selectedTxForDate?.productSnapshot?.spec }})</span></div>
+                <div class="text-xs text-emerald-600 mt-0.5">出庫日期：{{ selectedTxForDate?.date }}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-emerald-600">實付金額</div>
+                <div class="text-lg font-black text-emerald-700">${{ getDisplayAmount(selectedTxForDate) }}</div>
+              </div>
+            </div>
           </div>
           <div>
             <label class="label">會計收款日期</label>
@@ -338,7 +346,22 @@ const txToDelete = ref(null)
 const accountantDateDialog = ref(false)
 const selectedTxForDate = ref(null)
 const accountantReceivedDate = ref('')
-const isAccountant = computed(() => authStore.profile?.dutyName === '會計')
+const isAccountant = computed(() => authStore.isAccountant)
+
+function getDisplayAmount(tx) {
+  if (!tx) return 0
+  // 1. 優先使用實收金額
+  if (tx.orderReceivedAmount !== undefined && tx.orderReceivedAmount !== null) {
+    return tx.orderReceivedAmount
+  }
+  // 2. 次之使用整單總額 (如有)
+  if (tx.orderSubtotal !== undefined && tx.orderSubtotal !== null) {
+    return tx.orderSubtotal
+  }
+  // 3. 最後使用單價 * 數量計算
+  const price = tx.productSnapshot?.price || 0
+  return price * (tx.qty || 0)
+}
 
 function stopListener() {
   if (unsubscribe) {

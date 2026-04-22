@@ -4,7 +4,7 @@
       <!-- Tab 切換 -->
       <div class="flex gap-1 bg-gray-100 p-1 rounded-xl">
         <button
-          v-for="tab in tabs"
+          v-for="tab in visibleTabs"
           :key="tab.key"
           class="flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-all"
           :class="activeTab === tab.key
@@ -273,11 +273,25 @@ const authStore = useAuthStore()
 
 // ─── Tab ───────────────────────────────────────────────
 const activeTab = ref('stockReport')
-const tabs = [
-  { key: 'stockReport', label: '出入庫明細' },
-  { key: 'orderDetail', label: '結緣明細表' },
-  { key: 'orderReg',    label: '認購登記表' },
-]
+const visibleTabs = computed(() => {
+  const allTabs = [
+    { key: 'stockReport', label: '出入庫明細' },
+    { key: 'orderDetail', label: '結緣明細表' },
+    { key: 'orderReg',    label: '認購登記表' },
+  ]
+  // 僅會計可看 結緣明細表
+  return allTabs.filter(tab => {
+    if (tab.key === 'orderDetail') return authStore.isAccountant
+    return true
+  })
+})
+
+// 權限檢查：若當前分頁被過濾，自動跳回第一個可見分頁
+watch(visibleTabs, (newTabs) => {
+  if (!newTabs.find(t => t.key === activeTab.value)) {
+    activeTab.value = newTabs[0]?.key || 'stockReport'
+  }
+}, { immediate: true })
 
 // ─── 共用：品項清單 ─────────────────────────────────────
 const productGroups = computed(() => {
