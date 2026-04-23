@@ -84,7 +84,7 @@
             <ArrowUpCircle v-else class="w-5 h-5 text-red-600" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-start gap-2">
               <span class="font-semibold text-gray-800 break-all" :style="{ fontSize: 'var(--fs-main)' }">
                 {{ tx.productSnapshot?.name }}
                 <span v-if="tx.productSnapshot?.spec" class="text-gray-500 font-normal">
@@ -103,7 +103,7 @@
               {{ tx.note || '—' }}
               <span v-if="tx.editReason" class="text-xs text-amber-600 ml-2" :title="'修改原因: ' + tx.editReason">(曾修改)</span>
             </div>
-            <div class="text-xs text-gray-400 mt-1 flex gap-3">
+            <div class="mt-1 flex flex-wrap gap-3 text-xs text-gray-400">
               <span>{{ tx.date }}</span>
               <span>{{ tx.operator?.dharmaName || tx.operator?.name }}</span>
             </div>
@@ -121,7 +121,7 @@
               </span>
             </div>
             
-            <div class="mt-2 pt-2 border-t border-gray-100 flex justify-end gap-4">
+            <div class="mt-2 flex flex-wrap justify-end gap-4 border-t border-gray-100 pt-2">
               <!-- 會計快捷標記收款日期 -->
               <button
                 v-if="authStore.isAccountant && tx.type === 'out'"
@@ -146,7 +146,7 @@
       </div>
 
       <!-- 分頁操作區 -->
-      <div v-if="transactions.length > 0 || currentPage > 0" class="flex justify-between items-center mt-6 pt-4 pb-32 border-t border-gray-100">
+      <div v-if="transactions.length > 0 || currentPage > 0" class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 pb-32">
         <button
           class="px-4 py-2 flex items-center justify-center rounded-xl bg-white border border-gray-200 font-medium text-gray-600 transition-all hover:bg-gray-50 active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:bg-gray-100"
           :disabled="currentPage === 0 || loading"
@@ -154,7 +154,7 @@
         >
           上一頁
         </button>
-        <div class="flex items-center gap-2">
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
           <select v-model="pageSize" @change="resetPageAndListen" class="border flex-shrink-0 border-gray-200 rounded-lg text-sm bg-white py-1.5 pl-2 pr-1 shadow-sm focus:outline-none focus:ring-1 focus:ring-brand-500">
             <option :value="10">10 筆/頁</option>
             <option :value="20">20 筆/頁</option>
@@ -181,10 +181,10 @@
         align-center
         destroy-on-close
       >
-        <div class="space-y-4 pt-2">
+        <div class="max-h-[min(70dvh,34rem)] space-y-4 overflow-y-auto pt-2 pr-1">
           <div class="border p-3 rounded-xl bg-gray-50">
             <div class="text-sm text-gray-500">變更品項</div>
-            <div class="font-bold text-gray-800 text-lg">{{ selectedTxName }}</div>
+            <div class="text-lg font-bold text-gray-800 break-words">{{ selectedTxName }}</div>
           </div>
           <div>
             <label class="label">日期</label>
@@ -240,14 +240,14 @@
         align-center
         destroy-on-close
       >
-        <div class="space-y-4 pt-2">
+        <div class="max-h-[min(70dvh,34rem)] space-y-4 overflow-y-auto pt-2 pr-1">
           <div class="border p-3 rounded-xl bg-emerald-50 border-emerald-100">
-            <div class="flex justify-between items-start">
-              <div>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div class="min-w-0">
                 <div class="text-sm text-emerald-800 font-bold">{{ selectedTxForDate?.productSnapshot?.name }}<span v-if="selectedTxForDate?.productSnapshot?.spec" class="font-normal opacity-70"> ({{ selectedTxForDate?.productSnapshot?.spec }})</span></div>
                 <div class="text-xs text-emerald-600 mt-0.5">出庫日期：{{ selectedTxForDate?.date }}</div>
               </div>
-              <div class="text-right">
+              <div class="text-left sm:text-right">
                 <div class="text-xs text-emerald-600">實付金額</div>
                 <div class="text-lg font-black text-emerald-700">${{ formatMoney(getDisplayAmount(selectedTxForDate)) }}</div>
               </div>
@@ -273,22 +273,22 @@
       <el-dialog
         v-model="deleteDialog"
         title="確認刪除"
-        width="400px"
+        width="92%"
         align-center
         destroy-on-close
       >
-        <div class="space-y-4 pt-2">
+        <div class="max-h-[min(70dvh,34rem)] space-y-4 overflow-y-auto pt-2 pr-1">
           <p class="text-gray-600">確定要刪除這筆【{{ txToDelete?.type === 'in' ? '入庫' : '出庫' }}】紀錄嗎？資料將會回推庫存。</p>
-          <div class="border p-3 rounded-xl bg-gray-50 flex justify-between items-center">
-            <div>
-               <div class="font-bold text-gray-800">{{ txToDelete?.productSnapshot?.name }}<span v-if="txToDelete?.productSnapshot?.spec"> ({{txToDelete?.productSnapshot?.spec}})</span></div>
+          <div class="flex flex-col gap-3 rounded-xl border bg-gray-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+               <div class="font-bold text-gray-800 break-words">{{ txToDelete?.productSnapshot?.name }}<span v-if="txToDelete?.productSnapshot?.spec"> ({{txToDelete?.productSnapshot?.spec}})</span></div>
                <div class="text-sm text-gray-500">{{ txToDelete?.date }}</div>
             </div>
             <div class="font-bold text-lg" :class="txToDelete?.type === 'in' ? 'text-green-600' : 'text-red-600'">
                 {{ txToDelete?.type === 'in' ? '+' : '−' }}{{ txToDelete?.qty }}
             </div>
           </div>
-          <div class="flex gap-3 mt-6">
+          <div class="mt-6 flex flex-col gap-3 sm:flex-row">
             <button class="btn-ghost flex-1 py-3 border-gray-200" @click="deleteDialog = false">取消</button>
             <button class="btn-primary flex-1 py-3 bg-red-500 hover:bg-red-600 shadow-red-200 border-red-500" :disabled="submitting" @click="confirmDelete">
               {{ submitting ? '刪除中...' : '確認刪除' }}

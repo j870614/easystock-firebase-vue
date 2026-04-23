@@ -13,7 +13,7 @@
         class="card p-0 overflow-hidden border-2"
         :class="group.items.some((item) => item.isActive !== false) ? 'border-transparent' : 'opacity-50 border-gray-200'"
       >
-        <div class="flex items-center gap-3 p-3 bg-gray-50 border-b">
+        <div class="flex flex-col gap-3 border-b bg-gray-50 p-3 sm:flex-row sm:items-center">
           <Package class="w-5 h-5 text-brand-500 flex-shrink-0" />
           <div class="flex-1 min-w-0">
             <div class="font-bold text-gray-800 line-clamp-2 break-words">{{ group.name }}</div>
@@ -29,7 +29,7 @@
               </span>
             </div>
           </div>
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center justify-end gap-1.5">
             <el-switch
               :model-value="group.items.some((item) => appStore.isProductVisibleInHall(item))"
               @change="(val) => toggleGroupVisibility(group, val)"
@@ -48,7 +48,7 @@
         </div>
 
         <div class="divide-y">
-          <div v-for="item in group.items" :key="item.id" class="flex items-center gap-3 p-3">
+          <div v-for="item in group.items" :key="item.id" class="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
             <div class="flex-1 min-w-0">
               <div class="font-semibold text-gray-800">{{ item.spec || '預設規格' }}</div>
               <div class="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
@@ -57,7 +57,9 @@
                 <span v-if="showPurchaseColumns">採購：{{ formatMoney(item.purchasePrice || 0) }}</span>
               </div>
             </div>
-            <el-switch :model-value="appStore.isProductVisibleInHall(item)" @change="(val) => toggleItemVisibility(item, val)" />
+            <div class="flex justify-end">
+              <el-switch :model-value="appStore.isProductVisibleInHall(item)" @change="(val) => toggleItemVisibility(item, val)" />
+            </div>
           </div>
         </div>
       </div>
@@ -78,18 +80,20 @@
           <div
             v-for="group in hiddenGroups"
             :key="group.name"
-            class="flex items-center gap-3 p-3"
+            class="flex flex-col gap-3 p-3 sm:flex-row sm:items-center"
           >
             <div class="flex-1 min-w-0">
               <div class="font-semibold text-gray-800">{{ group.name }}</div>
               <div class="text-xs text-gray-400 mt-1">{{ group.scopeLabel }}</div>
             </div>
-            <button class="btn-ghost px-4 py-2 text-sm" @click="restoreGroup(group)">
-              重新上架
-            </button>
-            <button class="p-2 rounded-xl border border-brand-100 text-brand-600 hover:bg-brand-50" :disabled="authStore.isHallLead && group.isShared" @click="openForm(group)">
-              <Pencil class="w-4 h-4" />
-            </button>
+            <div class="flex items-center justify-end gap-2">
+              <button class="btn-ghost px-4 py-2 text-sm" @click="restoreGroup(group)">
+                重新上架
+              </button>
+              <button class="p-2 rounded-xl border border-brand-100 text-brand-600 hover:bg-brand-50" :disabled="authStore.isHallLead && group.isShared" @click="openForm(group)">
+                <Pencil class="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div v-if="hiddenGroups.length === 0" class="px-4 py-8 text-center text-gray-400">
             目前沒有隱藏品項
@@ -99,7 +103,7 @@
     </div>
 
     <el-dialog v-model="dialogVisible" :title="editingGroupName ? '編輯品項' : '新增品項'" width="92%" align-center>
-      <div class="space-y-4 py-2">
+      <div class="max-h-[min(70dvh,34rem)] space-y-4 overflow-y-auto py-2 pr-1">
         <div>
           <label class="label">品項名稱 *</label>
           <input v-model="form.name" type="text" class="input" placeholder="例如：背心" />
@@ -113,7 +117,7 @@
             </div>
           </template>
           <template v-else>
-            <div class="flex gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row">
               <button
                 class="flex-1 rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all"
                 :class="form.placementMode === 'all' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500'"
@@ -137,7 +141,7 @@
               >
                 <input v-model="form.hallIds" type="checkbox" :value="hall.id" class="w-4 h-4" />
                 <div class="min-w-0">
-                  <div class="font-medium text-gray-700">{{ hall.locationName }} / {{ hall.name }}</div>
+                  <div class="font-medium text-gray-700 break-words">{{ hall.locationName }} / {{ hall.name }}</div>
                   <div class="text-xs text-gray-400">{{ financeLabel(hall.financeMode) }}</div>
                 </div>
               </label>
@@ -177,7 +181,7 @@
                 </button>
               </div>
 
-              <div class="grid grid-cols-2 gap-2 mb-2">
+              <div class="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div>
                   <label class="text-xs text-gray-500 mb-1 block">規格名稱</label>
                   <input v-model="item.spec" type="text" class="input py-1.5 text-sm" placeholder="如 M / 薄" />
@@ -192,7 +196,7 @@
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-2 items-end">
+              <div class="grid grid-cols-1 items-end gap-2 sm:grid-cols-2">
                 <div>
                   <label class="text-xs text-gray-500 mb-1 block">安全庫存</label>
                   <input v-model.number="item.minStock" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />

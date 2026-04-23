@@ -16,8 +16,8 @@
           <span v-if="appStore.isReplenishMode">📦 入庫模式</span>
           <span v-else>🙏 認供結緣</span>
         </div>
-        <div class="flex items-center gap-1.5 ml-auto">
-          <span class="text-xs font-bold transition-colors whitespace-nowrap text-gray-500">
+        <div class="ml-auto flex w-full items-center justify-between gap-1.5 sm:w-auto sm:justify-start">
+          <span class="text-xs font-bold transition-colors text-gray-500">
             {{ appStore.isReplenishMode ? '切換成結緣模式' : '切換成入庫模式' }}
           </span>
           <el-switch v-model="appStore.isReplenishMode" style="--el-switch-on-color: #22c55e;" />
@@ -128,18 +128,18 @@
         align-center
         destroy-on-close
       >
-        <div class="space-y-4 py-2">
-          <div v-for="p in selectedGroupItems" :key="p.id" class="border-2 rounded-xl p-4 flex justify-between items-center" :class="appStore.isReplenishMode ? 'border-green-50' : 'border-brand-50'">
-            <div>
+        <div class="max-h-[min(70dvh,34rem)] space-y-4 overflow-y-auto py-2 pr-1">
+          <div v-for="p in selectedGroupItems" :key="p.id" class="flex flex-col gap-3 rounded-xl border-2 p-4 sm:flex-row sm:items-center sm:justify-between" :class="appStore.isReplenishMode ? 'border-green-50' : 'border-brand-50'">
+            <div class="min-w-0">
               <div class="font-bold text-gray-800" :style="{ fontSize: 'var(--fs-name)' }">{{ p.spec || '預設規格' }}</div>
               <div v-if="!appStore.isReplenishMode && isSaleMode" class="font-bold text-brand-600 mt-1" :style="{ fontSize: 'var(--fs-main)' }">單價：{{ formatMoney(getProductPrice(p)) }}</div>
               <div v-else-if="appStore.isReplenishMode && isPurchaseMode" class="font-bold text-green-600 mt-1" :style="{ fontSize: 'var(--fs-main)' }">採購：{{ formatMoney(getProductPurchasePrice(p)) }}</div>
-              <div class="text-gray-500 mt-1 flex items-center gap-2" :style="{ fontSize: 'var(--fs-main)' }">
+              <div class="mt-1 flex flex-wrap items-center gap-2 text-gray-500" :style="{ fontSize: 'var(--fs-main)' }">
                 <div>目前庫存：{{ getStock(p.id) }}</div>
                 <div v-if="getStock(p.id) <= (p.minStock || 0)" class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">⚠️ 建議補貨</div>
               </div>
             </div>
-            <button class="px-5 py-2.5 rounded-xl text-white font-bold transition-all active:scale-95 whitespace-nowrap disabled:opacity-50 disabled:active:scale-100"
+            <button class="w-full rounded-xl px-5 py-2.5 text-white font-bold transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 sm:w-auto"
               :class="getCartButtonClass(p)"
               :disabled="isAddToCartDisabled(p)"
               @click="addToCart(p)">
@@ -175,8 +175,8 @@
             <div class="overflow-y-auto px-4 py-3 space-y-4 max-h-[calc(100dvh-320px)]">
               <!-- 品項清單 -->
               <div class="space-y-3">
-                <div v-for="(item, idx) in cart" :key="idx" class="flex items-center gap-3 bg-white border p-3 rounded-xl shadow-sm">
-                   <div class="flex-1">
+                <div v-for="(item, idx) in cart" :key="idx" class="flex flex-col gap-3 rounded-xl border bg-white p-3 shadow-sm sm:flex-row sm:items-center">
+                   <div class="min-w-0 flex-1">
                      <div class="font-bold text-gray-800">{{ item.product.name }}</div>
                      <div v-if="item.product.spec" class="text-sm text-gray-500">{{ item.product.spec }}</div>
                      <div class="text-xs text-gray-400 font-medium mt-1" v-if="!appStore.isReplenishMode && isSaleMode">
@@ -184,7 +184,7 @@
                      </div>
                      <div class="mt-2 flex items-center gap-2" v-if="!appStore.isReplenishMode && isSaleMode">
                        <span class="text-xs font-bold text-brand-600">實付：</span>
-                       <div class="relative flex-1 max-w-[140px]">
+                       <div class="relative max-w-full flex-1 sm:max-w-[140px]">
                          <span class="absolute left-1 top-1/2 -translate-y-1/2 text-brand-600 font-bold text-sm">$</span>
                          <input
                            type="number"
@@ -197,13 +197,13 @@
                      </div>
                    </div>
                    
-                   <div class="flex items-center gap-1">
+                   <div class="flex items-center justify-end gap-1 sm:justify-start">
                      <button class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 active:bg-gray-200" @click="updateCartQty(idx, -1)"><Minus class="w-4 h-4"/></button>
                      <input type="number" inputmode="numeric" v-model.number="item.qty" @change="validateCartQty(idx)" class="w-12 text-center font-bold text-lg border border-gray-200 rounded-md focus:outline-none focus:border-brand-400 py-1" min="1" />
                      <button class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 active:bg-gray-200" @click="updateCartQty(idx, 1)"><Plus class="w-4 h-4"/></button>
                    </div>
                    
-                   <button class="p-2 ml-1 text-gray-400 hover:text-red-500 active:scale-90 transition-transform" @click="cart.splice(idx, 1)">
+                   <button class="self-end p-2 text-gray-400 transition-transform hover:text-red-500 active:scale-90 sm:self-auto" @click="cart.splice(idx, 1)">
                      <Trash2 class="w-5 h-5"/>
                    </button>
                 </div>

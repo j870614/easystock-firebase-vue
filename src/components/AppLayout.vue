@@ -108,24 +108,24 @@
       width="92%"
       align-center
     >
-      <div class="space-y-5">
+      <div class="space-y-5 max-h-[min(58dvh,32rem)] overflow-y-auto pr-1">
         <div>
           <div class="text-xs font-bold text-gray-400 mb-2">道場</div>
           <div class="grid gap-2">
             <button
               v-for="loc in appStore.activeLocations"
               :key="loc.id"
-              class="w-full text-left px-4 py-3 rounded-xl border-2 transition-all font-medium"
+              class="w-full rounded-xl border-2 px-4 py-3 text-left font-medium transition-all"
               :class="scopeLocationId === loc.id ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'"
               @click="chooseDialogLocation(loc.id)"
             >
-              <div class="flex items-center gap-3">
-                <Store class="w-5 h-5 flex-shrink-0" />
-                <div class="min-w-0">
-                  <div class="font-semibold truncate">{{ loc.name }}</div>
-                  <div v-if="loc.address" class="text-sm text-gray-500 truncate">{{ loc.address }}</div>
+              <div class="flex items-start gap-3">
+                <Store class="mt-0.5 h-5 w-5 flex-shrink-0" />
+                <div class="min-w-0 flex-1">
+                  <div class="font-semibold break-words">{{ loc.name }}</div>
+                  <div v-if="loc.address" class="mt-0.5 break-words text-sm text-gray-500 line-clamp-2">{{ loc.address }}</div>
                 </div>
-                <Check v-if="scopeLocationId === loc.id" class="w-5 h-5 ml-auto text-brand-600" />
+                <Check v-if="scopeLocationId === loc.id" class="ml-auto mt-0.5 h-5 w-5 flex-shrink-0 text-brand-600" />
               </div>
             </button>
           </div>
@@ -142,19 +142,19 @@
             <button
               v-for="hall in scopedHallOptions"
               :key="hall.id"
-              class="w-full text-left px-4 py-3 rounded-xl border transition-all"
+              class="w-full rounded-xl border px-4 py-3 text-left transition-all"
               :class="appStore.selectedHallId === hall.id ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'"
               @click="selectHallAndClose(hall.id)"
             >
-              <div class="flex items-center gap-3">
-                <Building2 class="w-5 h-5 flex-shrink-0" />
-                <div class="min-w-0">
-                  <div class="font-semibold truncate">{{ hall.name }}</div>
-                  <div class="text-xs text-gray-500">
+              <div class="flex items-start gap-3">
+                <Building2 class="mt-0.5 h-5 w-5 flex-shrink-0" />
+                <div class="min-w-0 flex-1">
+                  <div class="font-semibold break-words">{{ hall.name }}</div>
+                  <div class="mt-0.5 text-xs text-gray-500">
                     {{ hall.isSystem ? '系統預設堂口' : '一般堂口' }}
                   </div>
                 </div>
-                <Check v-if="appStore.selectedHallId === hall.id" class="w-5 h-5 ml-auto text-emerald-600" />
+                <Check v-if="appStore.selectedHallId === hall.id" class="ml-auto mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-600" />
               </div>
             </button>
           </div>

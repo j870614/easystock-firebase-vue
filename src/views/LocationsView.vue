@@ -18,7 +18,7 @@
           class="card border-2"
           :class="loc.isActive !== false ? 'border-transparent' : 'border-gray-200 opacity-60'"
         >
-          <div class="flex items-start gap-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
             <button class="drag-handle-location p-2 -m-2 rounded-xl text-gray-300 hover:text-gray-500 active:cursor-grabbing cursor-grab">
               <GripVertical class="w-5 h-5" />
             </button>
@@ -33,7 +33,7 @@
               <div v-if="loc.address" class="text-sm text-gray-500 mt-1">{{ loc.address }}</div>
               <div class="text-xs text-gray-400 mt-1">國度：{{ loc.country || '台灣' }}</div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
               <el-switch :model-value="loc.isActive !== false" @change="(val) => toggleLocationActive(loc, val)" />
               <button class="p-2 rounded-xl hover:bg-gray-100" @click="openLocationForm(loc)">
                 <Pencil class="w-5 h-5 text-gray-500" />
@@ -42,7 +42,7 @@
           </div>
 
           <div class="mt-4 pt-4 border-t border-gray-100">
-            <div class="flex items-center justify-between mb-3">
+            <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div class="text-sm font-semibold text-gray-700">堂口</div>
                 <div class="text-xs text-gray-400">知客為系統預設堂口，可拖曳調整順序</div>
@@ -60,7 +60,7 @@
               @end="() => persistHallOrder(loc.id)"
             >
               <template #item="{ element: hall }">
-                <div class="flex items-center gap-3 rounded-xl border border-gray-200 p-3 bg-gray-50">
+                <div class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-center">
                   <button class="drag-handle-hall p-2 -m-2 rounded-xl text-gray-300 hover:text-gray-500 active:cursor-grabbing cursor-grab">
                     <GripVertical class="w-4 h-4" />
                   </button>
@@ -75,14 +75,16 @@
                     </div>
                     <div class="text-xs text-gray-400 mt-1">{{ hall.isActive !== false ? '啟用中' : '停用中' }}</div>
                   </div>
-                  <el-switch
-                    :model-value="hall.isActive !== false"
-                    :disabled="hall.isSystem"
-                    @change="(val) => toggleHallActive(hall, val)"
-                  />
-                  <button class="p-2 rounded-xl hover:bg-white" @click="openHallForm(loc, hall)">
-                    <Pencil class="w-4 h-4 text-gray-500" />
-                  </button>
+                  <div class="flex items-center justify-end gap-2">
+                    <el-switch
+                      :model-value="hall.isActive !== false"
+                      :disabled="hall.isSystem"
+                      @change="(val) => toggleHallActive(hall, val)"
+                    />
+                    <button class="p-2 rounded-xl hover:bg-white" @click="openHallForm(loc, hall)">
+                      <Pencil class="w-4 h-4 text-gray-500" />
+                    </button>
+                  </div>
                 </div>
               </template>
             </draggable>
@@ -92,7 +94,7 @@
     </draggable>
 
     <el-dialog v-model="locationDialogVisible" :title="editingLocationId ? '編輯道場' : '新增道場'" width="92%" align-center>
-      <div class="space-y-4 py-2">
+      <div class="max-h-[min(70dvh,34rem)] space-y-4 overflow-y-auto py-2 pr-1">
         <div>
           <label class="label">道場名稱 *</label>
           <input v-model="locationForm.name" type="text" class="input" placeholder="例如：本會道場" />
@@ -105,7 +107,7 @@
           <label class="label">地址</label>
           <input v-model="locationForm.address" type="text" class="input" placeholder="例如：台北市..." />
         </div>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <div>
             <label class="text-xs text-gray-500 block mb-1">緯度</label>
             <input v-model.number="locationForm.lat" type="number" class="input py-2 text-sm" placeholder="25.033" />
@@ -125,7 +127,7 @@
     </el-dialog>
 
     <el-dialog v-model="hallDialogVisible" :title="editingHallId ? '編輯堂口' : '新增堂口'" width="92%" align-center>
-      <div class="space-y-4 py-2">
+      <div class="max-h-[min(70dvh,34rem)] space-y-4 overflow-y-auto py-2 pr-1">
         <div class="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-xl p-3">
           所屬道場：{{ hallForm.locationName || '—' }}
         </div>

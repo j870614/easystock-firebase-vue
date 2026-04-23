@@ -54,7 +54,7 @@
         </div>
 
         <div v-if="authStore.isOwner && editingUid === u.uid" class="flex flex-col gap-2 bg-gray-50 rounded-xl p-3 border">
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
               <label class="text-xs text-gray-500 block mb-1">法名</label>
               <input v-model="editForm.dharmaName" type="text" class="input py-2 text-sm" placeholder="法名（選填）" />
