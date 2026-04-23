@@ -165,6 +165,23 @@ const selectedLocs = ref([])
 const selectedHalls = ref([])
 const selectedDuties = ref([])
 
+const hallFilterOptions = computed(() => {
+  const scopedLocationIds =
+    selectedLocs.value.length === 1 && selectedLocs.value[0] !== 'none'
+      ? new Set(selectedLocs.value)
+      : null
+
+  return appStore.halls
+    .filter((hall) => !scopedLocationIds || scopedLocationIds.has(hall.locationId))
+    .map((hall) => {
+      const location = appStore.locations.find((loc) => loc.id === hall.locationId)
+      return {
+        value: hall.id,
+        label: location ? `${location.name} / ${hall.name}` : hall.name,
+      }
+    })
+})
+
 const filterGroups = computed(() => [
   {
     key: 'role',
@@ -182,7 +199,7 @@ const filterGroups = computed(() => [
     key: 'hall',
     label: '所屬堂口',
     selected: selectedHalls,
-    options: [{ value: 'none', label: '未指派' }, ...appStore.halls.map((hall) => ({ value: hall.id, label: hall.name }))],
+    options: [{ value: 'none', label: '未指派' }, ...hallFilterOptions.value],
   },
   {
     key: 'duty',
@@ -231,9 +248,15 @@ function roleLabel(role) {
 }
 
 function scopeLabel(user) {
-  const location = appStore.locations.find((item) => item.id === user.assignedLocationId)
   const hall = appStore.halls.find((item) => item.id === user.assignedHallId)
-  if (!location && !hall) return ''
+  const location =
+    appStore.locations.find((item) => item.id === user.assignedLocationId) ??
+    appStore.locations.find((item) => item.id === hall?.locationId)
+
+  if (!location && !hall) {
+    return ['owner', 'admin'].includes(user.role) ? '全域' : ''
+  }
+
   return [location?.name, hall?.name].filter(Boolean).join(' / ')
 }
 
