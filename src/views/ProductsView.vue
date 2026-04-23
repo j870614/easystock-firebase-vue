@@ -36,7 +36,7 @@
                 <div class="font-bold text-gray-800 line-clamp-2 break-words">{{ group.name }}</div>
                 <div class="flex items-center gap-2 flex-wrap mt-1">
                   <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
-                    {{ group.items.length }} 個規格
+                    {{ group.visibleItems.length }} / {{ group.items.length }} 個規格
                   </span>
                   <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
                     {{ group.scopeLabel }}
@@ -50,10 +50,10 @@
             </button>
             <div class="flex items-center justify-end gap-1.5" @click.stop>
               <el-switch
-                :model-value="group.items.some((item) => appStore.isProductVisibleInHall(item))"
+                :model-value="group.visibleItems.length > 0"
                 @change="(val) => toggleGroupVisibility(group, val)"
               />
-              <button class="p-2 rounded-xl border border-brand-100 text-brand-600 hover:bg-brand-50" :disabled="authStore.isHallLead && group.isShared" @click="openForm(group)">
+              <button class="p-2 rounded-xl border border-brand-100 text-brand-600 hover:bg-brand-50" @click="openForm(group)">
                 <Pencil class="w-4 h-4" />
               </button>
               <button
@@ -67,7 +67,7 @@
           </div>
 
           <div v-show="!isGroupCollapsed(group.name)" class="divide-y">
-            <div v-for="item in group.items" :key="item.id" class="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+            <div v-for="item in group.visibleItems" :key="item.id" class="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
               <div class="flex-1 min-w-0">
                 <div class="font-semibold text-gray-800">{{ item.spec || '預設規格' }}</div>
                 <div class="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
@@ -105,13 +105,13 @@
           >
             <div class="flex-1 min-w-0">
               <div class="font-semibold text-gray-800">{{ group.name }}</div>
-              <div class="text-xs text-gray-400 mt-1">{{ group.scopeLabel }}</div>
+              <div class="text-xs text-gray-400 mt-1">{{ group.hiddenItems.length }} 個規格目前隱藏</div>
             </div>
             <div class="flex items-center justify-end gap-2">
               <button class="btn-ghost px-4 py-2 text-sm" @click="restoreGroup(group)">
                 重新上架
               </button>
-              <button class="p-2 rounded-xl border border-brand-100 text-brand-600 hover:bg-brand-50" :disabled="authStore.isHallLead && group.isShared" @click="openForm(group)">
+              <button class="p-2 rounded-xl border border-brand-100 text-brand-600 hover:bg-brand-50" @click="openForm(group)">
                 <Pencil class="w-4 h-4" />
               </button>
             </div>
@@ -131,7 +131,12 @@
 
         <div class="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
           <div class="font-medium text-gray-700">上架範圍</div>
-          <template v-if="authStore.isHallLead">
+          <template v-if="form.localVisibilityOnly">
+            <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              共用品項內容由系統總管 / 管理員維護，執事負責人只管理本堂口上架狀態。
+            </div>
+          </template>
+          <template v-else-if="authStore.isHallLead">
             <div class="text-sm text-gray-600">
               執事負責人只能管理所屬堂口：{{ appStore.selectedLocation?.name }} / {{ appStore.selectedHall?.name }}
             </div>
@@ -153,18 +158,33 @@
                 指定堂口
               </button>
             </div>
-            <div v-if="form.placementMode === 'selected'" class="grid gap-2 max-h-52 overflow-y-auto">
-              <label
-                v-for="hall in selectableHalls"
-                :key="hall.id"
-                class="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2"
+            <div v-if="form.placementMode === 'selected'" class="max-h-72 space-y-3 overflow-y-auto pr-1">
+              <div
+                v-for="location in selectableHallGroups"
+                :key="location.id"
+                class="rounded-2xl border border-gray-200 bg-white p-3"
               >
-                <input v-model="form.hallIds" type="checkbox" :value="hall.id" class="w-4 h-4" />
-                <div class="min-w-0">
-                  <div class="font-medium text-gray-700 break-words">{{ hall.locationName }} / {{ hall.name }}</div>
-                  <div class="text-xs text-gray-400">{{ financeLabel(hall.financeMode) }}</div>
+                <div class="mb-3 flex items-center gap-2">
+                  <div class="text-sm font-semibold text-gray-800">{{ location.name }}</div>
+                  <span class="text-[11px] rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-500">
+                    {{ location.halls.length }} 個堂口
+                  </span>
                 </div>
-              </label>
+                <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  <label
+                    v-for="hall in location.halls"
+                    :key="hall.id"
+                    class="flex cursor-pointer items-start gap-3 rounded-2xl border px-3 py-3 transition-all"
+                    :class="form.hallIds.includes(hall.id) ? 'border-brand-500 bg-brand-50 shadow-sm' : 'border-gray-200 bg-gray-50 hover:border-gray-300'"
+                  >
+                    <input v-model="form.hallIds" type="checkbox" :value="hall.id" class="mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <div class="min-w-0">
+                      <div class="font-medium text-gray-700 break-words">{{ hall.name }}</div>
+                      <div class="mt-1 text-xs text-gray-400">{{ financeLabel(hall.financeMode) }}</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
             </div>
           </template>
         </div>
@@ -189,12 +209,12 @@
                 class="rounded-xl border border-gray-200 bg-gray-50 p-3 relative"
                 :class="item.isMarkedForDeletion ? 'opacity-40 grayscale' : ''"
               >
-                <div class="absolute left-3 top-3">
+                <div v-if="!form.localVisibilityOnly" class="absolute left-3 top-3">
                   <button class="drag-handle-spec rounded-full border border-gray-200 bg-white p-1.5 text-gray-400 shadow-sm hover:text-gray-600 cursor-grab active:cursor-grabbing">
                     <GripVertical class="w-4 h-4" />
                   </button>
                 </div>
-                <div class="absolute top-3 right-3 flex gap-1">
+                <div v-if="!form.localVisibilityOnly" class="absolute top-3 right-3 flex gap-1">
                   <button
                     v-if="item.id && authStore.isOwner"
                     class="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-sm"
@@ -211,29 +231,35 @@
                   </button>
                 </div>
 
-                <div class="mb-2 grid grid-cols-1 gap-2 pl-10 sm:grid-cols-2">
+                <div class="mb-2 grid grid-cols-1 gap-2" :class="form.localVisibilityOnly ? '' : 'pl-10 sm:grid-cols-2'">
                   <div>
                     <label class="text-xs text-gray-500 mb-1 block">規格名稱</label>
-                    <input v-model="item.spec" type="text" class="input py-1.5 text-sm" placeholder="如 M / 薄" />
+                    <input v-model="item.spec" type="text" class="input py-1.5 text-sm" :disabled="form.localVisibilityOnly" placeholder="如 M / 薄" />
                   </div>
                   <div v-if="showSaleFields">
                     <label class="text-xs text-gray-500 mb-1 block">售價</label>
-                    <input v-model.number="item.price" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+                    <input v-model.number="item.price" type="number" class="input py-1.5 text-sm" :disabled="form.localVisibilityOnly" placeholder="0" min="0" />
                   </div>
                   <div v-if="showPurchaseFields">
                     <label class="text-xs text-gray-500 mb-1 block">採購價</label>
-                    <input v-model.number="item.purchasePrice" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+                    <input v-model.number="item.purchasePrice" type="number" class="input py-1.5 text-sm" :disabled="form.localVisibilityOnly" placeholder="0" min="0" />
                   </div>
                 </div>
 
-                <div class="grid grid-cols-1 items-end gap-2 pl-10 sm:grid-cols-2">
+                <div class="grid grid-cols-1 items-end gap-2" :class="form.localVisibilityOnly ? '' : 'pl-10 sm:grid-cols-2'">
                   <div>
                     <label class="text-xs text-gray-500 mb-1 block">安全庫存</label>
-                    <input v-model.number="item.minStock" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+                    <input v-model.number="item.minStock" type="number" class="input py-1.5 text-sm" :disabled="form.localVisibilityOnly" placeholder="0" min="0" />
                   </div>
                   <div class="flex items-center justify-end h-10 px-1">
-                    <span class="text-xs text-gray-400 mr-2">主檔啟用</span>
-                    <el-switch v-model="item.isActive" size="small" />
+                    <span class="text-xs text-gray-400 mr-2">{{ form.localVisibilityOnly ? '本堂口上架' : '主檔啟用' }}</span>
+                    <el-switch
+                      v-if="form.localVisibilityOnly"
+                      :model-value="item.hallVisible"
+                      size="small"
+                      @change="(val) => toggleItemVisibility(item, val)"
+                    />
+                    <el-switch v-else v-model="item.isActive" size="small" />
                   </div>
                 </div>
               </div>
@@ -243,7 +269,7 @@
       </div>
       <template #footer>
         <button class="btn-ghost mr-2" @click="dialogVisible = false">取消</button>
-        <button class="btn-primary" :disabled="saveDisabled || saving" @click="save">
+        <button v-if="!form.localVisibilityOnly" class="btn-primary" :disabled="saveDisabled || saving" @click="save">
           {{ saving ? '儲存中…' : '確認儲存' }}
         </button>
       </template>
@@ -287,6 +313,7 @@ const form = ref({
   placementMode: 'all',
   hallIds: [],
   specs: [],
+  localVisibilityOnly: false,
 })
 
 const currentFinanceMode = computed(() => appStore.selectedHallFinanceMode)
@@ -307,15 +334,27 @@ const selectableHalls = computed(() =>
   [...appStore.halls]
     .filter((hall) => hall.isActive !== false)
     .sort((a, b) => {
-      const locA = appStore.locations.find((loc) => loc.id === a.locationId)?.name || ''
-      const locB = appStore.locations.find((loc) => loc.id === b.locationId)?.name || ''
-      if (locA !== locB) return locA.localeCompare(locB, 'zh-Hant')
+      const locA = appStore.locations.find((loc) => loc.id === a.locationId)
+      const locB = appStore.locations.find((loc) => loc.id === b.locationId)
+      if (locA?.id !== locB?.id) return sortByOrder(locA, locB)
       return sortByOrder(a, b)
     })
     .map((hall) => ({
       ...hall,
       locationName: appStore.locations.find((loc) => loc.id === hall.locationId)?.name || '未知道場',
     }))
+)
+
+const selectableHallGroups = computed(() =>
+  [...appStore.locations]
+    .filter((location) => location.isActive !== false)
+    .sort(sortByOrder)
+    .map((location) => ({
+      id: location.id,
+      name: location.name,
+      halls: selectableHalls.value.filter((hall) => hall.locationId === location.id),
+    }))
+    .filter((location) => location.halls.length > 0)
 )
 
 const targetHallIds = computed(() => {
@@ -338,9 +377,17 @@ function buildGroups(items) {
   return Array.from(map.values())
     .map((group) => {
       const visibleCount = group.items.reduce((sum, item) => sum + visibleHallIds(item).length, 0)
+      const visibleItems = [...group.items]
+        .filter((item) => appStore.isProductVisibleInHall(item))
+        .sort(sortByOrder)
+      const hiddenItems = [...group.items]
+        .filter((item) => appStore.isProductManagedInHall(item) && !appStore.isProductVisibleInHall(item))
+        .sort(sortByOrder)
       return {
         ...group,
         items: [...group.items].sort(sortByOrder),
+        visibleItems,
+        hiddenItems,
         isShared: group.items.some((item) => isSharedProduct(item)),
         scopeLabel: visibleCount > 1 ? `上架 ${visibleCount} 個堂口` : '單堂口',
       }
@@ -348,8 +395,9 @@ function buildGroups(items) {
     .sort((a, b) => sortByOrder(a.items[0], b.items[0]))
 }
 
-const visibleGroups = computed(() => buildGroups(appStore.activeProducts))
-const hiddenGroups = computed(() => buildGroups(appStore.hiddenProducts))
+const allGroups = computed(() => buildGroups(appStore.products.filter((product) => product.isActive !== false)))
+const visibleGroups = computed(() => allGroups.value.filter((group) => group.visibleItems.length > 0))
+const hiddenGroups = computed(() => allGroups.value.filter((group) => group.hiddenItems.length > 0))
 
 watch(
   visibleGroups,
@@ -391,10 +439,8 @@ function toggleGroupCollapsed(name) {
 }
 
 function visibleHallIds(product) {
-  return appStore.halls
-    .filter((hall) => hall.isActive !== false)
-    .filter((hall) => appStore.isProductVisibleInHall(product, hall.id))
-    .map((hall) => hall.id)
+  return appStore.getManagedHallIds(product)
+    .filter((hallId) => appStore.isProductVisibleInHall(product, hallId))
 }
 
 function isSharedProduct(product) {
@@ -421,17 +467,22 @@ function removeSpecLine(index) {
 
 function openForm(group = null) {
   editingGroupName.value = group?.name ?? ''
+  const localVisibilityOnly = authStore.isHallLead && group?.isShared
 
   if (group) {
+    const editableItems = localVisibilityOnly
+      ? group.items.filter((item) => appStore.isProductManagedInHall(item))
+      : group.items
     const hallIds = Array.from(
-      new Set(group.items.flatMap((item) => visibleHallIds(item)))
+      new Set(editableItems.flatMap((item) => appStore.getManagedHallIds(item)))
     )
-    const placementMode = group.items.every((item) => item.placementMode === 'all') ? 'all' : 'selected'
+    const placementMode = editableItems.every((item) => item.placementMode === 'all') ? 'all' : 'selected'
     form.value = {
       name: group.name,
       placementMode: authStore.isHallLead ? 'selected' : placementMode,
       hallIds: authStore.isHallLead ? [appStore.selectedHallId] : hallIds,
-      specs: group.items.map((item) => ({
+      localVisibilityOnly,
+      specs: editableItems.map((item) => ({
         key: uuidv4(),
         id: item.id,
         spec: item.spec ?? '',
@@ -439,6 +490,7 @@ function openForm(group = null) {
         purchasePrice: item.purchasePrice ?? 0,
         minStock: item.minStock ?? 0,
         isActive: item.isActive !== false,
+        hallVisible: appStore.isProductVisibleInHall(item),
         isMarkedForDeletion: false,
       })),
     }
@@ -447,6 +499,7 @@ function openForm(group = null) {
       name: '',
       placementMode: authStore.isHallLead ? 'selected' : 'all',
       hallIds: authStore.isHallLead ? [appStore.selectedHallId] : selectableHalls.value.map((hall) => hall.id),
+      localVisibilityOnly: false,
       specs: [],
     }
     addSpecLine()
@@ -461,6 +514,13 @@ async function syncPlacements(batch, productId, hallIds, placementMode) {
   selectableHalls.value.forEach((hall) => {
     const placementId = buildPlacementDocId(productId, hall.id)
     const existing = appStore.getPlacement(productId, hall.id)
+    if (placementMode === 'selected' && !visibleSet.has(hall.id)) {
+      if (existing) {
+        batch.delete(doc(db, 'productPlacements', placementId))
+      }
+      return
+    }
+
     if (visibleSet.has(hall.id)) {
       batch.set(
         doc(db, 'productPlacements', placementId),
@@ -471,18 +531,6 @@ async function syncPlacements(batch, productId, hallIds, placementMode) {
           isVisible: true,
           financeModeOverride: existing?.financeModeOverride ?? null,
           createdAt: existing?.createdAt ?? serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      )
-      return
-    }
-
-    if (existing) {
-      batch.set(
-        doc(db, 'productPlacements', placementId),
-        {
-          isVisible: false,
           updatedAt: serverTimestamp(),
         },
         { merge: true }
@@ -550,6 +598,7 @@ async function save() {
           isActive: item.isActive,
           order: baseOrder + index,
           placementMode,
+          selectedHallIds: placementMode === 'selected' ? hallIds : [],
         },
         { merge: true }
       )
@@ -579,7 +628,7 @@ async function toggleGroupVisibility(group, value) {
   if (!hall) return
 
   const batch = writeBatch(db)
-  group.items.forEach((item) => {
+  ;[...group.visibleItems, ...group.hiddenItems].forEach((item) => {
     batch.set(
       doc(db, 'productPlacements', buildPlacementDocId(item.id, hall.id)),
       {
@@ -628,7 +677,26 @@ async function writeBatchSet(ref, data) {
 }
 
 async function restoreGroup(group) {
-  await toggleGroupVisibility(group, true)
+  const hall = appStore.selectedHall
+  if (!hall) return
+
+  const batch = writeBatch(db)
+  group.hiddenItems.forEach((item) => {
+    batch.set(
+      doc(db, 'productPlacements', buildPlacementDocId(item.id, hall.id)),
+      {
+        productId: item.id,
+        locationId: hall.locationId,
+        hallId: hall.id,
+        isVisible: true,
+        financeModeOverride: appStore.getPlacement(item.id, hall.id)?.financeModeOverride ?? null,
+        createdAt: appStore.getPlacement(item.id, hall.id)?.createdAt ?? serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    )
+  })
+  await batch.commit()
   ElMessage.success('已重新上架到目前堂口')
 }
 

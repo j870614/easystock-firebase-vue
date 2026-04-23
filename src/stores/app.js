@@ -151,11 +151,38 @@ export const useAppStore = defineStore('app', () => {
     return normalizeFinanceMode(hall?.financeMode)
   }
 
+  function getManagedHallIds(product) {
+    if (!product) return []
+
+    const activeHallIds = halls.value
+      .filter((hall) => hall.isActive !== false)
+      .map((hall) => hall.id)
+
+    if ((product.placementMode ?? 'all') === 'all') {
+      return activeHallIds
+    }
+
+    if (Array.isArray(product.selectedHallIds) && product.selectedHallIds.length > 0) {
+      return product.selectedHallIds.filter((hallId) => activeHallIds.includes(hallId))
+    }
+
+    return productPlacements.value
+      .filter((placement) => placement.productId === product.id && placement.isVisible !== false)
+      .map((placement) => placement.hallId)
+      .filter((hallId, index, list) => hallId && list.indexOf(hallId) === index)
+  }
+
+  function isProductManagedInHall(product, hallId = selectedHallId.value) {
+    if (!product || !hallId || product.isActive === false) return false
+    return getManagedHallIds(product).includes(hallId)
+  }
+
   function isProductVisibleInHall(product, hallId = selectedHallId.value) {
     if (!product || !hallId || product.isActive === false) return false
+    if (!isProductManagedInHall(product, hallId)) return false
     const placement = getPlacement(product.id, hallId)
     if (placement) return placement.isVisible !== false
-    return product.placementMode === 'all'
+    return true
   }
 
   const activeProducts = computed(() =>
@@ -166,7 +193,7 @@ export const useAppStore = defineStore('app', () => {
 
   const hiddenProducts = computed(() =>
     [...products.value]
-      .filter((product) => product.isActive !== false && !isProductVisibleInHall(product))
+      .filter((product) => product.isActive !== false && isProductManagedInHall(product) && !isProductVisibleInHall(product))
       .sort(sortByOrder)
   )
 
@@ -513,6 +540,7 @@ export const useAppStore = defineStore('app', () => {
           id: item.id,
           purchasePrice: 0,
           placementMode: 'all',
+          selectedHallIds: [],
           ...item.data(),
         }))
       })
@@ -614,6 +642,8 @@ export const useAppStore = defineStore('app', () => {
     getDefaultHallForLocation,
     getPlacement,
     getEffectiveFinanceMode,
+    getManagedHallIds,
+    isProductManagedInHall,
     isProductVisibleInHall,
   }
 })
