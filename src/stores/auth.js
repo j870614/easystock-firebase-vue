@@ -1,4 +1,3 @@
-// src/stores/auth.js
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import {
@@ -10,54 +9,33 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
 import { auth, googleProvider, db } from '@/firebase'
+import { isGlobalRole, isOperationalRole, isScopedRole } from '@/utils/multiDept'
 
 export const useAuthStore = defineStore('auth', () => {
-  // ── State ────────────────────────────────────────────
-  const user = ref(null)       // Firebase Auth 使用者物件
-  const profile = ref(null)    // Firestore users/{uid} 文件
-  const loading = ref(true)    // 初始化中（避免閃爍）
+  const user = ref(null)
+  const profile = ref(null)
+  const loading = ref(true)
   const error = ref(null)
 
-  // ── Getters ──────────────────────────────────────────
   const isAuthenticated = computed(() => !!user.value)
   const role = computed(() => profile.value?.role ?? 'pending')
 
-  const isOwner   = computed(() => role.value === 'owner')
-  const isAdmin   = computed(() => ['owner', 'admin'].includes(role.value))
-  const isStaff   = computed(() => ['owner', 'admin', 'staff'].includes(role.value))
+  const isOwner = computed(() => role.value === 'owner')
+  const isAdmin = computed(() => isGlobalRole(role.value))
+  const isHallLead = computed(() => role.value === 'hallLead')
   const isPending = computed(() => role.value === 'pending')
+  const isStaff = computed(() => isOperationalRole(role.value))
+  const isScopedUser = computed(() => isScopedRole(role.value))
+  const canManageProducts = computed(() => ['owner', 'admin', 'hallLead'].includes(role.value))
+  const canSwitchScope = computed(() => isGlobalRole(role.value))
+  const canManageUsers = computed(() => ['owner', 'admin'].includes(role.value))
+  const canManageLocations = computed(() => ['owner', 'admin'].includes(role.value))
 
   const isAccountant = computed(() => profile.value?.dutyName === '會計')
-
   const assignedLocationId = computed(() => profile.value?.assignedLocationId ?? null)
+  const assignedHallId = computed(() => profile.value?.assignedHallId ?? null)
 
-  // ── Actions ──────────────────────────────────────────
-
-  /** 監聽 Firebase Auth 狀態（在 main.js 初始化時呼叫） */
   let initPromise = null
-  function init() {
-    if (initPromise) return initPromise
-
-    initPromise = new Promise(async (resolve) => {
-      // 強制等待持久化設定完成
-      await setPersistence(auth, browserSessionPersistence)
-
-      onAuthStateChanged(auth, async (firebaseUser) => {
-        user.value = firebaseUser
-        if (firebaseUser) {
-          // 在結束 loading 前確保第一筆資料已經拿到
-          await loadProfile(firebaseUser)
-        } else {
-          profile.value = null
-          stopProfileListener()
-        }
-        loading.value = false
-        resolve()
-      })
-    })
-    return initPromise
-  }
-
   let unsubscribeProfile = null
 
   function stopProfileListener() {
@@ -67,24 +45,26 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 讀取或建立 Firestore 使用者文件並持續監聽 */
   async function loadProfile(firebaseUser) {
     stopProfileListener()
     const userRef = doc(db, 'users', firebaseUser.uid)
 
-    // 第一次先試著抓，如果不存在就建立
     const initialSnap = await getDoc(userRef)
     if (!initialSnap.exists()) {
       const newProfile = {
-        uid:         firebaseUser.uid,
+        uid: firebaseUser.uid,
         displayName: firebaseUser.displayName ?? '未命名',
-        email:       firebaseUser.email ?? '',
-        photoURL:    firebaseUser.photoURL ?? '',
-        role:        'pending',
-        provider:    firebaseUser.providerData?.[0]?.providerId ?? 'unknown',
-        dharmaName:  '',
+        email: firebaseUser.email ?? '',
+        photoURL: firebaseUser.photoURL ?? '',
+        role: 'pending',
+        provider: firebaseUser.providerData?.[0]?.providerId ?? 'unknown',
+        dharmaName: '',
         secularName: '',
-        createdAt:   serverTimestamp(),
+        dutyId: null,
+        dutyName: '',
+        assignedLocationId: null,
+        assignedHallId: null,
+        createdAt: serverTimestamp(),
       }
       await setDoc(userRef, newProfile)
       profile.value = newProfile
@@ -92,24 +72,38 @@ export const useAuthStore = defineStore('auth', () => {
       profile.value = initialSnap.data()
     }
 
-    // 開啟監聽，後續變化即時同步
     unsubscribeProfile = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) {
-        profile.value = snap.data()
-      }
+      if (snap.exists()) profile.value = snap.data()
     })
   }
 
-  /** Google 登入 */
+  function init() {
+    if (initPromise) return initPromise
+
+    initPromise = new Promise(async (resolve) => {
+      await setPersistence(auth, browserSessionPersistence)
+
+      onAuthStateChanged(auth, async (firebaseUser) => {
+        user.value = firebaseUser
+        if (firebaseUser) {
+          await loadProfile(firebaseUser)
+        } else {
+          profile.value = null
+          stopProfileListener()
+        }
+        loading.value = false
+        resolve()
+      })
+    })
+
+    return initPromise
+  }
+
   async function loginWithGoogle() {
     error.value = null
-    // 登入程序啟動時，直接顯示全螢幕 loading 遮罩
     loading.value = true
     try {
       await signInWithPopup(auth, googleProvider)
-      
-      // 如果 onAuthStateChanged 的 loadProfile 還沒填充 profile
-      // 我們在這裡停下來等它完成，避免提早跳轉被判定為 pending
       if (!profile.value) {
         await new Promise((resolve) => {
           const unwatch = watch(profile, (newVal) => {
@@ -128,7 +122,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 登出 */
   async function signOut() {
     stopProfileListener()
     await firebaseSignOut(auth)
@@ -145,10 +138,17 @@ export const useAuthStore = defineStore('auth', () => {
     role,
     isOwner,
     isAdmin,
+    isHallLead,
     isStaff,
+    isScopedUser,
     isPending,
     isAccountant,
+    canManageProducts,
+    canSwitchScope,
+    canManageUsers,
+    canManageLocations,
     assignedLocationId,
+    assignedHallId,
     init,
     loginWithGoogle,
     signOut,

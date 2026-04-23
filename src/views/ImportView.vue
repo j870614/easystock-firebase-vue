@@ -8,8 +8,8 @@
           <div class="text-sm text-amber-800 leading-relaxed">
             <p class="font-semibold mb-1">注意事項</p>
             <ul class="list-disc list-inside space-y-1">
-              <li>目前匯入目標道場：<strong class="text-brand-700 bg-brand-100 px-1.5 py-0.5 rounded">{{ appStore.selectedLocation?.name }}</strong></li>
-              <li>匯入將會<strong>覆蓋</strong>該道場現有庫存</li>
+              <li>目前匯入目標範圍：<strong class="text-brand-700 bg-brand-100 px-1.5 py-0.5 rounded">{{ appStore.selectedLocation?.name }} / {{ appStore.selectedHall?.name }}</strong></li>
+              <li>匯入將會<strong>覆蓋</strong>該堂口現有庫存</li>
               <li>Excel 格式：第一欄「品項名稱」、第二欄「規格」、第三欄「庫存數量」</li>
               <li>您下載的範本已為您自動填入系統設定的品項</li>
             </ul>
@@ -119,6 +119,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
 import { ElMessageBox } from 'element-plus'
+import { buildStockDocId } from '@/utils/multiDept'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -246,14 +247,14 @@ async function doImport() {
   if (validRows.length === 0) return
 
   const targetLoc = appStore.selectedLocation
-  if (!targetLoc) {
-    alert('未選取道場')
+  if (!targetLoc || !appStore.selectedHallId) {
+    alert('未選取堂口')
     return
   }
 
   try {
     await ElMessageBox.confirm(
-      `確定要匯入並覆蓋「${targetLoc.name}」的庫存嗎？此操作將無法還原。`,
+      `確定要匯入並覆蓋「${targetLoc.name} / ${appStore.selectedHall?.name}」的庫存嗎？此操作將無法還原。`,
       '確認匯入覆蓋',
       { confirmButtonText: '確定覆蓋', cancelButtonText: '取消', type: 'warning' }
     )
@@ -264,22 +265,30 @@ async function doImport() {
   importing.value = true
   let count = 0
   const locId = targetLoc.id
+  const hallId = appStore.selectedHallId
 
   try {
     const batch = writeBatch(db)
 
     // 取得現有庫存
-    const stocksSnap = await getDocs(query(collection(db, 'stocks'), where('locationId', '==', locId)))
+    const stocksSnap = await getDocs(
+      query(
+        collection(db, 'stocks'),
+        where('locationId', '==', locId),
+        where('hallId', '==', hallId)
+      )
+    )
     const existingStocks = {}
     stocksSnap.forEach(d => {
       existingStocks[d.data().productId] = d.data().currentStock || 0
     })
 
     for (const row of validRows) {
-      const stockDocId = `${locId}_${row.productId}`
+      const stockDocId = buildStockDocId(locId, hallId, row.productId)
       const stockRef   = doc(db, 'stocks', stockDocId)
       batch.set(stockRef, {
         locationId:   locId,
+        hallId,
         productId:    row.productId,
         currentStock: row.qty,
       }, { merge: false }) // 強制覆蓋
@@ -292,6 +301,7 @@ async function doImport() {
         const txRef = doc(collection(db, 'transactions'))
         batch.set(txRef, {
           locationId: locId,
+          hallId,
           date:       new Date().toISOString().slice(0, 10),
           timestamp:  serverTimestamp(),
           type:       diff > 0 ? 'in' : 'out',

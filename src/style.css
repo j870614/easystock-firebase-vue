@@ -101,6 +101,7 @@
   .badge-out { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-red-100 text-red-800; }
   .badge-role-owner { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800; }
   .badge-role-admin { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800; }
+  .badge-role-hallLead { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800; }
   .badge-role-staff { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-gray-100 text-gray-700; }
   .badge-role-pending { @apply inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium bg-amber-100 text-amber-800; }
 

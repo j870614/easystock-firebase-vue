@@ -37,13 +37,13 @@ const routes = [
     path: '/products',
     name: 'products',
     component: () => import('@/views/ProductsView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'admin' },
+    meta: { requiresAuth: true, requiredRole: 'hallLead' },
   },
   {
     path: '/locations',
     name: 'locations',
     component: () => import('@/views/LocationsView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'owner' },
+    meta: { requiresAuth: true, requiredRole: 'admin' },
   },
   {
     path: '/reports',
@@ -61,19 +61,19 @@ const routes = [
     path: '/import',
     name: 'import',
     component: () => import('@/views/ImportView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'owner' },
+    meta: { requiresAuth: true, requiredRole: 'hallLead' },
   },
   {
     path: '/users',
     name: 'users',
     component: () => import('@/views/UsersView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'owner' },
+    meta: { requiresAuth: true, requiredRole: 'admin' },
   },
   {
     path: '/admin',
     name: 'admin',
     component: () => import('@/views/AdminHubView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'owner' },
+    meta: { requiresAuth: true, requiredRole: 'admin' },
   },
   {
     path: '/profile',
@@ -93,7 +93,7 @@ const router = createRouter({
 })
 
 // ── 導航守衛 ──────────────────────────────────────────────
-const ROLE_WEIGHT = { owner: 3, admin: 2, staff: 1, pending: 0 }
+const ROLE_WEIGHT = { owner: 4, admin: 3, hallLead: 2, staff: 1, pending: 0 }
 
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()

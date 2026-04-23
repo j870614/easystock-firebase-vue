@@ -97,12 +97,12 @@ import { Link, LogOut, ALargeSmall } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
+import { ROLE_MAP } from '@/utils/multiDept'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
-const ROLE_MAP = { owner: '系統總管', admin: '管理員', staff: '一般人員', pending: '待審核' }
 const roleLabel = computed(() => ROLE_MAP[authStore.role] ?? authStore.role)
 
 async function handleLogout() {

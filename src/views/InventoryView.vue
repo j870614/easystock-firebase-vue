@@ -2,11 +2,11 @@
   <AppLayout title="認供結緣" show-location-picker>
     <!-- 無道場提示 -->
     <div
-      v-if="!appStore.selectedLocationId"
+      v-if="!appStore.selectedLocationId || !appStore.selectedHallId"
       class="flex flex-col items-center justify-center py-20 text-center"
     >
       <Building2 class="w-16 h-16 text-gray-300 mb-4" />
-      <p class="text-gray-500">請先選擇道場</p>
+      <p class="text-gray-500">請先選擇道場與堂口</p>
     </div>
 
     <template v-else>
@@ -72,7 +72,7 @@
           </div>
           <div v-if="group.length === 1" class="text-right">
               <div class="text-sm font-bold" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-brand-600'">
-               <span v-if="!appStore.isReplenishMode">${{ formatMoney(getProductPrice(group[0])) }}</span>
+               <span v-if="!appStore.isReplenishMode && isSaleMode">${{ formatMoney(getProductPrice(group[0])) }}</span>
              </div>
              <div class="text-xs text-gray-500 mt-0.5">總庫存 {{ getStock(group[0].id) }}</div>
           </div>
@@ -132,7 +132,8 @@
           <div v-for="p in selectedGroupItems" :key="p.id" class="border-2 rounded-xl p-4 flex justify-between items-center" :class="appStore.isReplenishMode ? 'border-green-50' : 'border-brand-50'">
             <div>
               <div class="font-bold text-gray-800" :style="{ fontSize: 'var(--fs-name)' }">{{ p.spec || '預設規格' }}</div>
-              <div class="font-bold text-brand-600 mt-1" v-if="!appStore.isReplenishMode" :style="{ fontSize: 'var(--fs-main)' }">單價：{{ formatMoney(getProductPrice(p)) }}</div>
+              <div v-if="!appStore.isReplenishMode && isSaleMode" class="font-bold text-brand-600 mt-1" :style="{ fontSize: 'var(--fs-main)' }">單價：{{ formatMoney(getProductPrice(p)) }}</div>
+              <div v-else-if="appStore.isReplenishMode && isPurchaseMode" class="font-bold text-green-600 mt-1" :style="{ fontSize: 'var(--fs-main)' }">採購：{{ formatMoney(getProductPurchasePrice(p)) }}</div>
               <div class="text-gray-500 mt-1 flex items-center gap-2" :style="{ fontSize: 'var(--fs-main)' }">
                 <div>目前庫存：{{ getStock(p.id) }}</div>
                 <div v-if="getStock(p.id) <= (p.minStock || 0)" class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">⚠️ 建議補貨</div>
@@ -164,7 +165,7 @@
             <div v-if="isCartCollapsed" class="text-sm font-bold bg-white/20 px-3 py-1 rounded-full flex items-center gap-2 animate-in fade-in slide-in-from-right-4">
               <span>共 {{ cartTotalQty }} 件</span>
               <span class="opacity-60">|</span>
-              <span>${{ formatMoney(cartTotalPrice) }}</span>
+              <span v-if="isSaleMode">${{ formatMoney(cartTotalPrice) }}</span>
             </div>
             <button v-else class="text-sm font-medium bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg transition-colors" @click.stop="clearCart">全部清空</button>
           </div>
@@ -178,10 +179,10 @@
                    <div class="flex-1">
                      <div class="font-bold text-gray-800">{{ item.product.name }}</div>
                      <div v-if="item.product.spec" class="text-sm text-gray-500">{{ item.product.spec }}</div>
-                     <div class="text-xs text-gray-400 font-medium mt-1" v-if="!appStore.isReplenishMode">
+                     <div class="text-xs text-gray-400 font-medium mt-1" v-if="!appStore.isReplenishMode && isSaleMode">
                        應收：${{ formatMoney(item.price * item.qty) }}
                      </div>
-                     <div class="mt-2 flex items-center gap-2" v-if="!appStore.isReplenishMode">
+                     <div class="mt-2 flex items-center gap-2" v-if="!appStore.isReplenishMode && isSaleMode">
                        <span class="text-xs font-bold text-brand-600">實付：</span>
                        <div class="relative flex-1 max-w-[140px]">
                          <span class="absolute left-1 top-1/2 -translate-y-1/2 text-brand-600 font-bold text-sm">$</span>
@@ -219,7 +220,7 @@
               </div>
 
               <!-- 收款與支付 (僅結緣模式) -->
-              <div v-if="!appStore.isReplenishMode" class="space-y-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+              <div v-if="!appStore.isReplenishMode && isSaleMode" class="space-y-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 <div class="flex justify-between items-center text-gray-600 text-sm">
                    <span>應收總計</span>
                    <span class="font-bold">${{ formatMoney(cartTotalPrice) }}</span>
@@ -292,6 +293,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
 import { formatMoney } from '@/utils/format'
+import { buildStockDocId, isPurchaseEnabled, isSaleEnabled } from '@/utils/multiDept'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -313,6 +315,9 @@ const cartNote = ref('')
 const cart = ref([])
 const isCartCollapsed = ref(false)
 const paymentMethod = ref('cash')
+const currentFinanceMode = computed(() => appStore.selectedHallFinanceMode)
+const isSaleMode = computed(() => isSaleEnabled(currentFinanceMode.value))
+const isPurchaseMode = computed(() => isPurchaseEnabled(currentFinanceMode.value))
 // 實收總額改為運算屬性，根據各品項實收加總
 const receivedAmount = computed(() => {
   return cart.value.reduce((sum, item) => sum + (Number(item.receivedAmount) || 0), 0)
@@ -330,16 +335,9 @@ const cartTotalQty = computed(() => {
 // 分組品項：依據名稱歸類，並過濾掉在該道場停用的品項與不符合搜尋的品項
 const groupedProducts = computed(() => {
   const groups = {}
-  const locId = appStore.selectedLocationId
-  if (!locId) return groups
+  if (!appStore.selectedLocationId || !appStore.selectedHallId) return groups
 
   appStore.activeProducts.forEach(p => {
-    // 如果道場有獨立設定不啟用，則略過
-    const locOverride = p.overrides?.[locId]
-    if (locOverride && locOverride.isActive === false) {
-      return
-    }
-    
     if (!groups[p.name]) groups[p.name] = []
     groups[p.name].push(p)
   })
@@ -359,6 +357,10 @@ function getProductPrice(p) {
     return Number(countryOverride.price)
   }
   return Number(p.price || 0)
+}
+
+function getProductPurchasePrice(p) {
+  return Number(p.purchasePrice || 0)
 }
 
 function getStock(productId) {
@@ -404,7 +406,9 @@ function openProductSelect(name, groupItems) {
 }
 
 function addToCart(product) {
-  const price = getProductPrice(product)
+  const price = appStore.isReplenishMode
+    ? (isPurchaseMode.value ? getProductPurchasePrice(product) : 0)
+    : (isSaleMode.value ? getProductPrice(product) : 0)
   // 檢查購物車內是否已有該商品
   const existing = cart.value.find(item => item.product.id === product.id)
   if (existing) {
@@ -463,12 +467,13 @@ function listenStocks() {
     unsubscribeStocks = null
   }
   
-  if (!appStore.selectedLocationId) return
+  if (!appStore.selectedLocationId || !appStore.selectedHallId) return
   
   loadingProducts.value = true
   const q = query(
     collection(db, 'stocks'),
-    where('locationId', '==', appStore.selectedLocationId)
+    where('locationId', '==', appStore.selectedLocationId),
+    where('hallId', '==', appStore.selectedHallId)
   )
   
   unsubscribeStocks = onSnapshot(q, (snap) => {
@@ -503,6 +508,7 @@ async function submitCart() {
   submitting.value = true
 
   const locId = appStore.selectedLocationId
+  const hallId = appStore.selectedHallId
   const itemsToSubmit = [...cart.value]
   const currentTxType = appStore.isReplenishMode ? 'in' : 'out'
   const currentDate = date.value
@@ -512,7 +518,7 @@ async function submitCart() {
       // 1. 先讀取所有的庫存文件
       const stockSnaps = {}
       for (const item of itemsToSubmit) {
-        const stockDocId = `${locId}_${item.product.id}`
+        const stockDocId = buildStockDocId(locId, hallId, item.product.id)
         const stockRef = doc(db, 'stocks', stockDocId)
         stockSnaps[item.product.id] = await tx.get(stockRef)
       }
@@ -520,7 +526,7 @@ async function submitCart() {
       // 2. 寫入所有的變更與產生交易紀錄
       for (const item of itemsToSubmit) {
         const productId = item.product.id
-        const stockDocId = `${locId}_${productId}`
+        const stockDocId = buildStockDocId(locId, hallId, productId)
         const stockRef = doc(db, 'stocks', stockDocId)
         const snap = stockSnaps[productId]
 
@@ -538,6 +544,7 @@ async function submitCart() {
         } else {
           tx.set(stockRef, {
             locationId: locId,
+            hallId,
             productId,
             currentStock: newStock,
           })
@@ -546,6 +553,7 @@ async function submitCart() {
         // 產生交易紀錄
         const txPayload = {
           locationId: locId,
+          hallId,
           date: currentDate,
           timestamp: serverTimestamp(),
           type: currentTxType,
@@ -553,7 +561,8 @@ async function submitCart() {
           productSnapshot: {
             name: item.product.name,
             spec: item.product.spec ?? '',
-            price: item.price ?? 0,
+            price: !appStore.isReplenishMode ? item.price ?? 0 : Number(item.product.price || 0),
+            purchasePrice: appStore.isReplenishMode ? item.price ?? 0 : Number(item.product.purchasePrice || 0),
           },
           qty: item.qty,
           note: cartNote.value.trim(),
@@ -566,12 +575,16 @@ async function submitCart() {
           },
         }
 
-        if (currentTxType === 'out') {
+        if (currentTxType === 'out' && isSaleMode.value) {
           txPayload.itemSubtotal = (item.price ?? 0) * item.qty
           txPayload.itemReceivedAmount = Number(item.receivedAmount) || 0
           txPayload.orderSubtotal = cartTotalPrice.value
           txPayload.orderReceivedAmount = receivedAmount.value
           txPayload.paymentMethod = paymentMethod.value
+        }
+
+        if (currentTxType === 'in' && isPurchaseMode.value) {
+          txPayload.itemCostSubtotal = (item.price ?? 0) * item.qty
         }
 
         const txDocRef = doc(collection(db, 'transactions'))
@@ -601,7 +614,7 @@ async function submitCart() {
   }
 }
 
-watch(() => appStore.selectedLocationId, listenStocks)
+watch(() => [appStore.selectedLocationId, appStore.selectedHallId], listenStocks)
 onMounted(listenStocks)
 onUnmounted(() => {
   if (unsubscribeStocks) unsubscribeStocks()

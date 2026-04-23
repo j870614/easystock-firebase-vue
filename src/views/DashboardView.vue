@@ -2,11 +2,11 @@
   <AppLayout title="庫存總覽" show-location-picker>
     <!-- 無道場提示 -->
     <div
-      v-if="!appStore.selectedLocationId"
+      v-if="!appStore.selectedLocationId || !appStore.selectedHallId"
       class="flex flex-col items-center justify-center py-20 text-center"
     >
       <Building2 class="w-16 h-16 text-gray-300 mb-4" />
-      <p class="text-gray-500">尚未選擇道場<br />請點選右上角選擇</p>
+      <p class="text-gray-500">尚未選擇道場與堂口<br />請點選右上角選擇</p>
     </div>
 
     <template v-else>
@@ -29,7 +29,7 @@
         </div>
         <div class="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-sm text-white/80">
           <MapPin class="w-4 h-4" />
-          {{ appStore.selectedLocation.name }}
+          {{ appStore.selectedLocation.name }} / {{ appStore.selectedHall?.name }}
           <span class="ml-auto">{{ today }}</span>
         </div>
       </div>
@@ -198,11 +198,6 @@ const productGroups = computed(() => {
   const names = []
   const seen = new Set()
   appStore.activeProducts.forEach(p => {
-    // 檢查是不是在目前道場停用
-    const locId = appStore.selectedLocationId
-    const locOverride = p.overrides?.[locId]
-    if (locOverride && locOverride.isActive === false) return
-    
     if (!seen.has(p.name)) {
       seen.add(p.name)
       names.push(p.name)
@@ -218,6 +213,7 @@ const today = computed(() =>
 const roleLabel = computed(() => ({
   owner: '系統總管',
   admin: '管理員',
+  hallLead: '執事負責人',
   staff: '一般人員',
 }[authStore.role] ?? '待審核'))
 
@@ -226,14 +222,6 @@ const stockItems = computed(() => {
     ...p,
     currentStock: stockMap.value[p.id] ?? 0,
   }))
-  
-  // 先過濾被目前道場停用的
-  const locId = appStore.selectedLocationId
-  items = items.filter(p => {
-    const locOverride = p.overrides?.[locId]
-    if (locOverride && locOverride.isActive === false) return false
-    return true
-  })
   
   // 篩選選中的標籤 (如果有選)
   if (selectedGroupNames.value.length > 0) {
@@ -269,15 +257,17 @@ function stopListeners() {
 
 function listenData() {
   stopListeners()
-  if (!appStore.selectedLocationId) return
+  if (!appStore.selectedLocationId || !appStore.selectedHallId) return
   
   loading.value = true
   const locId = appStore.selectedLocationId
+  const hallId = appStore.selectedHallId
 
   // 1. 監聽庫存
   const stockQ = query(
     collection(db, 'stocks'),
-    where('locationId', '==', locId)
+    where('locationId', '==', locId),
+    where('hallId', '==', hallId)
   )
   unsubscribeStocks = onSnapshot(stockQ, (snap) => {
     stockMap.value = Object.fromEntries(
@@ -294,6 +284,7 @@ function listenData() {
   const txQ = query(
     collection(db, 'transactions'),
     where('locationId', '==', locId),
+    where('hallId', '==', hallId),
     where('date', '==', todayStr)
   )
   unsubscribeTx = onSnapshot(txQ, (snap) => {
@@ -304,7 +295,7 @@ function listenData() {
   })
 }
 
-watch(() => appStore.selectedLocationId, listenData)
+watch(() => [appStore.selectedLocationId, appStore.selectedHallId], listenData)
 onMounted(listenData)
 onUnmounted(stopListeners)
 </script>

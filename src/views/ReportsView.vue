@@ -167,17 +167,11 @@
               </el-config-provider>
             </div>
             
-            <!-- 道場多選 (僅結緣明細表需要) -->
+            <!-- 當前範圍 -->
             <div v-if="activeTab === 'orderDetail'">
-              <h3 class="text-sm font-medium text-gray-700 mb-2">道場名稱 (可多選)</h3>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="loc in appStore.locations.filter(l => l.isActive)"
-                  :key="loc.id"
-                  class="px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all"
-                  :class="commonLocs.includes(loc.id) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'"
-                  @click="toggleCommonLoc(loc.id)"
-                >{{ loc.name }}</button>
+              <h3 class="text-sm font-medium text-gray-700 mb-2">目前報表範圍</h3>
+              <div class="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-600">
+                {{ appStore.selectedLocation?.name }} / {{ appStore.selectedHall?.name }}
               </div>
             </div>
 
@@ -260,7 +254,7 @@
                   <th class="border p-2 text-center">會計收款日期</th>
                   <th class="border p-2 text-center">品項名稱</th>
                   <th class="border p-2 text-center">規格</th>
-                  <th class="border p-2 text-center">道場名稱</th>
+                  <th class="border p-2 text-center">範圍</th>
                   <th class="border p-2 text-center">備註/摘要</th>
                   <th class="border p-2 text-center">出庫數量</th>
                   <th class="border p-2 text-center">金額</th>
@@ -271,7 +265,7 @@
                   <td class="border p-2 text-center">{{ row.accountantReceivedDate || '—' }}</td>
                   <td class="border p-2 text-center">{{ row.productSnapshot?.name }}</td>
                   <td class="border p-2 text-center">{{ row.productSnapshot?.spec || '—' }}</td>
-                  <td class="border p-2 text-center">{{ row.locationName }}</td>
+                  <td class="border p-2 text-center">{{ row.scopeName }}</td>
                   <td class="border p-2">{{ row.note || '—' }}</td>
                   <td class="border p-2 text-center">{{ row.qty }}</td>
                   <td class="border p-2 text-center font-bold">${{ formatMoney(row.calculatedAmount) }}</td>
@@ -330,7 +324,7 @@
 
 <script setup>
 import { ref, watch, onMounted, computed } from 'vue'
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'
+import { collection, query, where, getDocs } from 'firebase/firestore'
 import zhTw from 'element-plus/es/locale/lang/zh-tw'
 import ExcelJS from 'exceljs'
 import { FileDown, Upload, PackageSearch } from 'lucide-vue-next'
@@ -339,6 +333,7 @@ import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/components/AppLayout.vue'
 import { formatMoney } from '@/utils/format'
+import { isSaleEnabled } from '@/utils/multiDept'
 
 const zhTwLocale = zhTw
 const appStore = useAppStore()
@@ -347,11 +342,12 @@ const authStore = useAuthStore()
 // ─── Tab ───────────────────────────────────────────────
 const activeTab = ref('stockReport')
 const visibleTabs = computed(() => {
-  return [
-    { key: 'stockReport', label: '出入庫明細' },
-    { key: 'orderDetail', label: '結緣明細表' },
-    { key: 'orderReg',    label: '認購登記表' },
-  ]
+  const tabs = [{ key: 'stockReport', label: '出入庫明細' }]
+  if (isSaleEnabled(appStore.selectedHallFinanceMode)) {
+    tabs.push({ key: 'orderDetail', label: '結緣明細表' })
+    tabs.push({ key: 'orderReg', label: '認購登記表' })
+  }
+  return tabs
 })
 
 // 權限檢查：若當前分頁被過濾，自動跳回第一個可見分頁
@@ -412,7 +408,7 @@ const selectedProductIds = computed(() => {
 })
 
 const isDataReady = computed(() => {
-  if (!appStore.selectedLocationId) return false
+  if (!appStore.selectedLocationId || !appStore.selectedHallId) return false
   if (selectedProductIds.value.length === 0) return false
   if (exportType.value === 'today') return true
   if (exportType.value === 'year') return !!selectedYear.value
@@ -422,11 +418,11 @@ const isDataReady = computed(() => {
 })
 
 const reportTitle = computed(() => {
-  const loc = appStore.selectedLocation?.name ?? '道場'
-  if (exportType.value === 'today') return `${loc} ${new Date().toLocaleDateString()} 出入庫明細表`
-  if (exportType.value === 'year') return `${loc} ${selectedYear.value}年 出入庫明細表`
-  if (exportType.value === 'month') return `${loc} ${selectedMonth.value} 出入庫明細表`
-  if (exportType.value === 'custom') return `${loc} ${selectedRange.value[0]}至${selectedRange.value[1]} 出入庫明細表`
+  const scope = `${appStore.selectedLocation?.name ?? '道場'} / ${appStore.selectedHall?.name ?? '堂口'}`
+  if (exportType.value === 'today') return `${scope} ${new Date().toLocaleDateString()} 出入庫明細表`
+  if (exportType.value === 'year') return `${scope} ${selectedYear.value}年 出入庫明細表`
+  if (exportType.value === 'month') return `${scope} ${selectedMonth.value} 出入庫明細表`
+  if (exportType.value === 'custom') return `${scope} ${selectedRange.value[0]}至${selectedRange.value[1]} 出入庫明細表`
   return ''
 })
 
@@ -456,15 +452,20 @@ function toggleProduct(name) {
   else selectedGroupNames.value.splice(idx, 1)
 }
 
-watch(() => [appStore.selectedLocationId, exportType.value, selectedYear.value, selectedMonth.value, selectedRange.value, selectedGroupNames.value], loadPreview, { deep: true })
+watch(() => [appStore.selectedLocationId, appStore.selectedHallId, exportType.value, selectedYear.value, selectedMonth.value, selectedRange.value, selectedGroupNames.value], loadPreview, { deep: true })
 
 async function buildReportData(locId) {
-  const productSnap = await getDocs(query(collection(db, 'products'), where('isActive', '==', true)))
-  let products = productSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-  products = products.filter(p => (p.overrides?.[locId]?.isActive ?? true) && selectedProductIds.value.includes(p.id))
+  const hallId = appStore.selectedHallId
+  let products = appStore.activeProducts.filter(p => selectedProductIds.value.includes(p.id))
   products.sort((a, b) => (a.order || 0) - (b.order || 0))
 
-  const txSnap = await getDocs(query(collection(db, 'transactions'), where('locationId', '==', locId)))
+  const txSnap = await getDocs(
+    query(
+      collection(db, 'transactions'),
+      where('locationId', '==', locId),
+      where('hallId', '==', hallId)
+    )
+  )
   const transactions = txSnap.docs.map(d => d.data()).sort((a, b) => a.date.localeCompare(b.date))
 
   const rows = []
@@ -518,7 +519,7 @@ async function exportExcel() {
   }
   exporting.value = true
   try {
-    const { products, rows } = await buildReportData(appStore.selectedLocationId)
+    const { rows } = await buildReportData(appStore.selectedLocationId)
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('出入庫明細')
     // 原有 Excel 匯出邏輯... (略，維持現狀)
@@ -541,7 +542,6 @@ const commonRange = ref([
   new Date().toISOString().slice(0, 10),
   new Date().toISOString().slice(0, 10)
 ])
-const commonLocs = ref([])
 const commonProds = ref([])
 const commonPaymentMethod = ref('')
 const sharedRows = ref([])
@@ -555,9 +555,6 @@ const sharedTotals = computed(() => {
   }), { qty: 0, amount: 0 })
 })
 
-function toggleCommonLoc(id) {
-  const i = commonLocs.value.indexOf(id); i === -1 ? commonLocs.value.push(id) : commonLocs.value.splice(i, 1)
-}
 function toggleCommonProd(name) {
   const i = commonProds.value.indexOf(name); i === -1 ? commonProds.value.push(name) : commonProds.value.splice(i, 1)
 }
@@ -565,14 +562,16 @@ function toggleCommonProd(name) {
 async function loadSharedData() {
   loadingShared.value = true
   try {
-    const qBase = query(collection(db, 'transactions'), where('type', '==', 'out'))
+    const qBase = query(
+      collection(db, 'transactions'),
+      where('locationId', '==', appStore.selectedLocationId),
+      where('hallId', '==', appStore.selectedHallId),
+      where('type', '==', 'out')
+    )
     const snap = await getDocs(qBase)
-    const locMap = {}
-    appStore.locations.forEach(l => locMap[l.id] = l)
     
     let rows = snap.docs.map(d => {
       const data = d.data()
-      const loc = locMap[data.locationId]
       const product = appStore.products.find(p => p.id === data.productId)
       
       // 金額判定：優先使用品項層級實收/小計 (新版數據)，若無則動態計算 (舊版或備援)
@@ -584,22 +583,15 @@ async function loadSharedData() {
         if (snapshotPrice != null) {
           amount = snapshotPrice * (data.qty || 0);
         } else {
-          // 最後備援：參考系統目前定價與道場加價
-          let price = product?.price || 0;
-          if (loc?.country) {
-            const override = product?.overrides?.[loc.country];
-            if (override && override.price != null && override.price !== '') {
-              price = Number(override.price);
-            }
-          }
-          amount = price * (data.qty || 0);
+          // 最後備援：使用目前品項售價，不再混入舊的 location override。
+          amount = (product?.price || 0) * (data.qty || 0);
         }
       }
 
       return { 
         id: d.id, 
         ...data, 
-        locationName: loc?.name || '未知道場',
+        scopeName: `${appStore.selectedLocation?.name || '未知道場'} / ${appStore.selectedHall?.name || '未知堂口'}`,
         calculatedAmount: amount
       }
     })
@@ -613,10 +605,9 @@ async function loadSharedData() {
       else if (commonFilterType.value === 'month') matchPeriod = r.date?.startsWith(commonMonth.value)
       else if (commonFilterType.value === 'custom') matchPeriod = r.date >= commonRange.value[0] && r.date <= commonRange.value[1]
       
-      const matchLoc = activeTab.value === 'orderDetail' ? (commonLocs.value.length === 0 || commonLocs.value.includes(r.locationId)) : true
       const matchProd = commonProds.value.length === 0 || commonProds.value.includes(r.productSnapshot?.name)
       const matchPayment = !commonPaymentMethod.value || commonPaymentMethod.value === r.paymentMethod
-      return matchPeriod && matchLoc && matchProd && matchPayment
+      return matchPeriod && matchProd && matchPayment
     })
 
     // 排序：認購日期
@@ -653,7 +644,7 @@ async function exportSharedExcel() {
           ard: r.accountantReceivedDate || '',
           name: r.productSnapshot?.name || '',
           spec: r.productSnapshot?.spec || '',
-          loc: r.locationName || '',
+          loc: r.scopeName || '',
           note: r.note || '',
           qty: r.qty || 0,
           amount: r.calculatedAmount
@@ -705,7 +696,7 @@ async function exportSharedExcel() {
   }
 }
 
-watch([activeTab, commonFilterType, commonYear, commonMonth, commonRange, commonLocs, commonProds, commonPaymentMethod], () => {
+watch([activeTab, commonFilterType, commonYear, commonMonth, commonRange, commonProds, commonPaymentMethod, () => appStore.selectedLocationId, () => appStore.selectedHallId], () => {
   if (activeTab.value !== 'stockReport') loadSharedData()
 }, { deep: true })
 

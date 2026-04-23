@@ -1,95 +1,145 @@
 <template>
-  <AppLayout title="道場管理" :show-location-picker="false">
+  <AppLayout title="道場與堂口管理" :show-location-picker="false">
     <div class="flex justify-end mb-4">
-      <button class="btn-primary gap-2 text-base" @click="openForm()">
+      <button class="btn-primary gap-2 text-base" @click="openLocationForm()">
         <Plus class="w-5 h-5" /> 新增道場
       </button>
     </div>
 
-    <div v-if="loading" class="flex justify-center py-12">
-      <div class="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-
-    <div v-else class="space-y-2 pb-24">
-      <VueDraggable
-        v-model="draggableLocations"
-        item-key="id"
-        handle=".drag-loc-handle"
-        @end="onDragEnd"
-        class="space-y-2"
-        ghost-class="opacity-50"
+    <div class="space-y-4 pb-24">
+      <div
+        v-for="loc in sortedLocations"
+        :key="loc.id"
+        class="card border-2"
+        :class="loc.isActive !== false ? 'border-transparent' : 'border-gray-200 opacity-60'"
       >
-        <template #item="{ element: loc }">
-          <div
-            class="card flex items-center gap-3"
-            :class="!loc.isActive ? 'opacity-50' : ''"
-          >
-            <button class="drag-loc-handle p-2 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0">
-              <GripVertical class="w-5 h-5" />
-            </button>
-            <Building2 class="w-8 h-8 text-brand-400 flex-shrink-0" />
-            <div class="flex-1 min-w-0">
+        <div class="flex items-start gap-3">
+          <Building2 class="w-8 h-8 text-brand-400 flex-shrink-0 mt-1" />
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
               <div class="font-semibold text-gray-800">{{ loc.name }}</div>
-              <div v-if="loc.address" class="text-sm text-gray-400 truncate">{{ loc.address }}</div>
+              <span class="text-xs px-2 py-0.5 rounded-full" :class="loc.isActive !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'">
+                {{ loc.isActive !== false ? '啟用' : '停用' }}
+              </span>
             </div>
-            <el-switch :model-value="loc.isActive" @change="(val) => toggleActive(loc, val)" />
-            <button class="p-2 rounded-xl hover:bg-gray-100" @click="openForm(loc)">
+            <div v-if="loc.address" class="text-sm text-gray-500 mt-1">{{ loc.address }}</div>
+            <div class="text-xs text-gray-400 mt-1">國度：{{ loc.country || '台灣' }}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <el-switch :model-value="loc.isActive !== false" @change="(val) => toggleLocationActive(loc, val)" />
+            <button class="p-2 rounded-xl hover:bg-gray-100" @click="openLocationForm(loc)">
               <Pencil class="w-5 h-5 text-gray-500" />
             </button>
           </div>
-        </template>
-      </VueDraggable>
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-gray-100">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div class="text-sm font-semibold text-gray-700">堂口</div>
+              <div class="text-xs text-gray-400">知客為系統預設堂口</div>
+            </div>
+            <button class="btn-ghost px-4 py-2 text-sm" @click="openHallForm(loc)">
+              <Plus class="w-4 h-4" /> 新增堂口
+            </button>
+          </div>
+
+          <div class="space-y-2">
+            <div
+              v-for="hall in getLocationHalls(loc.id)"
+              :key="hall.id"
+              class="flex items-center gap-3 rounded-xl border border-gray-200 p-3 bg-gray-50"
+            >
+              <Store class="w-5 h-5 text-gray-400 flex-shrink-0" />
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="font-medium text-gray-800">{{ hall.name }}</div>
+                  <span v-if="hall.isSystem" class="text-[11px] px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-100">系統預設</span>
+                  <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
+                    {{ financeLabel(hall.financeMode) }}
+                  </span>
+                </div>
+                <div class="text-xs text-gray-400 mt-1">{{ hall.isActive !== false ? '啟用中' : '停用中' }}</div>
+              </div>
+              <el-switch
+                :model-value="hall.isActive !== false"
+                :disabled="hall.isSystem"
+                @change="(val) => toggleHallActive(hall, val)"
+              />
+              <button class="p-2 rounded-xl hover:bg-white" @click="openHallForm(loc, hall)">
+                <Pencil class="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '編輯道場' : '新增道場'" width="92%" align-center>
+    <el-dialog v-model="locationDialogVisible" :title="editingLocationId ? '編輯道場' : '新增道場'" width="92%" align-center>
       <div class="space-y-4 py-2">
         <div>
           <label class="label">道場名稱 *</label>
-          <input v-model="form.name" type="text" class="input" placeholder="例如：本會道場" />
+          <input v-model="locationForm.name" type="text" class="input" placeholder="例如：本會道場" />
         </div>
         <div>
-          <label class="label">國度 (地區定價用) *</label>
-          <input v-model="form.country" type="text" class="input" placeholder="例如：台灣" />
+          <label class="label">國度 *</label>
+          <input v-model="locationForm.country" type="text" class="input" placeholder="例如：台灣" />
         </div>
         <div>
-          <label class="label">地址（選填）</label>
-          <div class="flex gap-2">
-            <input v-model="form.address" type="text" class="input" placeholder="例如：香港XX區XX路XX號" />
-            <button 
-              class="btn-ghost px-3 shrink-0" 
-              :disabled="!form.address || geocoding" 
-              @click="getLocationFromAddress"
-              title="從地址獲取經緯度"
-            >
-              <div v-if="geocoding" class="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-              <Search v-else class="w-4 h-4" />
-            </button>
-          </div>
+          <label class="label">地址</label>
+          <input v-model="locationForm.address" type="text" class="input" placeholder="例如：台北市..." />
         </div>
-        <div class="pt-2 border-t mt-4">
-          <div class="flex items-center justify-between mb-2">
-            <label class="label mb-0">地理座標（定位驗證用）</label>
-            <button class="text-brand-600 text-sm flex items-center gap-1 font-semibold hover:text-brand-700" @click="getLocation">
-              <MapPin class="w-4 h-4" /> 獲取位置
-            </button>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">緯度</label>
+            <input v-model.number="locationForm.lat" type="number" class="input py-2 text-sm" placeholder="25.033" />
           </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="text-xs text-gray-500 block mb-1">緯度 (Lat)</label>
-              <input v-model.number="form.lat" type="number" class="input py-2 text-sm" placeholder="例如：25.033" />
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 block mb-1">經度 (Lng)</label>
-              <input v-model.number="form.lng" type="number" class="input py-2 text-sm" placeholder="例如：121.565" />
-            </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">經度</label>
+            <input v-model.number="locationForm.lng" type="number" class="input py-2 text-sm" placeholder="121.565" />
           </div>
-          <p class="text-xs text-gray-400 mt-1">設定座標後，一般成員登入系統時必須在此座標半徑 200 公尺內。</p>
         </div>
       </div>
       <template #footer>
-        <button class="btn-ghost mr-2" @click="dialogVisible = false">取消</button>
-        <button class="btn-primary" :disabled="!form.name || saving" @click="save">
-          {{ saving ? '儲存中…' : '儲存' }}
+        <button class="btn-ghost mr-2" @click="locationDialogVisible = false">取消</button>
+        <button class="btn-primary" :disabled="!locationForm.name || savingLocation" @click="saveLocation">
+          {{ savingLocation ? '儲存中…' : '儲存' }}
+        </button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="hallDialogVisible" :title="editingHallId ? '編輯堂口' : '新增堂口'" width="92%" align-center>
+      <div class="space-y-4 py-2">
+        <div class="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-xl p-3">
+          所屬道場：{{ hallForm.locationName || '—' }}
+        </div>
+        <div>
+          <label class="label">堂口名稱 *</label>
+          <input v-model="hallForm.name" type="text" class="input" placeholder="例如：流通處" :disabled="hallForm.isSystem" />
+        </div>
+        <div>
+          <label class="label">財務模式 *</label>
+          <el-select v-model="hallForm.financeMode" class="w-full">
+            <el-option
+              v-for="option in FINANCE_MODE_OPTIONS"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </div>
+        <div class="flex items-center justify-between rounded-xl border border-gray-200 p-3">
+          <div>
+            <div class="font-medium text-gray-700">啟用狀態</div>
+            <div class="text-xs text-gray-400">系統預設堂口不可停用</div>
+          </div>
+          <el-switch v-model="hallForm.isActive" :disabled="hallForm.isSystem" />
+        </div>
+      </div>
+      <template #footer>
+        <button class="btn-ghost mr-2" @click="hallDialogVisible = false">取消</button>
+        <button class="btn-primary" :disabled="!hallForm.name || savingHall" @click="saveHall">
+          {{ savingHall ? '儲存中…' : '儲存' }}
         </button>
       </template>
     </el-dialog>
@@ -97,146 +147,232 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { collection, addDoc, updateDoc, doc, writeBatch } from 'firebase/firestore'
-import { Plus, Pencil, Building2, GripVertical, MapPin, Search } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Building2, Pencil, Plus, Store } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
-import VueDraggable from 'vuedraggable'
+import { DEFAULT_HALL_NAME, FINANCE_MODE_MAP, FINANCE_MODE_OPTIONS, buildPlacementDocId, sortByOrder } from '@/utils/multiDept'
 
 const appStore = useAppStore()
-const loading    = ref(false)
-const saving     = ref(false)
-const geocoding  = ref(false)
-const dialogVisible = ref(false)
-const editingId  = ref(null)
-const draggableLocations = ref([])
 
-watch(() => appStore.locations, (newVal) => {
-  draggableLocations.value = [...newVal].sort((a, b) => (a.order || 0) - (b.order || 0))
-}, { immediate: true })
+const locationDialogVisible = ref(false)
+const hallDialogVisible = ref(false)
+const savingLocation = ref(false)
+const savingHall = ref(false)
+const editingLocationId = ref(null)
+const editingHallId = ref(null)
 
-const form = ref({ name: '', country: '台灣', address: '', lat: null, lng: null, isActive: true })
+const sortedLocations = computed(() => [...appStore.locations].sort(sortByOrder))
 
-function openForm(loc = null) {
-  editingId.value = loc?.id ?? null
-  form.value = loc
-    ? { name: loc.name, country: loc.country || '台灣', address: loc.address ?? '', lat: loc.lat ?? null, lng: loc.lng ?? null, isActive: loc.isActive }
-    : { name: '', country: '台灣', address: '', lat: null, lng: null, isActive: true }
-  geocoding.value = false
-  dialogVisible.value = true
+const locationForm = ref({
+  name: '',
+  country: '台灣',
+  address: '',
+  lat: null,
+  lng: null,
+  isActive: true,
+})
+
+const hallForm = ref({
+  locationId: '',
+  locationName: '',
+  name: '',
+  financeMode: 'none',
+  isActive: true,
+  isSystem: false,
+})
+
+function financeLabel(mode) {
+  return FINANCE_MODE_MAP[mode] ?? FINANCE_MODE_MAP.none
 }
 
-function getLocation() {
-  if (!navigator.geolocation) {
-    alert('您的瀏覽器不支援地理定位');
-    return;
+function getLocationHalls(locationId) {
+  return [...appStore.getHallsForLocation(locationId)].sort(sortByOrder)
+}
+
+function openLocationForm(location = null) {
+  editingLocationId.value = location?.id ?? null
+  locationForm.value = location
+    ? {
+        name: location.name,
+        country: location.country || '台灣',
+        address: location.address || '',
+        lat: location.lat ?? null,
+        lng: location.lng ?? null,
+        isActive: location.isActive !== false,
+      }
+    : {
+        name: '',
+        country: '台灣',
+        address: '',
+        lat: null,
+        lng: null,
+        isActive: true,
+      }
+  locationDialogVisible.value = true
+}
+
+async function saveLocation() {
+  savingLocation.value = true
+  try {
+    if (editingLocationId.value) {
+      await updateDoc(doc(db, 'locations', editingLocationId.value), { ...locationForm.value })
+      ElMessage.success('道場已更新')
+      locationDialogVisible.value = false
+      return
+    }
+
+    const maxOrder = Math.max(0, ...appStore.locations.map((loc) => Number(loc.order || 0)))
+    const locationRef = await addDoc(collection(db, 'locations'), {
+      ...locationForm.value,
+      order: maxOrder + 10,
+    })
+
+    const hallRef = doc(collection(db, 'halls'))
+    const batch = writeBatch(db)
+    batch.set(hallRef, {
+      locationId: locationRef.id,
+      name: DEFAULT_HALL_NAME,
+      order: 10,
+      isActive: true,
+      isSystem: true,
+      financeMode: 'none',
+      createdAt: serverTimestamp(),
+    })
+
+    appStore.products
+      .filter((product) => (product.placementMode ?? 'all') === 'all')
+      .forEach((product) => {
+        batch.set(doc(db, 'productPlacements', buildPlacementDocId(product.id, hallRef.id)), {
+          productId: product.id,
+          locationId: locationRef.id,
+          hallId: hallRef.id,
+          isVisible: true,
+          financeModeOverride: null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      })
+
+    await batch.commit()
+    locationDialogVisible.value = false
+    ElMessage.success('道場已新增，並自動建立知客堂口')
+  } catch (error) {
+    ElMessage.error(`儲存失敗：${error.message}`)
+  } finally {
+    savingLocation.value = false
   }
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      form.value.lat = position.coords.latitude;
-      form.value.lng = position.coords.longitude;
-    },
-    (error) => {
-      alert('無法獲取位置：' + error.message);
-    },
-    { enableHighAccuracy: true }
-  );
 }
 
-async function getLocationFromAddress() {
-  if (!form.value.address) return
-  
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-  if (!apiKey) {
-    alert('系統未設定 Google Maps API 金鑰，無法使用此功能。')
+async function toggleLocationActive(location, value) {
+  await updateDoc(doc(db, 'locations', location.id), { isActive: value })
+}
+
+function openHallForm(location, hall = null) {
+  editingHallId.value = hall?.id ?? null
+  hallForm.value = hall
+    ? {
+        locationId: location.id,
+        locationName: location.name,
+        name: hall.name,
+        financeMode: hall.financeMode || 'none',
+        isActive: hall.isActive !== false,
+        isSystem: hall.isSystem === true,
+      }
+    : {
+        locationId: location.id,
+        locationName: location.name,
+        name: '',
+        financeMode: 'none',
+        isActive: true,
+        isSystem: false,
+      }
+  hallDialogVisible.value = true
+}
+
+async function saveHall() {
+  savingHall.value = true
+  try {
+    if (editingHallId.value) {
+      await updateDoc(doc(db, 'halls', editingHallId.value), {
+        name: hallForm.value.name.trim(),
+        financeMode: hallForm.value.financeMode,
+        isActive: hallForm.value.isSystem ? true : hallForm.value.isActive,
+      })
+      hallDialogVisible.value = false
+      ElMessage.success('堂口已更新')
+      return
+    }
+
+    const hallList = getLocationHalls(hallForm.value.locationId)
+    const maxOrder = Math.max(0, ...hallList.map((hall) => Number(hall.order || 0)))
+    const hallRef = doc(collection(db, 'halls'))
+    const batch = writeBatch(db)
+    batch.set(hallRef, {
+      locationId: hallForm.value.locationId,
+      name: hallForm.value.name.trim(),
+      order: maxOrder + 10,
+      isActive: hallForm.value.isActive,
+      isSystem: false,
+      financeMode: hallForm.value.financeMode,
+      createdAt: serverTimestamp(),
+    })
+
+    appStore.products
+      .filter((product) => (product.placementMode ?? 'all') === 'all')
+      .forEach((product) => {
+        batch.set(doc(db, 'productPlacements', buildPlacementDocId(product.id, hallRef.id)), {
+          productId: product.id,
+          locationId: hallForm.value.locationId,
+          hallId: hallRef.id,
+          isVisible: true,
+          financeModeOverride: null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      })
+
+    await batch.commit()
+    hallDialogVisible.value = false
+    ElMessage.success('堂口已新增')
+  } catch (error) {
+    ElMessage.error(`儲存失敗：${error.message}`)
+  } finally {
+    savingHall.value = false
+  }
+}
+
+async function toggleHallActive(hall, value) {
+  if (hall.isSystem) {
+    ElMessage.warning('知客堂口不可停用')
     return
   }
 
-  geocoding.value = true
-  try {
-    // 1. 確保載入 Google Maps SDK (前端 SDK 支援網域限制)
-    await loadGoogleMapsScript(apiKey)
-    
-    // 2. 使用 SDK 的 Geocoder
-    const geocoder = new window.google.maps.Geocoder()
-    geocoder.geocode({ 
-      address: form.value.address,
-      language: 'zh-TW',
-      region: 'tw'
-    }, (results, status) => {
-      geocoding.value = false
-      if (status === 'OK' && results[0]) {
-        const location = results[0].geometry.location
-        form.value.lat = location.lat()
-        form.value.lng = location.lng()
-      } else if (status === 'ZERO_RESULTS') {
-        alert('找不到該地址的座標，請確認地址是否正確。')
-      } else {
-        console.error('Geocoder failed:', status)
-        alert(`定位失敗 (${status})，請確認金鑰是否已啟用 Geocoding API 並允許目前的網域。`)
-      }
-    })
-  } catch (err) {
-    console.error('Load SDK error:', err)
-    alert('載入地圖元件失敗，請檢查網路連線或金鑰設定。')
-    geocoding.value = false
-  }
-}
+  if (!value) {
+    const [stockSnap, txSnap] = await Promise.all([
+      getDocs(query(collection(db, 'stocks'), where('hallId', '==', hall.id))),
+      getDocs(query(collection(db, 'transactions'), where('hallId', '==', hall.id))),
+    ])
 
-// 動態載入 Google Maps Script 的輔助函式
-function loadGoogleMapsScript(apiKey) {
-  return new Promise((resolve, reject) => {
-    if (window.google && window.google.maps) {
-      resolve()
+    if (!stockSnap.empty || !txSnap.empty) {
+      ElMessageBox.alert('此堂口已有庫存或交易資料，暫時不可停用。', '無法停用')
       return
     }
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
-    script.async = true
-    script.defer = true
-    script.onload = resolve
-    script.onerror = reject
-    document.head.appendChild(script)
-  })
-}
-
-async function save() {
-  saving.value = true
-  try {
-    const data = { ...form.value }
-    if (editingId.value) {
-      await updateDoc(doc(db, 'locations', editingId.value), data)
-    } else {
-      const maxOrder = Math.max(0, ...appStore.locations.map(l => l.order || 0))
-      data.order = maxOrder + 10
-      await addDoc(collection(db, 'locations'), data)
-    }
-    dialogVisible.value = false
-  } finally {
-    saving.value = false
   }
-}
 
-async function toggleActive(loc, val) {
-  loc.isActive = val
-  await updateDoc(doc(db, 'locations', loc.id), { isActive: val })
-}
-
-async function onDragEnd() {
-  try {
-    const batch = writeBatch(db)
-    draggableLocations.value.forEach((loc, index) => {
-      const newOrder = (index + 1) * 10
-      if (loc.order !== newOrder) {
-        loc.order = newOrder
-        batch.update(doc(db, 'locations', loc.id), { order: newOrder })
-      }
-    })
-    await batch.commit()
-  } catch(e) {
-    console.error('更新道場排序失敗', e)
-  }
+  await updateDoc(doc(db, 'halls', hall.id), { isActive: value })
 }
 </script>

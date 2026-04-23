@@ -18,12 +18,23 @@
 
 <script setup>
 import { Building2, Package, Users, Settings } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/components/AppLayout.vue'
 
-const adminItems = [
-  { to: '/locations', label: '道場管理', icon: Building2, bg: 'bg-blue-50',   color: 'text-blue-500' },
-  { to: '/products',  label: '品項管理', icon: Package,   bg: 'bg-green-50',  color: 'text-green-500' },
-  { to: '/users',     label: '成員管理', icon: Users,     bg: 'bg-purple-50', color: 'text-purple-500' },
-  { to: '/settings',  label: '系統設定', icon: Settings,  bg: 'bg-amber-50',  color: 'text-amber-500' },
-]
+const authStore = useAuthStore()
+
+const adminItems = computed(() => {
+  const items = [
+    { to: '/locations', label: '道場管理', icon: Building2, bg: 'bg-blue-50', color: 'text-blue-500' },
+    { to: '/products', label: '品項管理', icon: Package, bg: 'bg-green-50', color: 'text-green-500' },
+    { to: '/users', label: '成員管理', icon: Users, bg: 'bg-purple-50', color: 'text-purple-500' },
+  ]
+
+  if (authStore.isOwner) {
+    items.push({ to: '/settings', label: '系統設定', icon: Settings, bg: 'bg-amber-50', color: 'text-amber-500' })
+  }
+
+  return items
+})
 </script>

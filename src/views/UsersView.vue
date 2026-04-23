@@ -1,15 +1,16 @@
 <template>
   <AppLayout title="成員管理" :show-location-picker="false">
     <div class="mb-4 text-sm text-gray-500 bg-amber-50 border border-amber-200 rounded-xl p-3">
-      ⚠️ 僅系統總管可以變更成員角色
+      角色、道場、堂口與職稱分開管理；`staff` / `hallLead` 必須綁堂口。
     </div>
 
-    <!-- 篩選列 -->
     <div class="card mb-4 space-y-3">
       <div v-for="group in filterGroups" :key="group.key" class="space-y-1.5">
         <div class="flex items-center justify-between">
           <h3 class="text-xs font-bold text-gray-400">{{ group.label }}</h3>
-          <button class="text-[10px] text-brand-600 hover:underline" @click="toggleGroupAll(group)">{{ isGroupAll(group) ? '取消全選' : '全選' }}</button>
+          <button class="text-[10px] text-brand-600 hover:underline" @click="toggleGroupAll(group)">
+            {{ isGroupAll(group) ? '取消全選' : '全選' }}
+          </button>
         </div>
         <div class="flex flex-wrap gap-1.5">
           <button
@@ -18,7 +19,9 @@
             class="px-2.5 py-1 rounded-full text-xs font-medium border-2 transition-all"
             :class="group.selected.value.includes(item.value) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'"
             @click="toggleFilter(group.selected.value, item.value)"
-          >{{ item.label }}</button>
+          >
+            {{ item.label }}
+          </button>
         </div>
       </div>
     </div>
@@ -27,19 +30,10 @@
       <div class="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
     </div>
 
-    <div v-else class="space-y-2">
-      <div
-        v-for="u in filteredUsers"
-        :key="u.uid"
-        class="card flex flex-col gap-2"
-      >
-        <!-- 第一行：頭像 + 名稱/執事 + role badge -->
+    <div v-else class="space-y-3 pb-24">
+      <div v-for="u in filteredUsers" :key="u.uid" class="card flex flex-col gap-3">
         <div class="flex items-center gap-3">
-          <img
-            :src="u.photoURL || ''"
-            class="w-12 h-12 rounded-full bg-gray-200 flex-shrink-0"
-            :alt="u.displayName"
-          />
+          <img :src="u.photoURL || ''" class="w-12 h-12 rounded-full bg-gray-200 flex-shrink-0" :alt="u.displayName" />
           <div class="flex-1 min-w-0">
             <div class="font-semibold text-gray-800 truncate">
               <span v-if="u.dharmaName">{{ u.dharmaName }}</span>
@@ -53,21 +47,21 @@
             <div class="flex items-center gap-1.5 mt-1 flex-wrap">
               <span :class="`badge-role-${u.role}`">{{ roleLabel(u.role) }}</span>
               <span v-if="u.dutyName" class="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full">{{ u.dutyName }}</span>
+              <span v-if="scopeLabel(u)" class="text-xs bg-gray-50 text-gray-600 border border-gray-200 px-2 py-0.5 rounded-full">{{ scopeLabel(u) }}</span>
               <span v-if="u.uid === selfUid" class="text-xs text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full border border-brand-200">本人</span>
             </div>
           </div>
         </div>
 
-        <!-- 系統總管可編輯法名/俗名 -->
         <div v-if="authStore.isOwner && editingUid === u.uid" class="flex flex-col gap-2 bg-gray-50 rounded-xl p-3 border">
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="text-xs text-gray-500 block mb-1">法名</label>
-              <input v-model="editForm.dharmaName" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="法名（選填）" />
+              <input v-model="editForm.dharmaName" type="text" class="input py-2 text-sm" placeholder="法名（選填）" />
             </div>
             <div>
               <label class="text-xs text-gray-500 block mb-1">俗名</label>
-              <input v-model="editForm.secularName" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="俗名（選填）" />
+              <input v-model="editForm.secularName" type="text" class="input py-2 text-sm" placeholder="俗名（選填）" />
             </div>
           </div>
           <div class="flex gap-2 justify-end">
@@ -76,23 +70,22 @@
           </div>
         </div>
         <div v-else-if="authStore.isOwner" class="flex justify-end">
-          <button class="text-xs text-brand-600 hover:underline flex items-center gap-1" @click="startEditNames(u)">
-            ✏️ 編輯法名/俗名
-          </button>
+          <button class="text-xs text-brand-600 hover:underline" @click="startEditNames(u)">編輯法名 / 俗名</button>
         </div>
 
-        <!-- 第二行：owner 可編輯的下拉選單 -->
-        <div v-if="authStore.isOwner" class="grid grid-cols-1 gap-2">
+        <div v-if="authStore.canManageUsers && canManageUser(u)" class="grid grid-cols-1 gap-2">
           <el-select
             v-model="u.role"
             class="w-full"
             :disabled="u.uid === selfUid && u.role === 'owner'"
-            @change="changeRole(u)"
+            @change="() => changeRole(u)"
           >
-            <el-option label="待審核" value="pending" />
-            <el-option label="一般人員" value="staff" />
-            <el-option label="管理員" value="admin" />
-            <el-option label="系統總管" value="owner" />
+            <el-option
+              v-for="option in roleOptionsForUser(u)"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
           </el-select>
 
           <el-select
@@ -100,46 +93,45 @@
             class="w-full"
             placeholder="指派道場"
             clearable
-            @change="changeLocation(u)"
+            :disabled="!needsScopedAssignment(u.role)"
+            @change="() => changeLocation(u)"
           >
             <el-option
               v-for="loc in appStore.locations"
               :key="loc.id"
               :label="loc.name"
               :value="loc.id"
+            />
+          </el-select>
+
+          <el-select
+            v-model="u.assignedHallId"
+            class="w-full"
+            placeholder="指派堂口"
+            clearable
+            :disabled="!needsScopedAssignment(u.role) || !u.assignedLocationId"
+            @change="() => changeHall(u)"
+          >
+            <el-option
+              v-for="hall in hallOptionsForUser(u)"
+              :key="hall.id"
+              :label="hall.name"
+              :value="hall.id"
             />
           </el-select>
 
           <el-select
             v-model="u.dutyId"
             class="w-full"
-            placeholder="執事"
+            placeholder="職稱"
             clearable
-            @change="changeDuty(u)"
+            @change="() => changeDuty(u)"
           >
             <el-option
-              v-for="d in appStore.activeDuties"
-              :key="d.id"
-              :label="d.name"
-              :value="d.id"
-            />
-          </el-select>
-        </div>
-
-        <!-- admin（非 owner）僅可改道場 -->
-        <div v-else-if="authStore.isAdmin && !authStore.isOwner && u.uid !== selfUid" class="flex gap-2">
-          <el-select
-            v-model="u.assignedLocationId"
-            class="flex-1 min-w-0"
-            placeholder="指派道場"
-            clearable
-            @change="changeLocation(u)"
-          >
-            <el-option
-              v-for="loc in appStore.locations"
-              :key="loc.id"
-              :label="loc.name"
-              :value="loc.id"
+              v-for="duty in appStore.activeDuties"
+              :key="duty.id"
+              :label="duty.name"
+              :value="duty.id"
             />
           </el-select>
         </div>
@@ -149,139 +141,204 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { collection, onSnapshot, updateDoc, doc, orderBy, query } from 'firebase/firestore'
+import { computed, ref } from 'vue'
+import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { ElMessage } from 'element-plus'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
+import { ROLE_MAP } from '@/utils/multiDept'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
-const selfUid = computed(() => authStore.user?.uid)
 
-const users = ref([])
 const loading = ref(false)
+const users = ref([])
 const editingUid = ref(null)
 const editForm = ref({ dharmaName: '', secularName: '' })
 
-// 篩選
-const selectedRoles = ref(['owner', 'admin', 'staff', 'pending'])
+const selfUid = computed(() => authStore.user?.uid)
+
+const selectedRoles = ref(Object.keys(ROLE_MAP))
 const selectedLocs = ref([])
+const selectedHalls = ref([])
 const selectedDuties = ref([])
 
 const filterGroups = computed(() => [
-  { key: 'role', label: '權限角色', selected: selectedRoles, options: Object.entries(ROLE_MAP).map(([v, l]) => ({ value: v, label: l })) },
-  { key: 'loc', label: '所屬道場', selected: selectedLocs, options: [{ value: 'none', label: '未指派' }, ...appStore.locations.map(l => ({ value: l.id, label: l.name }))] },
-  { key: 'duty', label: '目前執事', selected: selectedDuties, options: [{ value: 'none', label: '無執事' }, ...appStore.activeDuties.map(d => ({ value: d.id, label: d.name }))] },
+  {
+    key: 'role',
+    label: '權限角色',
+    selected: selectedRoles,
+    options: Object.entries(ROLE_MAP).map(([value, label]) => ({ value, label })),
+  },
+  {
+    key: 'loc',
+    label: '所屬道場',
+    selected: selectedLocs,
+    options: [{ value: 'none', label: '未指派' }, ...appStore.locations.map((loc) => ({ value: loc.id, label: loc.name }))],
+  },
+  {
+    key: 'hall',
+    label: '所屬堂口',
+    selected: selectedHalls,
+    options: [{ value: 'none', label: '未指派' }, ...appStore.halls.map((hall) => ({ value: hall.id, label: hall.name }))],
+  },
+  {
+    key: 'duty',
+    label: '職稱',
+    selected: selectedDuties,
+    options: [{ value: 'none', label: '無職稱' }, ...appStore.activeDuties.map((duty) => ({ value: duty.id, label: duty.name }))],
+  },
 ])
 
-const filteredUsers = computed(() => {
-  return users.value.filter(u => {
-    const roleMatch = selectedRoles.value.includes(u.role)
-    const locMatch = selectedLocs.value.length === 0 || 
-                    (selectedLocs.value.includes('none') && !u.assignedLocationId) ||
-                    selectedLocs.value.includes(u.assignedLocationId)
-    const dutyMatch = selectedDuties.value.length === 0 || 
-                     (selectedDuties.value.includes('none') && !u.dutyId) ||
-                     selectedDuties.value.includes(u.dutyId)
-    return roleMatch && locMatch && dutyMatch
+const filteredUsers = computed(() =>
+  users.value.filter((user) => {
+    const roleMatch = selectedRoles.value.includes(user.role)
+    const locMatch =
+      selectedLocs.value.length === 0 ||
+      (selectedLocs.value.includes('none') && !user.assignedLocationId) ||
+      selectedLocs.value.includes(user.assignedLocationId)
+    const hallMatch =
+      selectedHalls.value.length === 0 ||
+      (selectedHalls.value.includes('none') && !user.assignedHallId) ||
+      selectedHalls.value.includes(user.assignedHallId)
+    const dutyMatch =
+      selectedDuties.value.length === 0 ||
+      (selectedDuties.value.includes('none') && !user.dutyId) ||
+      selectedDuties.value.includes(user.dutyId)
+    return roleMatch && locMatch && hallMatch && dutyMatch
   })
-})
+)
 
-function toggleFilter(arr, val) {
-  const i = arr.indexOf(val); i === -1 ? arr.push(val) : arr.splice(i, 1)
-}
-function isGroupAll(g) { return g.selected.value.length === g.options.length }
-function toggleGroupAll(g) {
-  if (isGroupAll(g)) g.selected.value = []
-  else g.selected.value = g.options.map(o => o.value)
+function toggleFilter(arr, value) {
+  const index = arr.indexOf(value)
+  if (index === -1) arr.push(value)
+  else arr.splice(index, 1)
 }
 
-let unsubscribe = null
-
-const ROLE_MAP = {
-  owner:   '系統總管',
-  admin:   '管理員',
-  staff:   '一般人員',
-  pending: '待審核',
+function isGroupAll(group) {
+  return group.selected.value.length === group.options.length
 }
-const roleLabel = r => ROLE_MAP[r] ?? r
 
-function listen() {
-  loading.value = true
-  const q = query(collection(db, 'users'), orderBy('displayName'))
+function toggleGroupAll(group) {
+  if (isGroupAll(group)) group.selected.value = []
+  else group.selected.value = group.options.map((option) => option.value)
+}
 
-  unsubscribe = onSnapshot(q, (snap) => {
-    users.value = snap.docs.map(d => ({ ...d.data(), uid: d.id }))
-    loading.value = false
-  }, (err) => {
-    console.error('Users listener error:', err)
-    loading.value = false
+function roleLabel(role) {
+  return ROLE_MAP[role] ?? role
+}
+
+function scopeLabel(user) {
+  const location = appStore.locations.find((item) => item.id === user.assignedLocationId)
+  const hall = appStore.halls.find((item) => item.id === user.assignedHallId)
+  if (!location && !hall) return ''
+  return [location?.name, hall?.name].filter(Boolean).join(' / ')
+}
+
+function needsScopedAssignment(role) {
+  return ['staff', 'hallLead'].includes(role)
+}
+
+function canManageUser(user) {
+  if (authStore.isOwner) return true
+  if (!authStore.isAdmin) return false
+  return user.role !== 'owner'
+}
+
+function roleOptionsForUser(user) {
+  if (authStore.isOwner) {
+    return Object.entries(ROLE_MAP).map(([value, label]) => ({ value, label }))
+  }
+
+  return Object.entries(ROLE_MAP)
+    .filter(([value]) => !['owner'].includes(value))
+    .map(([value, label]) => ({ value, label }))
+}
+
+function hallOptionsForUser(user) {
+  if (!user.assignedLocationId) return []
+  return appStore.getHallsForLocation(user.assignedLocationId)
+}
+
+function getFallbackHallId(locationId) {
+  return appStore.getDefaultHallForLocation(locationId)?.id ?? null
+}
+
+function startEditNames(user) {
+  editingUid.value = user.uid
+  editForm.value = {
+    dharmaName: user.dharmaName || '',
+    secularName: user.secularName || '',
+  }
+}
+
+async function saveNames(user) {
+  await updateDoc(doc(db, 'users', user.uid), {
+    dharmaName: editForm.value.dharmaName.trim(),
+    secularName: editForm.value.secularName.trim(),
   })
+  editingUid.value = null
+  ElMessage.success('已更新名稱')
 }
 
-async function changeRole(u) {
-  if (!authStore.isOwner) {
-    ElMessage.error('僅系統總管可變更角色。')
+async function changeRole(user) {
+  const payload = { role: user.role }
+  if (!needsScopedAssignment(user.role)) {
+    payload.assignedLocationId = null
+    payload.assignedHallId = null
+    user.assignedLocationId = null
+    user.assignedHallId = null
+  } else if (user.assignedLocationId && !user.assignedHallId) {
+    const hallId = getFallbackHallId(user.assignedLocationId)
+    payload.assignedHallId = hallId
+    user.assignedHallId = hallId
+  }
+
+  await updateDoc(doc(db, 'users', user.uid), payload)
+  ElMessage.success(`角色已更新為「${roleLabel(user.role)}」`)
+}
+
+async function changeLocation(user) {
+  if (!needsScopedAssignment(user.role)) {
+    await updateDoc(doc(db, 'users', user.uid), {
+      assignedLocationId: null,
+      assignedHallId: null,
+    })
     return
   }
-  try {
-    await updateDoc(doc(db, 'users', u.uid), { role: u.role })
-    ElMessage.success(`已將角色更新為「${roleLabel(u.role)}」`)
-  } catch (e) {
-    ElMessage.error('更新失敗，請確認您的權限。')
-  }
+
+  const hallId = user.assignedLocationId ? getFallbackHallId(user.assignedLocationId) : null
+  user.assignedHallId = hallId
+  await updateDoc(doc(db, 'users', user.uid), {
+    assignedLocationId: user.assignedLocationId || null,
+    assignedHallId: hallId,
+  })
+  ElMessage.success('道場與預設堂口已更新')
 }
 
-async function changeLocation(u) {
-  try {
-    await updateDoc(doc(db, 'users', u.uid), { assignedLocationId: u.assignedLocationId || null })
-    const locName = appStore.locations.find(l => l.id === u.assignedLocationId)?.name || '無'
-    ElMessage.success(`道場已更新為「${locName}」`)
-  } catch (e) {
-    ElMessage.error('更新道場失敗，請確認您的權限。')
-  }
+async function changeHall(user) {
+  const hallId = user.assignedHallId || getFallbackHallId(user.assignedLocationId)
+  user.assignedHallId = hallId
+  await updateDoc(doc(db, 'users', user.uid), { assignedHallId: hallId || null })
+  ElMessage.success('堂口已更新')
 }
 
-async function changeDuty(u) {
-  const duty = appStore.activeDuties.find(d => d.id === u.dutyId)
+async function changeDuty(user) {
+  const duty = appStore.activeDuties.find((item) => item.id === user.dutyId)
   const dutyName = duty?.name || ''
-  try {
-    await updateDoc(doc(db, 'users', u.uid), { dutyId: u.dutyId || null, dutyName })
-    u.dutyName = dutyName
-    ElMessage.success(dutyName ? `執事已更新為「${dutyName}」` : '已清除執事')
-  } catch (e) {
-    ElMessage.error('更新執事失敗，請確認您的權限。')
-  }
+  user.dutyName = dutyName
+  await updateDoc(doc(db, 'users', user.uid), {
+    dutyId: user.dutyId || null,
+    dutyName,
+  })
+  ElMessage.success(dutyName ? `職稱已更新為「${dutyName}」` : '已清除職稱')
 }
 
-function startEditNames(u) {
-  editingUid.value = u.uid
-  editForm.value = { dharmaName: u.dharmaName || '', secularName: u.secularName || '' }
-}
-
-async function saveNames(u) {
-  try {
-    await updateDoc(doc(db, 'users', u.uid), {
-      dharmaName: editForm.value.dharmaName.trim(),
-      secularName: editForm.value.secularName.trim(),
-    })
-    u.dharmaName = editForm.value.dharmaName.trim()
-    u.secularName = editForm.value.secularName.trim()
-    editingUid.value = null
-    ElMessage.success('法名/俗名已更新')
-  } catch (e) {
-    ElMessage.error('更新失敗：' + e.message)
-  }
-}
-
-onMounted(() => {
-  appStore.init()
-  listen()
-})
-onUnmounted(() => {
-  if (unsubscribe) unsubscribe()
+loading.value = true
+onSnapshot(collection(db, 'users'), (snap) => {
+  users.value = snap.docs.map((item) => ({ uid: item.id, ...item.data() }))
+  loading.value = false
 })
 </script>

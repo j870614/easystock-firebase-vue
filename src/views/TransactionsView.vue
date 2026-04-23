@@ -1,8 +1,8 @@
 <template>
   <AppLayout title="出入庫紀錄" show-location-picker>
-    <div v-if="!appStore.selectedLocationId" class="flex flex-col items-center justify-center py-20 text-center">
+    <div v-if="!appStore.selectedLocationId || !appStore.selectedHallId" class="flex flex-col items-center justify-center py-20 text-center">
       <Building2 class="w-16 h-16 text-gray-300 mb-4" />
-      <p class="text-gray-500">請先選擇道場</p>
+      <p class="text-gray-500">請先選擇道場與堂口</p>
     </div>
     <template v-else>
       <!-- 篩選列：類型與日期 -->
@@ -132,7 +132,7 @@
                 <CalendarCheck class="w-4 h-4" />
                 {{ tx.accountantReceivedDate ? '修改收款日期' : '標記收款日期' }}
               </button>
-              <template v-if="authStore.isAdmin">
+              <template v-if="authStore.canManageProducts">
                 <button class="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-brand-600 active:scale-95 transition-all" @click="openEdit(tx)">
                   <Edit2 class="w-4 h-4"/> 編輯
                 </button>
@@ -310,6 +310,7 @@ import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/components/AppLayout.vue'
 import { formatMoney } from '@/utils/format'
+import { buildStockDocId } from '@/utils/multiDept'
 
 const zhTwLocale = zhTw
 
@@ -408,11 +409,12 @@ function changePage(delta) {
 function listen() {
   stopListener()
   transactions.value = [] // 切換條件時先清空資料
-  if (!appStore.selectedLocationId) return
+  if (!appStore.selectedLocationId || !appStore.selectedHallId) return
   
   loading.value = true
   const constraints = [
     where('locationId', '==', appStore.selectedLocationId),
+    where('hallId', '==', appStore.selectedHallId),
   ]
   
   if (activeFilter.value !== 'all') {
@@ -512,7 +514,8 @@ async function submitEdit() {
   try {
     await runTransaction(db, async (t) => {
       const locId = appStore.selectedLocationId
-      const stockDocId = `${locId}_${editForm.value.productId}`
+      const hallId = appStore.selectedHallId
+      const stockDocId = buildStockDocId(locId, hallId, editForm.value.productId)
       const stockRef = doc(db, 'stocks', stockDocId)
       const txRef = doc(db, 'transactions', editForm.value.id)
 
@@ -530,7 +533,7 @@ async function submitEdit() {
       if (stockSnap.exists()) {
         t.update(stockRef, { currentStock: newStock })
       } else {
-        t.set(stockRef, { locationId: locId, productId: editForm.value.productId, currentStock: newStock })
+        t.set(stockRef, { locationId: locId, hallId, productId: editForm.value.productId, currentStock: newStock })
       }
       
       const updateData = {
@@ -580,7 +583,8 @@ async function confirmDelete() {
   try {
     await runTransaction(db, async (t) => {
       const locId = appStore.selectedLocationId
-      const stockDocId = `${locId}_${tx.productId}`
+      const hallId = appStore.selectedHallId
+      const stockDocId = buildStockDocId(locId, hallId, tx.productId)
       const stockRef = doc(db, 'stocks', stockDocId)
       const txRef = doc(db, 'transactions', tx.id)
 
@@ -598,7 +602,7 @@ async function confirmDelete() {
       if (stockSnap.exists()) {
         t.update(stockRef, { currentStock: newStock })
       } else {
-        t.set(stockRef, { locationId: locId, productId: tx.productId, currentStock: newStock })
+        t.set(stockRef, { locationId: locId, hallId, productId: tx.productId, currentStock: newStock })
       }
 
       t.delete(txRef)
@@ -640,7 +644,7 @@ async function submitAccountantDate() {
   }
 }
 
-watch(() => appStore.selectedLocationId, resetPageAndListen)
+watch(() => [appStore.selectedLocationId, appStore.selectedHallId], resetPageAndListen)
 onMounted(resetPageAndListen)
 onUnmounted(stopListener)
 </script>

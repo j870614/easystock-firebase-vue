@@ -6,202 +6,209 @@
       </button>
     </div>
 
-    <!-- 骨架屏 / Loading -->
-    <div v-if="loading" class="flex justify-center py-12">
-      <div class="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-
-    <div v-else class="space-y-2 pb-24">
-      <!-- 拖拽列表 (以群組顯示) -->
-      <VueDraggable
-        v-model="draggableGroups"
-        item-key="name"
-        handle=".drag-handle"
-        @end="onDragEnd"
-        class="space-y-4"
-        ghost-class="opacity-50"
+    <div class="space-y-4 pb-24">
+      <div
+        v-for="group in visibleGroups"
+        :key="group.name"
+        class="card p-0 overflow-hidden border-2"
+        :class="group.items.some((item) => item.isActive !== false) ? 'border-transparent' : 'opacity-50 border-gray-200'"
       >
-        <template #item="{ element: group }">
-          <div class="card p-0 overflow-hidden border-2" :class="group.items.some(i => i.isActive) ? 'border-transparent' : 'opacity-50 border-gray-200'">
-            <!-- 群組標頭 -->
-            <div
-              class="flex items-center gap-2 p-3 bg-gray-50 border-b cursor-pointer select-none"
-              @click="toggleGroup(group.name)"
+        <div class="flex items-center gap-3 p-3 bg-gray-50 border-b">
+          <Package class="w-5 h-5 text-brand-500 flex-shrink-0" />
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-gray-800 line-clamp-2 break-words">{{ group.name }}</div>
+            <div class="flex items-center gap-2 flex-wrap mt-1">
+              <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
+                {{ group.items.length }} 個規格
+              </span>
+              <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
+                {{ group.scopeLabel }}
+              </span>
+              <span v-if="group.isShared" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
+                共用品項
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <el-switch
+              :model-value="group.items.some((item) => appStore.isProductVisibleInHall(item))"
+              @change="(val) => toggleGroupVisibility(group, val)"
+            />
+            <button class="p-2 rounded-xl border border-brand-100 text-brand-600 hover:bg-brand-50" :disabled="authStore.isHallLead && group.isShared" @click="openForm(group)">
+              <Pencil class="w-4 h-4" />
+            </button>
+            <button
+              v-if="authStore.isOwner"
+              class="p-2 rounded-xl border border-red-100 text-red-500 hover:bg-red-50"
+              @click="confirmDeleteGroup(group)"
             >
-              <button class="drag-handle p-1.5 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0" @click.stop>
-                <GripVertical class="w-5 h-5" />
-              </button>
-              <div class="font-bold text-gray-800 flex-1 min-w-0 line-clamp-2 break-words text-sm sm:text-base">{{ group.name }}</div>
-              
-              <div class="flex items-center gap-1.5 flex-shrink-0">
-                <div class="text-[10px] sm:text-xs text-gray-500 bg-white px-2 py-1 rounded-lg border shadow-sm hidden xs:block">
-                  {{ group.items.length }} 個規格
-                </div>
-                <!-- 新增：群組開關 (針對當前道場) -->
-                <div class="ml-2 mr-1 flex items-center" @click.stop v-if="authStore.isAdmin || authStore.isOwner">
-                  <el-switch
-                    :model-value="getGroupActive(group)"
-                    @change="(val) => toggleGroupActive(group, val)"
-                  />
-                </div>
-                <button class="p-1.5 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click.stop="confirmCopy(group)" title="複製此品項">
-                  <Copy class="w-4 h-4" />
-                </button>
-                <button class="p-1.5 rounded-xl border-2 border-brand-100 bg-white text-brand-600 hover:bg-brand-50 transition-colors" @click.stop="openForm(group)">
-                  <Pencil class="w-4 h-4" />
-                </button>
-                <button v-if="authStore.isOwner" class="p-1.5 rounded-xl border-2 border-red-100 bg-white text-red-500 hover:bg-red-50 transition-colors" @click.stop="confirmDeleteGroup(group)" title="刪除整個品項">
-                  <Trash2 class="w-4 h-4" />
-                </button>
-                <!-- 收合圖示 -->
-                <button class="p-1 text-gray-400 hover:text-gray-600 transition-transform duration-200" :class="expandedGroups.has(group.name) ? 'rotate-180' : ''" @click.stop="toggleGroup(group.name)">
-                  <ChevronDown class="w-5 h-5" />
-                </button>
+              <Trash2 class="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div class="divide-y">
+          <div v-for="item in group.items" :key="item.id" class="flex items-center gap-3 p-3">
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-gray-800">{{ item.spec || '預設規格' }}</div>
+              <div class="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
+                <span>安全庫存：{{ item.minStock || 0 }}</span>
+                <span v-if="showSaleColumns">售價：{{ formatMoney(item.price || 0) }}</span>
+                <span v-if="showPurchaseColumns">採購：{{ formatMoney(item.purchasePrice || 0) }}</span>
               </div>
             </div>
-
-            <!-- 群組內品項（可收合） -->
-            <transition name="collapse">
-              <div v-show="expandedGroups.has(group.name)" class="divide-y opacity-70">
-                <div
-                  v-for="p in group.items"
-                  :key="p.id"
-                  class="flex items-center gap-3 p-3 pl-12 bg-white transition-colors"
-                  :class="!p.isActive ? 'opacity-50' : ''"
-                >
-                  <!-- 品項資訊 -->
-                  <div class="flex-1 min-w-0">
-                    <div class="font-semibold text-gray-800 break-words">
-                      {{ p.spec || '預設規格' }}
-                    </div>
-                    <div class="text-sm text-gray-400 break-words">單價: {{ formatMoney(p.price || 0) }} | 安全庫存: {{ p.minStock || 0 }}</div>
-                  </div>
-
-                  <el-switch :model-value="getItemActive(p)" @change="(val) => toggleActive(p, val)" />
-                </div>
-              </div>
-            </transition>
+            <el-switch :model-value="appStore.isProductVisibleInHall(item)" @change="(val) => toggleItemVisibility(item, val)" />
           </div>
-        </template>
-      </VueDraggable>
+        </div>
+      </div>
+
+      <div class="card p-0 overflow-hidden border border-gray-200">
+        <button
+          class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 text-left"
+          @click="hiddenCollapsed = !hiddenCollapsed"
+        >
+          <div>
+            <div class="font-semibold text-gray-700">已隱藏品項</div>
+            <div class="text-xs text-gray-400">目前堂口未上架或已隱藏的品項</div>
+          </div>
+          <ChevronDown class="w-5 h-5 text-gray-400 transition-transform" :class="hiddenCollapsed ? '' : 'rotate-180'" />
+        </button>
+
+        <div v-show="!hiddenCollapsed" class="divide-y">
+          <div
+            v-for="group in hiddenGroups"
+            :key="group.name"
+            class="flex items-center gap-3 p-3"
+          >
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-gray-800">{{ group.name }}</div>
+              <div class="text-xs text-gray-400 mt-1">{{ group.scopeLabel }}</div>
+            </div>
+            <button class="btn-ghost px-4 py-2 text-sm" @click="restoreGroup(group)">
+              重新上架
+            </button>
+            <button class="p-2 rounded-xl border border-brand-100 text-brand-600 hover:bg-brand-50" :disabled="authStore.isHallLead && group.isShared" @click="openForm(group)">
+              <Pencil class="w-4 h-4" />
+            </button>
+          </div>
+          <div v-if="hiddenGroups.length === 0" class="px-4 py-8 text-center text-gray-400">
+            目前沒有隱藏品項
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- 新增/編輯 Dialog -->
-    <el-dialog v-model="dialogVisible" :title="editingId ? '編輯品項' : '新增品項'" width="92%" align-center>
+    <el-dialog v-model="dialogVisible" :title="editingGroupName ? '編輯品項' : '新增品項'" width="92%" align-center>
       <div class="space-y-4 py-2">
         <div>
           <label class="label">品項名稱 *</label>
           <input v-model="form.name" type="text" class="input" placeholder="例如：背心" />
-          <p class="text-xs text-brand-600 mt-1">變更名稱後，下方所有規格將同步更新品名。</p>
         </div>
 
-        <div class="border-t pt-4">
+        <div class="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+          <div class="font-medium text-gray-700">上架範圍</div>
+          <template v-if="authStore.isHallLead">
+            <div class="text-sm text-gray-600">
+              執事負責人只能管理所屬堂口：{{ appStore.selectedLocation?.name }} / {{ appStore.selectedHall?.name }}
+            </div>
+          </template>
+          <template v-else>
+            <div class="flex gap-2">
+              <button
+                class="flex-1 rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all"
+                :class="form.placementMode === 'all' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500'"
+                @click="form.placementMode = 'all'"
+              >
+                所有堂口
+              </button>
+              <button
+                class="flex-1 rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all"
+                :class="form.placementMode === 'selected' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500'"
+                @click="form.placementMode = 'selected'"
+              >
+                指定堂口
+              </button>
+            </div>
+            <div v-if="form.placementMode === 'selected'" class="grid gap-2 max-h-52 overflow-y-auto">
+              <label
+                v-for="hall in selectableHalls"
+                :key="hall.id"
+                class="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2"
+              >
+                <input v-model="form.hallIds" type="checkbox" :value="hall.id" class="w-4 h-4" />
+                <div class="min-w-0">
+                  <div class="font-medium text-gray-700">{{ hall.locationName }} / {{ hall.name }}</div>
+                  <div class="text-xs text-gray-400">{{ financeLabel(hall.financeMode) }}</div>
+                </div>
+              </label>
+            </div>
+          </template>
+        </div>
+
+        <div>
           <div class="flex justify-between items-center mb-2">
             <label class="label mb-0">規格管理 *</label>
             <button class="text-brand-600 font-semibold text-sm flex items-center gap-1 hover:text-brand-700" @click="addSpecLine">
-              <Plus class="w-4 h-4"/> 新增規格
+              <Plus class="w-4 h-4" /> 新增規格
             </button>
           </div>
 
-          <VueDraggable
-            v-model="form.specs"
-            item-key="key"
-            handle=".drag-spec-handle"
-            class="space-y-3"
-            ghost-class="opacity-50"
-          >
-            <template #item="{ element: item, index: idx }">
-              <div class="p-3 bg-gray-50 rounded-xl border relative transition-all"
-                :class="item.isMarkedForDeletion ? 'opacity-30 grayscale pointer-events-none' : ''">
-                
-                <div class="absolute -top-3 -left-3 flex gap-1 z-10" v-if="!item.isMarkedForDeletion">
-                  <button class="drag-spec-handle bg-white border border-gray-200 text-gray-400 hover:text-gray-600 p-1.5 rounded-full shadow-sm cursor-grab active:cursor-grabbing">
-                    <GripVertical class="w-4 h-4" />
-                  </button>
-                </div>
-
-                <!-- 刪除/移除按鈕 -->
-                <div class="absolute -top-2 -right-2 flex gap-1 z-10">
-                  <!-- 管理員只能停用，總管可以刪除 -->
-                  <button v-if="item.id && authStore.isOwner" 
-                    class="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-sm"
-                    title="徹底刪除"
-                    @click="item.isMarkedForDeletion = true">
-                    <Trash2 class="w-3 h-3"/>
-                  </button>
-                  <button v-if="!item.id" 
-                    class="bg-gray-400 text-white p-1.5 rounded-full hover:bg-gray-500 shadow-sm"
-                    @click="removeSpecLine(idx)">
-                    <X class="w-3 h-3"/>
-                  </button>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 mb-2">
-                  <div>
-                    <label class="text-xs text-gray-500 mb-1 block">規格名稱</label>
-                    <input v-model="item.spec" type="text" class="input py-1.5 text-sm" placeholder="如: M、薄 (可留空)" />
-                  </div>
-                  <div>
-                    <label class="text-xs text-gray-500 mb-1 block">單價</label>
-                    <input v-model.number="item.price" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
-                  </div>
-                </div>
-                <div class="grid grid-cols-2 gap-2 items-end">
-                  <div>
-                    <label class="text-xs text-gray-500 mb-1 block">安全庫存</label>
-                    <input v-model.number="item.minStock" type="number" class="input py-1.5 text-sm" placeholder="預設: 0" min="0" />
-                  </div>
-                  <div class="flex items-center justify-end h-10 px-1">
-                     <span class="text-xs text-gray-400 mr-2">系統啟用狀態</span>
-                     <el-switch v-model="item.isActive" size="small" />
-                  </div>
-                </div>
-
-                <!-- 單價覆蓋 (依國度) -->
-                <div class="mt-3 pt-3 border-t border-gray-200" v-if="uniqueCountries.length > 0">
-                  <div class="text-xs text-brand-600 font-bold mb-2 flex items-center gap-1">
-                    各國度單價設定 (選填)
-                  </div>
-                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                     <div v-for="country in uniqueCountries" :key="country" class="bg-white p-2 rounded border border-gray-200 flex flex-col gap-1 shadow-sm">
-                        <div class="font-bold text-[11px] text-gray-700 truncate" :title="country">{{ country }}</div>
-                        <div>
-                           <label class="text-[10px] text-gray-500 block mb-0.5">單價覆蓋</label>
-                           <input type="number" class="input py-1 text-xs px-1" :placeholder="`預設: ${formatMoney(item.price || 0)}`"
-                                  :value="item.overrides?.[country]?.price ?? ''"
-                                  @input="e => updateOverride(item, country, 'price', e.target.value)" />
-                        </div>
-                     </div>
-                  </div>
-                </div>
-
-                <!-- 隱藏設定 (依道場) -->
-                <div class="mt-3 pt-3 border-t border-gray-200" v-if="appStore.locations.length > 0">
-                  <div class="text-xs text-brand-600 font-bold mb-2 flex items-center gap-1">
-                    各道場顯示設定 (選填)
-                  </div>
-                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                     <div v-for="loc in appStore.locations" :key="loc.id" class="bg-white p-2 rounded border border-gray-200 flex flex-col gap-1 shadow-sm">
-                        <div class="font-bold text-[11px] text-gray-700 truncate" :title="loc.name">{{ loc.name }}</div>
-                        <div class="flex items-center justify-between mt-1">
-                           <label class="text-[10px] text-gray-500">在該道場顯示</label>
-                           <el-switch size="small"
-                                      :model-value="item.overrides?.[loc.id]?.isActive ?? true"
-                                      @change="val => updateOverride(item, loc.id, 'isActive', val)" />
-                        </div>
-                     </div>
-                  </div>
-                </div>
-
-                <div v-if="item.isMarkedForDeletion" class="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded absolute top-2 left-2 font-bold pointer-events-auto">待刪除</div>
+          <div class="space-y-3">
+            <div
+              v-for="(item, index) in form.specs"
+              :key="item.key"
+              class="rounded-xl border border-gray-200 bg-gray-50 p-3 relative"
+              :class="item.isMarkedForDeletion ? 'opacity-40 grayscale' : ''"
+            >
+              <div class="absolute top-3 right-3 flex gap-1">
+                <button
+                  v-if="item.id && authStore.isOwner"
+                  class="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-sm"
+                  @click="item.isMarkedForDeletion = true"
+                >
+                  <Trash2 class="w-3 h-3" />
+                </button>
+                <button
+                  v-if="!item.id"
+                  class="bg-gray-400 text-white p-1.5 rounded-full hover:bg-gray-500 shadow-sm"
+                  @click="removeSpecLine(index)"
+                >
+                  <X class="w-3 h-3" />
+                </button>
               </div>
-            </template>
-          </VueDraggable>
+
+              <div class="grid grid-cols-2 gap-2 mb-2">
+                <div>
+                  <label class="text-xs text-gray-500 mb-1 block">規格名稱</label>
+                  <input v-model="item.spec" type="text" class="input py-1.5 text-sm" placeholder="如 M / 薄" />
+                </div>
+                <div v-if="showSaleFields">
+                  <label class="text-xs text-gray-500 mb-1 block">售價</label>
+                  <input v-model.number="item.price" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+                </div>
+                <div v-if="showPurchaseFields">
+                  <label class="text-xs text-gray-500 mb-1 block">採購價</label>
+                  <input v-model.number="item.purchasePrice" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 items-end">
+                <div>
+                  <label class="text-xs text-gray-500 mb-1 block">安全庫存</label>
+                  <input v-model.number="item.minStock" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+                </div>
+                <div class="flex items-center justify-end h-10 px-1">
+                  <span class="text-xs text-gray-400 mr-2">主檔啟用</span>
+                  <el-switch v-model="item.isActive" size="small" />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <template #footer>
         <button class="btn-ghost mr-2" @click="dialogVisible = false">取消</button>
-        <button class="btn-primary" :disabled="!form.name || form.specs.filter(s => !s.isMarkedForDeletion).length === 0 || saving" @click="save">
+        <button class="btn-primary" :disabled="saveDisabled || saving" @click="save">
           {{ saving ? '儲存中…' : '確認儲存' }}
         </button>
       </template>
@@ -210,178 +217,212 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { computed, ref } from 'vue'
 import {
-  collection, addDoc, updateDoc, doc, writeBatch, deleteDoc
+  collection,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  updateDoc,
+  writeBatch,
 } from 'firebase/firestore'
-import { Plus, Pencil, GripVertical, X, Trash2, ChevronDown, Copy } from 'lucide-vue-next'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ChevronDown, Package, Pencil, Plus, Trash2, X } from 'lucide-vue-next'
+import { v4 as uuidv4 } from 'uuid'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
-import { formatMoney } from '@/utils/format'
 import AppLayout from '@/components/AppLayout.vue'
-import VueDraggable from 'vuedraggable'
-import { v4 as uuidv4 } from 'uuid'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatMoney } from '@/utils/format'
+import { FINANCE_MODE_MAP, buildPlacementDocId, isPurchaseEnabled, isSaleEnabled, sortByOrder } from '@/utils/multiDept'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
-const loading  = ref(false)
-const saving   = ref(false)
+
 const dialogVisible = ref(false)
-const editingId = ref(null)
+const saving = ref(false)
+const hiddenCollapsed = ref(true)
+const editingGroupName = ref('')
 
-const draggableGroups = ref([])
-const expandedGroups = ref(new Set())
-
-function toggleGroup(name) {
-  if (expandedGroups.value.has(name)) {
-    expandedGroups.value.delete(name)
-  } else {
-    expandedGroups.value.add(name)
-  }
-  // trigger reactivity
-  expandedGroups.value = new Set(expandedGroups.value)
-}
-
-function getItemActive(p) {
-  const locId = appStore.selectedLocationId
-  if (!locId) return p.isActive
-  return p.overrides?.[locId]?.isActive ?? p.isActive
-}
-
-function getGroupActive(group) {
-  return group.items.some(p => getItemActive(p))
-}
-
-watch(() => appStore.products, (newVal) => {
-  // 分組邏輯
-  const map = new Map()
-  
-  // 保持依照 appStore.products 原本的 order 順序，依序放入分組
-  newVal.forEach(p => {
-    if (!map.has(p.name)) {
-      map.set(p.name, {
-        name: p.name,
-        order: p.order || 999999,
-        items: []
-      })
-    }
-    map.get(p.name).items.push(p)
-  })
-
-  // 將 Map 轉為 Array 並依照每個 group 原本的 order 排序
-  draggableGroups.value = Array.from(map.values()).sort((a, b) => a.order - b.order)
-
-}, { immediate: true })
-
-
-
-const uniqueCountries = computed(() => {
-  const map = new Set()
-  appStore.locations.forEach(l => {
-    map.add(l.country || '台灣')
-  })
-  return Array.from(map)
+const form = ref({
+  name: '',
+  placementMode: 'all',
+  hallIds: [],
+  specs: [],
 })
 
-const form = ref({ name: '', specs: [], originalName: '' })
+const currentFinanceMode = computed(() => appStore.selectedHallFinanceMode)
+const showSaleColumns = computed(() => isSaleEnabled(currentFinanceMode.value))
+const showPurchaseColumns = computed(() => isPurchaseEnabled(currentFinanceMode.value))
+
+const showSaleFields = computed(() => {
+  if (authStore.isHallLead) return isSaleEnabled(currentFinanceMode.value)
+  return targetHallIds.value.some((hallId) => isSaleEnabled(appStore.getHallById(hallId)?.financeMode))
+})
+
+const showPurchaseFields = computed(() => {
+  if (authStore.isHallLead) return isPurchaseEnabled(currentFinanceMode.value)
+  return targetHallIds.value.some((hallId) => isPurchaseEnabled(appStore.getHallById(hallId)?.financeMode))
+})
+
+const selectableHalls = computed(() =>
+  [...appStore.halls]
+    .filter((hall) => hall.isActive !== false)
+    .sort((a, b) => {
+      const locA = appStore.locations.find((loc) => loc.id === a.locationId)?.name || ''
+      const locB = appStore.locations.find((loc) => loc.id === b.locationId)?.name || ''
+      if (locA !== locB) return locA.localeCompare(locB, 'zh-Hant')
+      return sortByOrder(a, b)
+    })
+    .map((hall) => ({
+      ...hall,
+      locationName: appStore.locations.find((loc) => loc.id === hall.locationId)?.name || '未知道場',
+    }))
+)
+
+const targetHallIds = computed(() => {
+  if (authStore.isHallLead) return appStore.selectedHallId ? [appStore.selectedHallId] : []
+  if (form.value.placementMode === 'all') {
+    return selectableHalls.value.map((hall) => hall.id)
+  }
+  return form.value.hallIds
+})
+
+function buildGroups(items) {
+  const map = new Map()
+  items.forEach((item) => {
+    if (!map.has(item.name)) {
+      map.set(item.name, { name: item.name, items: [] })
+    }
+    map.get(item.name).items.push(item)
+  })
+
+  return Array.from(map.values())
+    .map((group) => {
+      const visibleCount = group.items.reduce((sum, item) => sum + visibleHallIds(item).length, 0)
+      return {
+        ...group,
+        items: [...group.items].sort(sortByOrder),
+        isShared: group.items.some((item) => isSharedProduct(item)),
+        scopeLabel: visibleCount > 1 ? `上架 ${visibleCount} 個堂口` : '單堂口',
+      }
+    })
+    .sort((a, b) => sortByOrder(a.items[0], b.items[0]))
+}
+
+const visibleGroups = computed(() => buildGroups(appStore.activeProducts))
+const hiddenGroups = computed(() => buildGroups(appStore.hiddenProducts))
+
+const saveDisabled = computed(() => {
+  if (!form.value.name.trim()) return true
+  if (form.value.specs.filter((item) => !item.isMarkedForDeletion).length === 0) return true
+  if (!authStore.isHallLead && form.value.placementMode === 'selected' && form.value.hallIds.length === 0) return true
+  return false
+})
+
+function financeLabel(mode) {
+  return FINANCE_MODE_MAP[mode] ?? FINANCE_MODE_MAP.none
+}
+
+function visibleHallIds(product) {
+  return appStore.halls
+    .filter((hall) => hall.isActive !== false)
+    .filter((hall) => appStore.isProductVisibleInHall(product, hall.id))
+    .map((hall) => hall.id)
+}
+
+function isSharedProduct(product) {
+  const visibleIds = visibleHallIds(product)
+  return product.placementMode === 'all' || visibleIds.some((hallId) => hallId !== appStore.selectedHallId)
+}
 
 function addSpecLine() {
-  form.value.specs.push({ key: uuidv4(), id: null, spec: '', price: 0, minStock: 0, isActive: true, isMarkedForDeletion: false, overrides: {} })
+  form.value.specs.push({
+    key: uuidv4(),
+    id: null,
+    spec: '',
+    price: 0,
+    purchasePrice: 0,
+    minStock: 0,
+    isActive: true,
+    isMarkedForDeletion: false,
+  })
 }
 
-function updateOverride(item, key, field, value) {
-  if (!item.overrides) item.overrides = {}
-  if (!item.overrides[key]) item.overrides[key] = { isActive: true } // default behavior
-  
-  if (field === 'price') {
-    const num = parseFloat(value)
-    item.overrides[key].price = isNaN(num) ? null : num
-  } else {
-    item.overrides[key][field] = value
-  }
+function removeSpecLine(index) {
+  form.value.specs.splice(index, 1)
 }
 
-function removeSpecLine(idx) {
-  form.value.specs.splice(idx, 1)
-}
+function openForm(group = null) {
+  editingGroupName.value = group?.name ?? ''
 
-async function confirmCopy(group) {
-  try {
-    await ElMessageBox.confirm(`確定要複製「${group.name}」嗎？`, '複製確認', {
-      confirmButtonText: '複製',
-      cancelButtonText: '取消',
-      type: 'info'
-    })
-    openForm(group, true)
-  } catch {
-    // 使用者取消
-  }
-}
-
-async function confirmDeleteGroup(group) {
-  try {
-    const { value } = await ElMessageBox.prompt(
-      `【危險操作】這將會徹底刪除「${group.name}」及其所有規格！<br/>為避免誤刪，請輸入「<b>${group.name}</b>」以確認：`,
-      '刪除整個品項',
-      {
-        confirmButtonText: '確定刪除',
-        cancelButtonText: '取消',
-        confirmButtonClass: 'el-button--danger',
-        dangerouslyUseHTMLString: true,
-        inputValidator: (val) => val === group.name || '輸入的名稱不相符',
-        inputErrorMessage: '輸入的名稱不相符'
-      }
-    )
-    
-    loading.value = true
-    const batch = writeBatch(db)
-    group.items.forEach(p => {
-      batch.delete(doc(db, 'products', p.id))
-    })
-    await batch.commit()
-    ElMessage.success(`已刪除「${group.name}」`)
-  } catch (e) {
-    if (e !== 'cancel') {
-      console.error('刪除整個品項失敗:', e)
-      ElMessage.error('刪除失敗：' + e.message)
-    } else {
-      ElMessage.info('已取消刪除。')
-    }
-  } finally {
-    if (loading.value) loading.value = false
-  }
-}
-
-function openForm(group = null, isCopy = false) {
-  editingId.value = group && !isCopy ? 'GROUP' : null 
-  
   if (group) {
+    const hallIds = Array.from(
+      new Set(group.items.flatMap((item) => visibleHallIds(item)))
+    )
+    const placementMode = group.items.every((item) => item.placementMode === 'all') ? 'all' : 'selected'
     form.value = {
-      originalName: isCopy ? '' : group.name,
-      name: isCopy ? `${group.name} (複製)` : group.name,
-      specs: group.items.map(p => ({
+      name: group.name,
+      placementMode: authStore.isHallLead ? 'selected' : placementMode,
+      hallIds: authStore.isHallLead ? [appStore.selectedHallId] : hallIds,
+      specs: group.items.map((item) => ({
         key: uuidv4(),
-        id: isCopy ? null : p.id,
-        spec: p.spec ?? '',
-        price: p.price ?? 0,
-        minStock: p.minStock ?? 0,
-        isActive: isCopy ? true : p.isActive,
+        id: item.id,
+        spec: item.spec ?? '',
+        price: item.price ?? 0,
+        purchasePrice: item.purchasePrice ?? 0,
+        minStock: item.minStock ?? 0,
+        isActive: item.isActive !== false,
         isMarkedForDeletion: false,
-        overrides: isCopy ? {} : (p.overrides ? JSON.parse(JSON.stringify(p.overrides)) : {})
-      }))
+      })),
     }
   } else {
     form.value = {
-      originalName: '',
       name: '',
-      specs: [
-        { key: uuidv4(), id: null, spec: '', price: 0, minStock: 0, isActive: true, isMarkedForDeletion: false, overrides: {} }
-      ]
+      placementMode: authStore.isHallLead ? 'selected' : 'all',
+      hallIds: authStore.isHallLead ? [appStore.selectedHallId] : selectableHalls.value.map((hall) => hall.id),
+      specs: [],
     }
+    addSpecLine()
   }
+
   dialogVisible.value = true
+}
+
+async function syncPlacements(batch, productId, hallIds, placementMode) {
+  const visibleSet = new Set(placementMode === 'all' ? selectableHalls.value.map((hall) => hall.id) : hallIds)
+
+  selectableHalls.value.forEach((hall) => {
+    const placementId = buildPlacementDocId(productId, hall.id)
+    const existing = appStore.getPlacement(productId, hall.id)
+    if (visibleSet.has(hall.id)) {
+      batch.set(
+        doc(db, 'productPlacements', placementId),
+        {
+          productId,
+          locationId: hall.locationId,
+          hallId: hall.id,
+          isVisible: true,
+          financeModeOverride: existing?.financeModeOverride ?? null,
+          createdAt: existing?.createdAt ?? serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      )
+      return
+    }
+
+    if (existing) {
+      batch.set(
+        doc(db, 'productPlacements', placementId),
+        {
+          isVisible: false,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      )
+    }
+  })
 }
 
 async function save() {
@@ -389,121 +430,153 @@ async function save() {
   try {
     const baseName = form.value.name.trim()
     const batch = writeBatch(db)
+    const hallIds = authStore.isHallLead ? [appStore.selectedHallId] : form.value.hallIds
+    const placementMode = authStore.isHallLead ? 'selected' : form.value.placementMode
 
-    if (editingId.value === 'GROUP') {
-      const baseOrder = draggableGroups.value.find(g => g.name === form.value.originalName)?.order || 100
-      
-      // 1. 處理現有規格的更新與標記刪除
-      form.value.specs.forEach((s, idx) => {
-        const itemOrder = baseOrder + idx
-        if (s.id) {
-          const pRef = doc(db, 'products', s.id)
-          if (s.isMarkedForDeletion) {
-             batch.delete(pRef)
-          } else {
-             batch.update(pRef, {
-               name: baseName,
-               spec: s.spec.trim(),
-               price: s.price,
-               minStock: s.minStock,
-               isActive: s.isActive,
-               order: itemOrder,
-               overrides: s.overrides || {}
-             })
+    const baseOrder =
+      editingGroupName.value
+        ? visibleGroups.value.find((group) => group.name === editingGroupName.value)?.items[0]?.order ||
+          hiddenGroups.value.find((group) => group.name === editingGroupName.value)?.items[0]?.order ||
+          100
+        : (Math.max(0, ...appStore.products.map((product) => Number(product.order || 0))) + 100)
+
+    for (const [index, item] of form.value.specs.entries()) {
+      if (item.isMarkedForDeletion && item.id) {
+        batch.delete(doc(db, 'products', item.id))
+        selectableHalls.value.forEach((hall) => {
+          const placement = appStore.getPlacement(item.id, hall.id)
+          if (placement) {
+            batch.delete(doc(db, 'productPlacements', buildPlacementDocId(item.id, hall.id)))
           }
-        } else if (!s.isMarkedForDeletion) {
-          // 2. 處理編輯視窗中新增的規格
-          const newRef = doc(collection(db, 'products'))
-          batch.set(newRef, {
-            name: baseName,
-            spec: s.spec.trim(),
-            price: s.price,
-            minStock: s.minStock,
-            isActive: s.isActive,
-            order: itemOrder,
-            overrides: s.overrides || {}
-          })
-        }
-      })
-    } else {
-      // 全新新增模式
-      const nextBaseOrder = (draggableGroups.value.length > 0) 
-        ? Math.max(...draggableGroups.value.map(g => g.order)) + 100 
-        : 100
+        })
+        continue
+      }
 
-      form.value.specs.forEach((s, idx) => {
-        if (!s.isMarkedForDeletion) {
-          const newRef = doc(collection(db, 'products'))
-          batch.set(newRef, {
-            name: baseName,
-            spec: s.spec.trim(),
-            price: s.price,
-            minStock: s.minStock,
-            isActive: true, // 新建預設啟用
-            order: nextBaseOrder + idx,
-            overrides: s.overrides || {}
-          })
-        }
-      })
+      if (item.isMarkedForDeletion) continue
+
+      const productRef = item.id ? doc(db, 'products', item.id) : doc(collection(db, 'products'))
+      batch.set(
+        productRef,
+        {
+          name: baseName,
+          spec: item.spec.trim(),
+          price: Number(item.price || 0),
+          purchasePrice: Number(item.purchasePrice || 0),
+          minStock: Number(item.minStock || 0),
+          isActive: item.isActive,
+          order: baseOrder + index,
+          placementMode,
+        },
+        { merge: true }
+      )
+      await syncPlacements(batch, productRef.id, hallIds, placementMode)
     }
+
     await batch.commit()
     dialogVisible.value = false
-  } catch (e) {
-    console.error('儲存失敗', e)
-    alert('儲存失敗：' + e.message)
+    ElMessage.success('品項已儲存')
+  } catch (error) {
+    ElMessage.error(`儲存失敗：${error.message}`)
   } finally {
     saving.value = false
   }
 }
 
-async function toggleActive(product, val) {
-  const locId = appStore.selectedLocationId
-  if (!locId) return
+async function toggleItemVisibility(product, value) {
+  const hallId = appStore.selectedHallId
+  const hall = appStore.selectedHall
+  if (!hallId || !hall) return
 
-  const newOverrides = { ...(product.overrides || {}) }
-  if (!newOverrides[locId]) newOverrides[locId] = {}
-  newOverrides[locId].isActive = val
-
-  await updateDoc(doc(db, 'products', product.id), { overrides: newOverrides })
+  await updateDocOrCreate(product.id, hall, value)
 }
 
-async function toggleGroupActive(group, val) {
-  const locId = appStore.selectedLocationId
-  if (!locId) return
+async function toggleGroupVisibility(group, value) {
+  const hall = appStore.selectedHall
+  if (!hall) return
 
   const batch = writeBatch(db)
-  group.items.forEach(p => {
-    const newOverrides = { ...(p.overrides || {}) }
-    if (!newOverrides[locId]) newOverrides[locId] = {}
-    newOverrides[locId].isActive = val
-
-    const pRef = doc(db, 'products', p.id)
-    batch.update(pRef, { overrides: newOverrides })
+  group.items.forEach((item) => {
+    batch.set(
+      doc(db, 'productPlacements', buildPlacementDocId(item.id, hall.id)),
+      {
+        productId: item.id,
+        locationId: hall.locationId,
+        hallId: hall.id,
+        isVisible: value,
+        financeModeOverride: appStore.getPlacement(item.id, hall.id)?.financeModeOverride ?? null,
+        createdAt: appStore.getPlacement(item.id, hall.id)?.createdAt ?? serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    )
   })
-  try {
-    await batch.commit()
-  } catch(e) {
-    console.error(e)
-    alert('更新群組啟用狀態失敗')
-  }
+  await batch.commit()
 }
 
-async function onDragEnd() {
-  try {
-    const batch = writeBatch(db)
-    draggableGroups.value.forEach((group, index) => {
-      const newBaseOrder = (index + 1) * 100
-      if (group.order !== newBaseOrder) {
-        group.order = newBaseOrder
-      }
-      group.items.forEach((p, pIdx) => {
-        const pRef = doc(db, 'products', p.id)
-        batch.update(pRef, { order: newBaseOrder + pIdx })
-      })
+async function updateDocOrCreate(productId, hall, isVisible) {
+  const placementId = buildPlacementDocId(productId, hall.id)
+  const existing = appStore.getPlacement(productId, hall.id)
+  const placementRef = doc(db, 'productPlacements', placementId)
+
+  if (existing) {
+    await updateDoc(placementRef, {
+      isVisible,
+      updatedAt: serverTimestamp(),
     })
-    await batch.commit()
-  } catch(e) {
-    console.error('更新排序失敗', e)
+    return
+  }
+
+  await writeBatchSet(placementRef, {
+    productId,
+    locationId: hall.locationId,
+    hallId: hall.id,
+    isVisible,
+    financeModeOverride: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+async function writeBatchSet(ref, data) {
+  const batch = writeBatch(db)
+  batch.set(ref, data, { merge: true })
+  await batch.commit()
+}
+
+async function restoreGroup(group) {
+  await toggleGroupVisibility(group, true)
+  ElMessage.success('已重新上架到目前堂口')
+}
+
+async function confirmDeleteGroup(group) {
+  try {
+    await ElMessageBox.confirm(
+      `確定要徹底刪除「${group.name}」嗎？這會移除所有規格與堂口上架設定。`,
+      '刪除品項',
+      {
+        confirmButtonText: '確認刪除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+
+    for (const item of group.items) {
+      await deleteDoc(doc(db, 'products', item.id))
+      await Promise.all(
+        selectableHalls.value.map(async (hall) => {
+          const placement = appStore.getPlacement(item.id, hall.id)
+          if (placement) {
+            await deleteDoc(doc(db, 'productPlacements', buildPlacementDocId(item.id, hall.id)))
+          }
+        })
+      )
+    }
+
+    ElMessage.success('品項已刪除')
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(`刪除失敗：${error.message}`)
+    }
   }
 }
 </script>
