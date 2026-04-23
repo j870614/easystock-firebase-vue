@@ -111,7 +111,7 @@
             <!-- 會計快捷資訊顯示 -->
             <div v-if="tx.type === 'out'" class="mt-1.5 flex flex-wrap gap-2">
               <span class="inline-flex items-center gap-1 bg-brand-50 text-brand-700 border border-brand-200 px-2.5 py-1 rounded-full font-bold" :style="{ fontSize: 'var(--fs-main)' }">
-                實付：${{ getDisplayAmount(tx) }}
+                實付：${{ formatMoney(getDisplayAmount(tx)) }}
               </span>
               <span v-if="tx.paymentMethod" class="inline-flex items-center gap-1 bg-gray-50 text-gray-600 border border-gray-200 px-2.5 py-1 rounded-full font-medium" :style="{ fontSize: 'var(--fs-main)' }">
                 💳 {{ paymentLabel(tx.paymentMethod) }}
@@ -249,7 +249,7 @@
               </div>
               <div class="text-right">
                 <div class="text-xs text-emerald-600">實付金額</div>
-                <div class="text-lg font-black text-emerald-700">${{ getDisplayAmount(selectedTxForDate) }}</div>
+                <div class="text-lg font-black text-emerald-700">${{ formatMoney(getDisplayAmount(selectedTxForDate)) }}</div>
               </div>
             </div>
           </div>
@@ -309,6 +309,7 @@ import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/components/AppLayout.vue'
+import { formatMoney } from '@/utils/format'
 
 const zhTwLocale = zhTw
 

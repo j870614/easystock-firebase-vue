@@ -185,18 +185,15 @@
             <div>
               <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-medium text-gray-700">付款方式</h3>
-                <div class="flex gap-2 text-xs">
-                  <button class="text-brand-600 hover:underline" @click="commonPaymentMethods = ['cash', 'card', 'transfer']" v-if="commonPaymentMethods.length < 3">全選</button>
-                  <button class="text-gray-400 hover:underline" @click="commonPaymentMethods = []" v-else>取消</button>
-                </div>
+                <button class="text-xs text-gray-400 hover:underline" @click="commonPaymentMethod = ''" v-if="commonPaymentMethod">清除</button>
               </div>
               <div class="flex flex-wrap gap-2">
                 <button
-                  v-for="(label, value) in { cash:'現金', card:'刷卡', transfer:'匯款' }"
+                  v-for="(label, value) in { '': '全部', cash:'現金', card:'刷卡', transfer:'匯款' }"
                   :key="value"
                   class="px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all"
-                  :class="commonPaymentMethods.includes(value) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'"
-                  @click="togglePaymentMethod(value)"
+                  :class="commonPaymentMethod === value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'"
+                  @click="commonPaymentMethod = value"
                 >{{ label }}</button>
               </div>
             </div>
@@ -277,14 +274,14 @@
                   <td class="border p-2 text-center">{{ row.locationName }}</td>
                   <td class="border p-2">{{ row.note || '—' }}</td>
                   <td class="border p-2 text-center">{{ row.qty }}</td>
-                  <td class="border p-2 text-center font-bold">${{ row.calculatedAmount }}</td>
+                  <td class="border p-2 text-center font-bold">${{ formatMoney(row.calculatedAmount) }}</td>
                 </tr>
               </tbody>
               <tfoot class="bg-gray-50 font-bold text-base">
                 <tr>
                   <td colspan="5" class="border p-3 text-right">總計</td>
                   <td class="border p-3 text-center text-brand-600">{{ sharedTotals.qty }}</td>
-                  <td class="border p-3 text-center text-brand-600">${{ sharedTotals.amount }}</td>
+                  <td class="border p-3 text-center text-brand-600">${{ formatMoney(sharedTotals.amount) }}</td>
                 </tr>
               </tfoot>
             </table>
@@ -309,7 +306,7 @@
                   <td class="border p-2">{{ row.note || '—' }}</td>
                   <td class="border p-2">{{ row.productSnapshot?.name }} {{ row.productSnapshot?.spec }}</td>
                   <td class="border p-2 text-center">{{ row.qty }}</td>
-                  <td class="border p-2 text-center font-bold">${{ row.calculatedAmount }}</td>
+                  <td class="border p-2 text-center font-bold">${{ formatMoney(row.calculatedAmount) }}</td>
                   <td class="border p-2 text-center">{{ row.accountantReceivedDate || '—' }}</td>
                   <td class="border p-2 text-center">{{ paymentLabel(row.paymentMethod) }}</td>
                   <td class="border p-2 text-center text-xs">{{ row.operator?.dharmaName || row.operator?.name }}</td>
@@ -319,7 +316,7 @@
                 <tr>
                   <td colspan="3" class="border p-3 text-right">總計</td>
                   <td class="border p-3 text-center text-brand-600">{{ sharedTotals.qty }}</td>
-                  <td class="border p-3 text-center text-brand-600">${{ sharedTotals.amount }}</td>
+                  <td class="border p-3 text-center text-brand-600">${{ formatMoney(sharedTotals.amount) }}</td>
                   <td colspan="3" class="border p-3 font-normal text-gray-400"></td>
                 </tr>
               </tfoot>
@@ -341,6 +338,7 @@ import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/components/AppLayout.vue'
+import { formatMoney } from '@/utils/format'
 
 const zhTwLocale = zhTw
 const appStore = useAppStore()
@@ -545,14 +543,10 @@ const commonRange = ref([
 ])
 const commonLocs = ref([])
 const commonProds = ref([])
-const commonPaymentMethods = ref(['cash', 'card', 'transfer'])
+const commonPaymentMethod = ref('')
 const sharedRows = ref([])
 const loadingShared = ref(false)
 const exportingShared = ref(false)
-
-function togglePaymentMethod(val) {
-  const i = commonPaymentMethods.value.indexOf(val); i === -1 ? commonPaymentMethods.value.push(val) : commonPaymentMethods.value.splice(i, 1)
-}
 
 const sharedTotals = computed(() => {
   return sharedRows.value.reduce((acc, row) => ({
@@ -621,7 +615,7 @@ async function loadSharedData() {
       
       const matchLoc = activeTab.value === 'orderDetail' ? (commonLocs.value.length === 0 || commonLocs.value.includes(r.locationId)) : true
       const matchProd = commonProds.value.length === 0 || commonProds.value.includes(r.productSnapshot?.name)
-      const matchPayment = commonPaymentMethods.value.length === 0 || commonPaymentMethods.value.includes(r.paymentMethod)
+      const matchPayment = !commonPaymentMethod.value || commonPaymentMethod.value === r.paymentMethod
       return matchPeriod && matchLoc && matchProd && matchPayment
     })
 
@@ -699,6 +693,7 @@ async function exportSharedExcel() {
     const lastRow = ws.lastRow
     lastRow.font = { bold: true }
     lastRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } }
+    ws.getColumn('amount').numFmt = '#,##0'
     
     const buffer = await wb.xlsx.writeBuffer()
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -710,7 +705,7 @@ async function exportSharedExcel() {
   }
 }
 
-watch([activeTab, commonFilterType, commonYear, commonMonth, commonRange, commonLocs, commonProds, commonPaymentMethods], () => {
+watch([activeTab, commonFilterType, commonYear, commonMonth, commonRange, commonLocs, commonProds, commonPaymentMethod], () => {
   if (activeTab.value !== 'stockReport') loadSharedData()
 }, { deep: true })
 

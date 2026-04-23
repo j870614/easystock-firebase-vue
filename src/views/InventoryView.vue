@@ -71,8 +71,8 @@
             </div>
           </div>
           <div v-if="group.length === 1" class="text-right">
-             <div class="text-sm font-bold" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-brand-600'">
-               <span v-if="!appStore.isReplenishMode">${{ getProductPrice(group[0]) }}</span>
+              <div class="text-sm font-bold" :class="appStore.isReplenishMode ? 'text-green-600' : 'text-brand-600'">
+               <span v-if="!appStore.isReplenishMode">${{ formatMoney(getProductPrice(group[0])) }}</span>
              </div>
              <div class="text-xs text-gray-500 mt-0.5">總庫存 {{ getStock(group[0].id) }}</div>
           </div>
@@ -132,7 +132,7 @@
           <div v-for="p in selectedGroupItems" :key="p.id" class="border-2 rounded-xl p-4 flex justify-between items-center" :class="appStore.isReplenishMode ? 'border-green-50' : 'border-brand-50'">
             <div>
               <div class="font-bold text-gray-800" :style="{ fontSize: 'var(--fs-name)' }">{{ p.spec || '預設規格' }}</div>
-              <div class="font-bold text-brand-600 mt-1" v-if="!appStore.isReplenishMode" :style="{ fontSize: 'var(--fs-main)' }">單價：{{ getProductPrice(p) }}</div>
+              <div class="font-bold text-brand-600 mt-1" v-if="!appStore.isReplenishMode" :style="{ fontSize: 'var(--fs-main)' }">單價：{{ formatMoney(getProductPrice(p)) }}</div>
               <div class="text-gray-500 mt-1 flex items-center gap-2" :style="{ fontSize: 'var(--fs-main)' }">
                 <div>目前庫存：{{ getStock(p.id) }}</div>
                 <div v-if="getStock(p.id) <= (p.minStock || 0)" class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">⚠️ 建議補貨</div>
@@ -164,7 +164,7 @@
             <div v-if="isCartCollapsed" class="text-sm font-bold bg-white/20 px-3 py-1 rounded-full flex items-center gap-2 animate-in fade-in slide-in-from-right-4">
               <span>共 {{ cartTotalQty }} 件</span>
               <span class="opacity-60">|</span>
-              <span>${{ cartTotalPrice }}</span>
+              <span>${{ formatMoney(cartTotalPrice) }}</span>
             </div>
             <button v-else class="text-sm font-medium bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg transition-colors" @click.stop="clearCart">全部清空</button>
           </div>
@@ -179,7 +179,7 @@
                      <div class="font-bold text-gray-800">{{ item.product.name }}</div>
                      <div v-if="item.product.spec" class="text-sm text-gray-500">{{ item.product.spec }}</div>
                      <div class="text-xs text-gray-400 font-medium mt-1" v-if="!appStore.isReplenishMode">
-                       應收：${{ item.price * item.qty }}
+                       應收：${{ formatMoney(item.price * item.qty) }}
                      </div>
                      <div class="mt-2 flex items-center gap-2" v-if="!appStore.isReplenishMode">
                        <span class="text-xs font-bold text-brand-600">實付：</span>
@@ -222,12 +222,12 @@
               <div v-if="!appStore.isReplenishMode" class="space-y-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 <div class="flex justify-between items-center text-gray-600 text-sm">
                    <span>應收總計</span>
-                   <span class="font-bold">${{ cartTotalPrice }}</span>
+                   <span class="font-bold">${{ formatMoney(cartTotalPrice) }}</span>
                 </div>
                 
                 <div class="flex justify-between items-center">
                    <div class="flex items-center gap-2">
-                     <span class="font-bold text-gray-800">實收總計</span>
+                   <span class="font-bold text-gray-800">實收總計</span>
                      <button
                        type="button"
                        class="text-[10px] bg-brand-50 text-brand-600 px-2 py-0.5 rounded-full hover:bg-brand-100 transition-colors border border-brand-100"
@@ -236,7 +236,7 @@
                    </div>
                    <div class="flex items-center gap-1 text-2xl font-black text-brand-600">
                      <span class="text-lg opacity-50">$</span>
-                     <span>{{ receivedAmount }}</span>
+                     <span>{{ formatMoney(receivedAmount) }}</span>
                    </div>
                 </div>
 
@@ -291,6 +291,7 @@ import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
+import { formatMoney } from '@/utils/format'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -451,7 +452,6 @@ function clearCart() {
   buyerName.value = ''
   buyerPhone.value = ''
   paymentMethod.value = 'cash'
-  receivedAmount.value = 0
 }
 
 // 監聽模式切換，清空購物車

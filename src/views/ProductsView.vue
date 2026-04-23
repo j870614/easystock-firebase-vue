@@ -74,7 +74,7 @@
                     <div class="font-semibold text-gray-800 break-words">
                       {{ p.spec || '預設規格' }}
                     </div>
-                    <div class="text-sm text-gray-400 break-words">單價: {{ p.price || 0 }} | 安全庫存: {{ p.minStock || 0 }}</div>
+                    <div class="text-sm text-gray-400 break-words">單價: {{ formatMoney(p.price || 0) }} | 安全庫存: {{ p.minStock || 0 }}</div>
                   </div>
 
                   <el-switch :model-value="getItemActive(p)" @change="(val) => toggleActive(p, val)" />
@@ -167,7 +167,7 @@
                         <div class="font-bold text-[11px] text-gray-700 truncate" :title="country">{{ country }}</div>
                         <div>
                            <label class="text-[10px] text-gray-500 block mb-0.5">單價覆蓋</label>
-                           <input type="number" class="input py-1 text-xs px-1" :placeholder="`預設: ${item.price || 0}`"
+                           <input type="number" class="input py-1 text-xs px-1" :placeholder="`預設: ${formatMoney(item.price || 0)}`"
                                   :value="item.overrides?.[country]?.price ?? ''"
                                   @input="e => updateOverride(item, country, 'price', e.target.value)" />
                         </div>
@@ -218,6 +218,7 @@ import { Plus, Pencil, GripVertical, X, Trash2, ChevronDown, Copy } from 'lucide
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
+import { formatMoney } from '@/utils/format'
 import AppLayout from '@/components/AppLayout.vue'
 import VueDraggable from 'vuedraggable'
 import { v4 as uuidv4 } from 'uuid'
