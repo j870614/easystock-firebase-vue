@@ -361,7 +361,7 @@ watch(
 
     const nextCollapsed = {}
     groups.forEach((group) => {
-      nextCollapsed[group.name] = collapsedGroups.value[group.name] ?? false
+      nextCollapsed[group.name] = collapsedGroups.value[group.name] ?? true
     })
     collapsedGroups.value = nextCollapsed
   },

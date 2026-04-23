@@ -382,10 +382,11 @@ const navItems = computed(() => {
   }
 
   if (authStore.canManageProducts) {
+    const ownerManagementNav = authStore.isOwner
     items.push({
-      to: authStore.canSwitchScope ? '/admin' : '/products',
-      label: authStore.canSwitchScope ? '管理' : '品項',
-      icon: authStore.canSwitchScope ? LayoutGrid : Package,
+      to: ownerManagementNav ? '/admin' : '/products',
+      label: ownerManagementNav ? '管理' : '品項',
+      icon: ownerManagementNav ? LayoutGrid : Package,
     })
   }
 
