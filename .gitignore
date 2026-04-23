@@ -6,3 +6,5 @@ functions/node_modules/
 .firebase/
 *.log
 .DS_Store
+.codex/
+.claude/

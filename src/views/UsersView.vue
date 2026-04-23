@@ -1,7 +1,7 @@
 <template>
   <AppLayout title="成員管理" :show-location-picker="false">
     <div class="mb-4 text-sm text-gray-500 bg-amber-50 border border-amber-200 rounded-xl p-3">
-      角色、道場、堂口與職稱分開管理；`staff` / `hallLead` 必須綁堂口。
+      角色、道場、堂口與職稱分開管理；一般人員 / 執事負責人 必須綁堂口。
     </div>
 
     <div class="card mb-4 space-y-3">
