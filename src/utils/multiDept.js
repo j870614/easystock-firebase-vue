@@ -26,6 +26,10 @@ export function buildPlacementDocId(productId, hallId) {
   return `${productId}_${hallId}`
 }
 
+export function buildSystemHallId(locationId) {
+  return `${locationId}__system_zhike`
+}
+
 export function buildStockDocId(locationId, hallId, productId) {
   return `${locationId}_${hallId}_${productId}`
 }

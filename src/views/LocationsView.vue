@@ -164,7 +164,7 @@ import { Building2, Pencil, Plus, Store } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
-import { DEFAULT_HALL_NAME, FINANCE_MODE_MAP, FINANCE_MODE_OPTIONS, buildPlacementDocId, sortByOrder } from '@/utils/multiDept'
+import { DEFAULT_HALL_NAME, FINANCE_MODE_MAP, FINANCE_MODE_OPTIONS, buildPlacementDocId, buildSystemHallId, sortByOrder } from '@/utils/multiDept'
 
 const appStore = useAppStore()
 
@@ -241,7 +241,7 @@ async function saveLocation() {
       order: maxOrder + 10,
     })
 
-    const hallRef = doc(collection(db, 'halls'))
+    const hallRef = doc(db, 'halls', buildSystemHallId(locationRef.id))
     const batch = writeBatch(db)
     batch.set(hallRef, {
       locationId: locationRef.id,
@@ -306,9 +306,18 @@ function openHallForm(location, hall = null) {
 async function saveHall() {
   savingHall.value = true
   try {
+    const normalizedName = hallForm.value.name.trim()
+    const duplicatedHall = getLocationHalls(hallForm.value.locationId).find(
+      (hall) => hall.name.trim() === normalizedName && hall.id !== editingHallId.value
+    )
+    if (duplicatedHall) {
+      ElMessage.warning(`此道場已存在「${normalizedName}」堂口`)
+      return
+    }
+
     if (editingHallId.value) {
       await updateDoc(doc(db, 'halls', editingHallId.value), {
-        name: hallForm.value.name.trim(),
+        name: normalizedName,
         financeMode: hallForm.value.financeMode,
         isActive: hallForm.value.isSystem ? true : hallForm.value.isActive,
       })
@@ -323,7 +332,7 @@ async function saveHall() {
     const batch = writeBatch(db)
     batch.set(hallRef, {
       locationId: hallForm.value.locationId,
-      name: hallForm.value.name.trim(),
+      name: normalizedName,
       order: maxOrder + 10,
       isActive: hallForm.value.isActive,
       isSystem: false,

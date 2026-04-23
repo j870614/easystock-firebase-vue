@@ -15,6 +15,7 @@ import { useAuthStore } from './auth'
 import {
   DEFAULT_HALL_NAME,
   buildPlacementDocId,
+  buildSystemHallId,
   buildStockDocId,
   getLegacyLocationVisibility,
   isGlobalRole,
@@ -125,6 +126,9 @@ export const useAppStore = defineStore('app', () => {
 
   function getDefaultHallForLocation(locationId) {
     return (
+      halls.value.find(
+        (hall) => hall.id === buildSystemHallId(locationId)
+      ) ??
       halls.value.find(
         (hall) => hall.locationId === locationId && hall.name === DEFAULT_HALL_NAME
       ) ??
@@ -257,7 +261,7 @@ export const useAppStore = defineStore('app', () => {
     locationDocs.forEach((loc) => {
       const key = `${loc.id}_${DEFAULT_HALL_NAME}`
       if (existingMap.has(key)) return
-      const hallRef = doc(collection(db, 'halls'))
+      const hallRef = doc(db, 'halls', buildSystemHallId(loc.id))
       ops.push({
         type: 'set',
         ref: hallRef,
