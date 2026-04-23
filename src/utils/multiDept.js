@@ -9,10 +9,10 @@ export const ROLE_MAP = {
 }
 
 export const FINANCE_MODE_MAP = {
-  none: '無金額',
-  purchase: '採購',
-  sale: '銷售',
-  both: '雙模式',
+  none: '不顯示',
+  purchase: '顯示入庫單價',
+  sale: '顯示收款金額',
+  both: '完整顯示',
 }
 
 export const FINANCE_MODE_OPTIONS = [
