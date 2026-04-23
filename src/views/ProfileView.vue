@@ -82,32 +82,19 @@
         <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0">已連結</span>
       </div>
     </div>
-
-    <!-- 登出 -->
-    <button class="btn-ghost w-full text-red-500 border-red-100" @click="handleLogout">
-      <LogOut class="w-5 h-5" /> 登出
-    </button>
   </AppLayout>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { Link, LogOut, ALargeSmall } from 'lucide-vue-next'
+import { Link, ALargeSmall } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
 import { ROLE_MAP } from '@/utils/multiDept'
 
-const router = useRouter()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
 const roleLabel = computed(() => ROLE_MAP[authStore.role] ?? authStore.role)
-
-async function handleLogout() {
-  await authStore.signOut()
-  appStore.stop()
-  router.push('/login')
-}
 </script>

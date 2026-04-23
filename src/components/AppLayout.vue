@@ -5,8 +5,8 @@
     :data-fs="appStore.fontScale"
   >
     <header class="top-nav" :class="appStore.isReplenishMode ? 'bg-green-100 shadow-green-200/50' : ''">
-      <div class="flex items-center gap-3 flex-1 w-full max-w-[960px] mx-auto">
-        <div class="flex-shrink-0 w-10">
+      <div class="grid grid-cols-[2.25rem,minmax(0,1fr),auto] items-center gap-2 sm:gap-3 flex-1 w-full max-w-[960px] mx-auto">
+        <div class="flex items-center justify-start w-9 sm:w-10">
           <slot name="header-left">
             <button
               v-if="showBack"
@@ -18,24 +18,24 @@
           </slot>
         </div>
 
-        <h1 class="text-lg font-bold text-gray-800 flex-1 min-w-0 truncate text-center">
+        <h1 class="min-w-0 truncate px-1 text-center text-base font-bold text-gray-800 sm:px-2 sm:text-lg">
           {{ title }}
         </h1>
 
-        <div class="flex-none flex items-center gap-2 justify-end">
+        <div class="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2">
           <slot name="header-right">
             <button
               v-if="showLocationPicker && authStore.canSwitchScope && appStore.activeLocations.length > 0"
-              class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors bg-gray-100 text-gray-700 flex-shrink-0"
+              class="flex max-w-[42vw] items-center gap-1.5 rounded-xl bg-gray-100 px-2 py-1.5 text-xs font-medium text-gray-700 transition-colors flex-shrink sm:max-w-none sm:gap-2 sm:px-3 sm:text-sm"
               @click="openScopeDialog"
             >
               <MapPin class="w-4 h-4 flex-shrink-0" />
-              <span class="max-w-[110px] truncate">
+              <span class="max-w-[72px] truncate sm:max-w-[110px]">
                 {{ appStore.selectedLocation?.name ?? '選擇道場' }}
               </span>
               <span
                 v-if="appStore.selectedHall"
-                class="hidden sm:inline-flex px-2 py-0.5 rounded-full text-[11px] bg-white border border-gray-200 text-gray-500"
+                class="hidden md:inline-flex px-2 py-0.5 rounded-full text-[11px] bg-white border border-gray-200 text-gray-500"
               >
                 {{ appStore.selectedHall.name }}
               </span>
@@ -44,18 +44,26 @@
 
             <div
               v-else-if="showLocationPicker && appStore.selectedLocation && appStore.selectedHall"
-              class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700"
+              class="flex max-w-[40vw] items-center gap-1.5 rounded-xl bg-gray-100 px-2 py-1.5 text-xs font-medium text-gray-700 sm:max-w-none sm:gap-2 sm:px-3 sm:text-sm"
             >
               <MapPin class="w-4 h-4 flex-shrink-0" />
-              <span class="max-w-[80px] truncate">{{ appStore.selectedLocation.name }}</span>
-              <span class="px-2 py-0.5 rounded-full text-[11px] bg-white border border-gray-200 text-emerald-600">
+              <span class="max-w-[72px] truncate sm:max-w-[80px]">{{ appStore.selectedLocation.name }}</span>
+              <span class="hidden md:inline-flex px-2 py-0.5 rounded-full text-[11px] bg-white border border-gray-200 text-emerald-600">
                 {{ appStore.selectedHall.name }}
               </span>
             </div>
 
+            <button
+              class="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-red-100 px-2 text-xs font-medium text-red-500 transition-all hover:bg-red-50 sm:gap-1.5 sm:px-3"
+              @click="handleLogout"
+            >
+              <LogOut class="h-4 w-4 flex-shrink-0" />
+              <span class="hidden min-[381px]:inline">登出</span>
+            </button>
+
             <router-link
               to="/profile"
-              class="flex flex-shrink-0 w-9 h-9 items-center justify-center rounded-full hover:ring-2 hover:ring-brand-300 transition-all bg-gray-200 overflow-hidden"
+              class="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-200 transition-all hover:ring-2 hover:ring-brand-300"
             >
               <img
                 v-if="authStore.user?.photoURL"
@@ -213,6 +221,7 @@ import {
   History,
   LayoutDashboard,
   LayoutGrid,
+  LogOut,
   MapPin,
   Package,
   Settings,

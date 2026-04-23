@@ -8,6 +8,8 @@
 :root {
   --fs-main: 1.1rem;
   --fs-name: 1.25rem;
+  --top-nav-height: calc(3.5rem + env(safe-area-inset-top));
+  --bottom-nav-height: calc(4.5rem + env(safe-area-inset-bottom));
 }
 
 /* 全域字體過渡 */
@@ -111,7 +113,7 @@
            bg-white/90 backdrop-blur-md
            border-b border-gray-100
            flex items-center px-4;
-    height: calc(3.5rem + env(safe-area-inset-top));
+    height: var(--top-nav-height);
     padding-top: env(safe-area-inset-top);
     -webkit-backdrop-filter: blur(12px);
   }
@@ -145,8 +147,8 @@
 
   /* 頁面主內容區域（避開頂底導航）*/
   .page-content {
-    padding-top: calc(3.5rem + env(safe-area-inset-top));
-    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+    padding-top: var(--top-nav-height);
+    padding-bottom: calc(var(--bottom-nav-height) + 1rem);
     min-height: 100dvh;
   }
 
