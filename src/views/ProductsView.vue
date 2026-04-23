@@ -135,63 +135,76 @@
         </div>
 
         <div class="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-          <div class="font-medium text-gray-700">上架範圍</div>
-          <template v-if="form.localVisibilityOnly">
-            <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              共用品項內容由系統總管 / 管理員維護，執事負責人只管理本堂口上架狀態。
+          <button
+            class="flex w-full items-center justify-between gap-3 rounded-xl bg-white px-3 py-3 text-left"
+            type="button"
+            @click="placementCollapsed = !placementCollapsed"
+          >
+            <div class="min-w-0">
+              <div class="font-medium text-gray-700">上架範圍</div>
+              <div class="mt-1 text-sm text-gray-500">{{ placementSummary() }}</div>
             </div>
-          </template>
-          <template v-else-if="authStore.isHallLead">
-            <div class="text-sm text-gray-600">
-              執事負責人只能管理所屬堂口：{{ appStore.selectedLocation?.name }} / {{ appStore.selectedHall?.name }}
-            </div>
-          </template>
-          <template v-else>
-            <div class="flex flex-col gap-2 sm:flex-row">
-              <button
-                class="flex-1 rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all"
-                :class="form.placementMode === 'all' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500'"
-                @click="form.placementMode = 'all'"
-              >
-                所有堂口
-              </button>
-              <button
-                class="flex-1 rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all"
-                :class="form.placementMode === 'selected' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500'"
-                @click="form.placementMode = 'selected'"
-              >
-                指定堂口
-              </button>
-            </div>
-            <div v-if="form.placementMode === 'selected'" class="max-h-72 space-y-3 overflow-y-auto pr-1">
-              <div
-                v-for="location in selectableHallGroups"
-                :key="location.id"
-                class="rounded-2xl border border-gray-200 bg-white p-3"
-              >
-                <div class="mb-3 flex items-center gap-2">
-                  <div class="text-sm font-semibold text-gray-800">{{ location.name }}</div>
-                  <span class="text-[11px] rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-500">
-                    {{ location.halls.length }} 個堂口
-                  </span>
-                </div>
-                <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                  <label
-                    v-for="hall in location.halls"
-                    :key="hall.id"
-                    class="flex cursor-pointer items-start gap-3 rounded-2xl border px-3 py-3 transition-all"
-                    :class="form.hallIds.includes(hall.id) ? 'border-brand-500 bg-brand-50 shadow-sm' : 'border-gray-200 bg-gray-50 hover:border-gray-300'"
-                  >
-                    <input v-model="form.hallIds" type="checkbox" :value="hall.id" class="mt-0.5 h-4 w-4 flex-shrink-0" />
-                    <div class="min-w-0">
-                      <div class="font-medium text-gray-700 break-words">{{ hall.name }}</div>
-                      <div class="mt-1 text-xs text-gray-400">{{ financeLabel(hall.financeMode) }}</div>
-                    </div>
-                  </label>
+            <ChevronDown class="h-5 w-5 flex-shrink-0 text-gray-400 transition-transform" :class="placementCollapsed ? '' : 'rotate-180'" />
+          </button>
+
+          <div v-show="!placementCollapsed" class="space-y-3">
+            <template v-if="form.localVisibilityOnly">
+              <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                共用品項內容由系統總管 / 管理員維護，執事負責人只管理本堂口上架狀態。
+              </div>
+            </template>
+            <template v-else-if="authStore.isHallLead">
+              <div class="text-sm text-gray-600">
+                執事負責人只能管理所屬堂口：{{ appStore.selectedLocation?.name }} / {{ appStore.selectedHall?.name }}
+              </div>
+            </template>
+            <template v-else>
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <button
+                  class="flex-1 rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all"
+                  :class="form.placementMode === 'all' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500'"
+                  @click="form.placementMode = 'all'"
+                >
+                  所有堂口
+                </button>
+                <button
+                  class="flex-1 rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all"
+                  :class="form.placementMode === 'selected' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500'"
+                  @click="form.placementMode = 'selected'"
+                >
+                  指定堂口
+                </button>
+              </div>
+              <div v-if="form.placementMode === 'selected'" class="max-h-72 space-y-3 overflow-y-auto pr-1">
+                <div
+                  v-for="location in selectableHallGroups"
+                  :key="location.id"
+                  class="rounded-2xl border border-gray-200 bg-white p-3"
+                >
+                  <div class="mb-3 flex items-center gap-2">
+                    <div class="text-sm font-semibold text-gray-800">{{ location.name }}</div>
+                    <span class="text-[11px] rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-500">
+                      {{ location.halls.length }} 個堂口
+                    </span>
+                  </div>
+                  <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    <label
+                      v-for="hall in location.halls"
+                      :key="hall.id"
+                      class="flex cursor-pointer items-start gap-3 rounded-2xl border px-3 py-3 transition-all"
+                      :class="form.hallIds.includes(hall.id) ? 'border-brand-500 bg-brand-50 shadow-sm' : 'border-gray-200 bg-gray-50 hover:border-gray-300'"
+                    >
+                      <input v-model="form.hallIds" type="checkbox" :value="hall.id" class="mt-0.5 h-4 w-4 flex-shrink-0" />
+                      <div class="min-w-0">
+                        <div class="font-medium text-gray-700 break-words">{{ hall.name }}</div>
+                        <div class="mt-1 text-xs text-gray-400">{{ financeLabel(hall.financeMode) }}</div>
+                      </div>
+                    </label>
+                  </div>
                 </div>
               </div>
-            </div>
-          </template>
+            </template>
+          </div>
         </div>
 
         <div>
@@ -310,6 +323,7 @@ const dialogVisible = ref(false)
 const saving = ref(false)
 const hiddenCollapsed = ref(true)
 const editingGroupName = ref('')
+const placementCollapsed = ref(true)
 const collapsedGroups = ref({})
 const draggableGroups = ref([])
 
@@ -435,6 +449,18 @@ function financeLabel(mode) {
   return FINANCE_MODE_MAP[mode] ?? FINANCE_MODE_MAP.none
 }
 
+function placementSummary() {
+  if (form.value.localVisibilityOnly) {
+    return `${appStore.selectedLocation?.name || '目前道場'} / ${appStore.selectedHall?.name || '目前堂口'}`
+  }
+
+  if (form.value.placementMode === 'all') {
+    return '所有堂口'
+  }
+
+  return `指定堂口：已選 ${form.value.hallIds.length} 個堂口`
+}
+
 function isGroupCollapsed(name) {
   return collapsedGroups.value[name] ?? false
 }
@@ -480,6 +506,7 @@ function removeSpecLine(index) {
 
 function openForm(group = null) {
   editingGroupName.value = group?.name ?? ''
+  placementCollapsed.value = true
   const localVisibilityOnly = authStore.isHallLead && group?.isShared
 
   if (group) {
