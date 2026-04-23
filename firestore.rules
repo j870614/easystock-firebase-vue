@@ -18,8 +18,16 @@ service cloud.firestore {
       );
     }
 
+    function isHallLead() {
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'hallLead';
+    }
+
     function isStaff() {
-      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'staff'];
+      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'hallLead', 'staff'];
+    }
+
+    function canManageProducts() {
+      return isAdmin() || isHallLead();
     }
 
     function isAccountant() {
@@ -55,11 +63,27 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
 
-    // ── products 集合 ─────────────────────────────────────────
-    match /products/{productId} {
+    // ── halls 集合 ────────────────────────────────────────────
+    match /halls/{hallId} {
       allow read:   if isStaff();
       allow create: if isAdmin();
       allow update: if isAdmin();
+      allow delete: if isOwner();
+    }
+
+    // ── products 集合 ─────────────────────────────────────────
+    match /products/{productId} {
+      allow read:   if isStaff();
+      allow create: if canManageProducts();
+      allow update: if canManageProducts();
+      allow delete: if isOwner();
+    }
+
+    // ── productPlacements 集合 ───────────────────────────────
+    match /productPlacements/{placementId} {
+      allow read:   if isStaff();
+      allow create: if canManageProducts();
+      allow update: if canManageProducts();
       allow delete: if isOwner();
     }
 

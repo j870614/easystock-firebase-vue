@@ -248,9 +248,9 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  async function ensureDefaultHallsForLocations(locationDocs) {
+  async function ensureDefaultHallsForLocations(locationDocs, existingHalls = halls.value) {
     const existingMap = new Map(
-      halls.value.map((hall) => [`${hall.locationId}_${hall.name}`, hall])
+      existingHalls.map((hall) => [`${hall.locationId}_${hall.name}`, hall])
     )
     const ops = []
 
@@ -273,9 +273,9 @@ export const useAppStore = defineStore('app', () => {
       })
     })
 
-    if (ops.length > 0) {
-      await commitOps(ops)
-    }
+    if (ops.length === 0) return false
+    await commitOps(ops)
+    return true
   }
 
   async function runMultiDeptMigration() {
@@ -283,18 +283,28 @@ export const useAppStore = defineStore('app', () => {
     if (!auth.isAuthenticated || !isGlobalRole(auth.role) || migrationRunning.value) return
 
     const settingsRef = doc(db, 'settings', 'system')
-    const settingsSnap = await getDoc(settingsRef)
+    const [settingsSnap, locationSnap, existingHallSnap] = await Promise.all([
+      getDoc(settingsRef),
+      getDocs(collection(db, 'locations')),
+      getDocs(collection(db, 'halls')),
+    ])
     const version = Number(settingsSnap.data()?.multiDeptVersion ?? 0)
-    if (version >= 2) return
+    const locationDocs = locationSnap.docs.map((item) => ({ id: item.id, ...item.data() }))
+    const existingHallDocs = existingHallSnap.docs.map((item) => ({ id: item.id, ...item.data() }))
+    const hasMissingDefaultHall = locationDocs.some(
+      (loc) =>
+        !existingHallDocs.find(
+          (hall) => hall.locationId === loc.id && hall.name === DEFAULT_HALL_NAME
+        )
+    )
+    if (version >= 2 && !hasMissingDefaultHall) return
 
     migrationRunning.value = true
     try {
-      const locationSnap = await getDocs(collection(db, 'locations'))
-      const locationDocs = locationSnap.docs.map((item) => ({ id: item.id, ...item.data() }))
-      await ensureDefaultHallsForLocations(locationDocs)
+      const didCreateDefaultHalls = await ensureDefaultHallsForLocations(locationDocs, existingHallDocs)
 
       const [hallSnap, productSnap, placementSnap, stockSnap, txSnap, userSnap] = await Promise.all([
-        getDocs(collection(db, 'halls')),
+        didCreateDefaultHalls ? getDocs(collection(db, 'halls')) : Promise.resolve(existingHallSnap),
         getDocs(collection(db, 'products')),
         getDocs(collection(db, 'productPlacements')),
         getDocs(collection(db, 'stocks')),
@@ -450,14 +460,16 @@ export const useAppStore = defineStore('app', () => {
         await commitOps(ops)
       }
 
-      await setDoc(
-        settingsRef,
-        {
-          multiDeptVersion: 2,
-          multiDeptMigratedAt: serverTimestamp(),
-        },
-        { merge: true }
-      )
+      if (version < 2 || hasMissingDefaultHall || didCreateDefaultHalls) {
+        await setDoc(
+          settingsRef,
+          {
+            multiDeptVersion: 2,
+            multiDeptMigratedAt: serverTimestamp(),
+          },
+          { merge: true }
+        )
+      }
     } finally {
       migrationRunning.value = false
     }
