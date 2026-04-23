@@ -6,65 +6,86 @@
       </button>
     </div>
 
-    <div class="space-y-4 pb-24">
-      <div
-        v-for="group in visibleGroups"
-        :key="group.name"
-        class="card p-0 overflow-hidden border-2"
-        :class="group.items.some((item) => item.isActive !== false) ? 'border-transparent' : 'opacity-50 border-gray-200'"
-      >
-        <div class="flex flex-col gap-3 border-b bg-gray-50 p-3 sm:flex-row sm:items-center">
-          <Package class="w-5 h-5 text-brand-500 flex-shrink-0" />
-          <div class="flex-1 min-w-0">
-            <div class="font-bold text-gray-800 line-clamp-2 break-words">{{ group.name }}</div>
-            <div class="flex items-center gap-2 flex-wrap mt-1">
-              <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
-                {{ group.items.length }} 個規格
-              </span>
-              <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
-                {{ group.scopeLabel }}
-              </span>
-              <span v-if="group.isShared" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
-                共用品項
-              </span>
-            </div>
-          </div>
-          <div class="flex items-center justify-end gap-1.5">
-            <el-switch
-              :model-value="group.items.some((item) => appStore.isProductVisibleInHall(item))"
-              @change="(val) => toggleGroupVisibility(group, val)"
-            />
-            <button class="p-2 rounded-xl border border-brand-100 text-brand-600 hover:bg-brand-50" :disabled="authStore.isHallLead && group.isShared" @click="openForm(group)">
-              <Pencil class="w-4 h-4" />
+    <draggable
+      :list="draggableGroups"
+      item-key="name"
+      handle=".drag-handle-group"
+      class="space-y-4 pb-24"
+      ghost-class="opacity-50"
+      @end="persistGroupOrder"
+    >
+      <template #item="{ element: group }">
+        <div
+          class="card p-0 overflow-hidden border-2"
+          :class="group.items.some((item) => item.isActive !== false) ? 'border-transparent' : 'opacity-50 border-gray-200'"
+        >
+          <div class="flex flex-col gap-3 border-b bg-gray-50 p-3 sm:flex-row sm:items-center">
+            <button
+              class="drag-handle-group hidden rounded-xl p-2 text-gray-300 transition hover:text-gray-500 active:cursor-grabbing sm:inline-flex cursor-grab"
+              type="button"
+            >
+              <GripVertical class="w-5 h-5" />
             </button>
             <button
-              v-if="authStore.isOwner"
-              class="p-2 rounded-xl border border-red-100 text-red-500 hover:bg-red-50"
-              @click="confirmDeleteGroup(group)"
+              class="flex flex-1 items-start gap-3 text-left min-w-0"
+              type="button"
+              @click="toggleGroupCollapsed(group.name)"
             >
-              <Trash2 class="w-4 h-4" />
+              <Package class="mt-0.5 w-5 h-5 text-brand-500 flex-shrink-0" />
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-gray-800 line-clamp-2 break-words">{{ group.name }}</div>
+                <div class="flex items-center gap-2 flex-wrap mt-1">
+                  <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
+                    {{ group.items.length }} 個規格
+                  </span>
+                  <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
+                    {{ group.scopeLabel }}
+                  </span>
+                  <span v-if="group.isShared" class="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
+                    共用品項
+                  </span>
+                </div>
+              </div>
+              <ChevronDown class="mt-0.5 w-5 h-5 flex-shrink-0 text-gray-400 transition-transform" :class="isGroupCollapsed(group.name) ? '-rotate-90' : ''" />
             </button>
+            <div class="flex items-center justify-end gap-1.5" @click.stop>
+              <el-switch
+                :model-value="group.items.some((item) => appStore.isProductVisibleInHall(item))"
+                @change="(val) => toggleGroupVisibility(group, val)"
+              />
+              <button class="p-2 rounded-xl border border-brand-100 text-brand-600 hover:bg-brand-50" :disabled="authStore.isHallLead && group.isShared" @click="openForm(group)">
+                <Pencil class="w-4 h-4" />
+              </button>
+              <button
+                v-if="authStore.isOwner"
+                class="p-2 rounded-xl border border-red-100 text-red-500 hover:bg-red-50"
+                @click="confirmDeleteGroup(group)"
+              >
+                <Trash2 class="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div class="divide-y">
-          <div v-for="item in group.items" :key="item.id" class="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
-            <div class="flex-1 min-w-0">
-              <div class="font-semibold text-gray-800">{{ item.spec || '預設規格' }}</div>
-              <div class="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
-                <span>安全庫存：{{ item.minStock || 0 }}</span>
-                <span v-if="showSaleColumns">售價：{{ formatMoney(item.price || 0) }}</span>
-                <span v-if="showPurchaseColumns">採購：{{ formatMoney(item.purchasePrice || 0) }}</span>
+          <div v-show="!isGroupCollapsed(group.name)" class="divide-y">
+            <div v-for="item in group.items" :key="item.id" class="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-gray-800">{{ item.spec || '預設規格' }}</div>
+                <div class="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
+                  <span>安全庫存：{{ item.minStock || 0 }}</span>
+                  <span v-if="showSaleColumns">售價：{{ formatMoney(item.price || 0) }}</span>
+                  <span v-if="showPurchaseColumns">採購：{{ formatMoney(item.purchasePrice || 0) }}</span>
+                </div>
+              </div>
+              <div class="flex justify-end">
+                <el-switch :model-value="appStore.isProductVisibleInHall(item)" @change="(val) => toggleItemVisibility(item, val)" />
               </div>
             </div>
-            <div class="flex justify-end">
-              <el-switch :model-value="appStore.isProductVisibleInHall(item)" @change="(val) => toggleItemVisibility(item, val)" />
-            </div>
           </div>
         </div>
-      </div>
+      </template>
+    </draggable>
 
-      <div class="card p-0 overflow-hidden border border-gray-200">
+    <div class="card p-0 overflow-hidden border border-gray-200">
         <button
           class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 text-left"
           @click="hiddenCollapsed = !hiddenCollapsed"
@@ -99,7 +120,6 @@
             目前沒有隱藏品項
           </div>
         </div>
-      </div>
     </div>
 
     <el-dialog v-model="dialogVisible" :title="editingGroupName ? '編輯品項' : '新增品項'" width="92%" align-center>
@@ -157,57 +177,68 @@
             </button>
           </div>
 
-          <div class="space-y-3">
-            <div
-              v-for="(item, index) in form.specs"
-              :key="item.key"
-              class="rounded-xl border border-gray-200 bg-gray-50 p-3 relative"
-              :class="item.isMarkedForDeletion ? 'opacity-40 grayscale' : ''"
-            >
-              <div class="absolute top-3 right-3 flex gap-1">
-                <button
-                  v-if="item.id && authStore.isOwner"
-                  class="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-sm"
-                  @click="item.isMarkedForDeletion = true"
-                >
-                  <Trash2 class="w-3 h-3" />
-                </button>
-                <button
-                  v-if="!item.id"
-                  class="bg-gray-400 text-white p-1.5 rounded-full hover:bg-gray-500 shadow-sm"
-                  @click="removeSpecLine(index)"
-                >
-                  <X class="w-3 h-3" />
-                </button>
-              </div>
+          <draggable
+            :list="form.specs"
+            item-key="key"
+            handle=".drag-handle-spec"
+            class="space-y-3"
+            ghost-class="opacity-50"
+          >
+            <template #item="{ element: item, index }">
+              <div
+                class="rounded-xl border border-gray-200 bg-gray-50 p-3 relative"
+                :class="item.isMarkedForDeletion ? 'opacity-40 grayscale' : ''"
+              >
+                <div class="absolute left-3 top-3">
+                  <button class="drag-handle-spec rounded-full border border-gray-200 bg-white p-1.5 text-gray-400 shadow-sm hover:text-gray-600 cursor-grab active:cursor-grabbing">
+                    <GripVertical class="w-4 h-4" />
+                  </button>
+                </div>
+                <div class="absolute top-3 right-3 flex gap-1">
+                  <button
+                    v-if="item.id && authStore.isOwner"
+                    class="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-sm"
+                    @click="item.isMarkedForDeletion = true"
+                  >
+                    <Trash2 class="w-3 h-3" />
+                  </button>
+                  <button
+                    v-if="!item.id"
+                    class="bg-gray-400 text-white p-1.5 rounded-full hover:bg-gray-500 shadow-sm"
+                    @click="removeSpecLine(index)"
+                  >
+                    <X class="w-3 h-3" />
+                  </button>
+                </div>
 
-              <div class="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <div>
-                  <label class="text-xs text-gray-500 mb-1 block">規格名稱</label>
-                  <input v-model="item.spec" type="text" class="input py-1.5 text-sm" placeholder="如 M / 薄" />
+                <div class="mb-2 grid grid-cols-1 gap-2 pl-10 sm:grid-cols-2">
+                  <div>
+                    <label class="text-xs text-gray-500 mb-1 block">規格名稱</label>
+                    <input v-model="item.spec" type="text" class="input py-1.5 text-sm" placeholder="如 M / 薄" />
+                  </div>
+                  <div v-if="showSaleFields">
+                    <label class="text-xs text-gray-500 mb-1 block">售價</label>
+                    <input v-model.number="item.price" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+                  </div>
+                  <div v-if="showPurchaseFields">
+                    <label class="text-xs text-gray-500 mb-1 block">採購價</label>
+                    <input v-model.number="item.purchasePrice" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+                  </div>
                 </div>
-                <div v-if="showSaleFields">
-                  <label class="text-xs text-gray-500 mb-1 block">售價</label>
-                  <input v-model.number="item.price" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
-                </div>
-                <div v-if="showPurchaseFields">
-                  <label class="text-xs text-gray-500 mb-1 block">採購價</label>
-                  <input v-model.number="item.purchasePrice" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
-                </div>
-              </div>
 
-              <div class="grid grid-cols-1 items-end gap-2 sm:grid-cols-2">
-                <div>
-                  <label class="text-xs text-gray-500 mb-1 block">安全庫存</label>
-                  <input v-model.number="item.minStock" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
-                </div>
-                <div class="flex items-center justify-end h-10 px-1">
-                  <span class="text-xs text-gray-400 mr-2">主檔啟用</span>
-                  <el-switch v-model="item.isActive" size="small" />
+                <div class="grid grid-cols-1 items-end gap-2 pl-10 sm:grid-cols-2">
+                  <div>
+                    <label class="text-xs text-gray-500 mb-1 block">安全庫存</label>
+                    <input v-model.number="item.minStock" type="number" class="input py-1.5 text-sm" placeholder="0" min="0" />
+                  </div>
+                  <div class="flex items-center justify-end h-10 px-1">
+                    <span class="text-xs text-gray-400 mr-2">主檔啟用</span>
+                    <el-switch v-model="item.isActive" size="small" />
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </template>
+          </draggable>
         </div>
       </div>
       <template #footer>
@@ -221,7 +252,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   collection,
   deleteDoc,
@@ -231,7 +262,8 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ChevronDown, Package, Pencil, Plus, Trash2, X } from 'lucide-vue-next'
+import draggable from 'vuedraggable'
+import { ChevronDown, GripVertical, Package, Pencil, Plus, Trash2, X } from 'lucide-vue-next'
 import { v4 as uuidv4 } from 'uuid'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
@@ -247,6 +279,8 @@ const dialogVisible = ref(false)
 const saving = ref(false)
 const hiddenCollapsed = ref(true)
 const editingGroupName = ref('')
+const collapsedGroups = ref({})
+const draggableGroups = ref([])
 
 const form = ref({
   name: '',
@@ -317,6 +351,23 @@ function buildGroups(items) {
 const visibleGroups = computed(() => buildGroups(appStore.activeProducts))
 const hiddenGroups = computed(() => buildGroups(appStore.hiddenProducts))
 
+watch(
+  visibleGroups,
+  (groups) => {
+    draggableGroups.value = groups.map((group) => ({
+      ...group,
+      items: [...group.items],
+    }))
+
+    const nextCollapsed = {}
+    groups.forEach((group) => {
+      nextCollapsed[group.name] = collapsedGroups.value[group.name] ?? false
+    })
+    collapsedGroups.value = nextCollapsed
+  },
+  { immediate: true }
+)
+
 const saveDisabled = computed(() => {
   if (!form.value.name.trim()) return true
   if (form.value.specs.filter((item) => !item.isMarkedForDeletion).length === 0) return true
@@ -326,6 +377,17 @@ const saveDisabled = computed(() => {
 
 function financeLabel(mode) {
   return FINANCE_MODE_MAP[mode] ?? FINANCE_MODE_MAP.none
+}
+
+function isGroupCollapsed(name) {
+  return collapsedGroups.value[name] ?? false
+}
+
+function toggleGroupCollapsed(name) {
+  collapsedGroups.value = {
+    ...collapsedGroups.value,
+    [name]: !isGroupCollapsed(name),
+  }
 }
 
 function visibleHallIds(product) {
@@ -427,6 +489,24 @@ async function syncPlacements(batch, productId, hallIds, placementMode) {
       )
     }
   })
+}
+
+async function persistGroupOrder() {
+  try {
+    const batch = writeBatch(db)
+
+    draggableGroups.value.forEach((group, groupIndex) => {
+      const baseOrder = (groupIndex + 1) * 100
+      group.items.forEach((item, itemIndex) => {
+        batch.update(doc(db, 'products', item.id), { order: baseOrder + itemIndex })
+      })
+    })
+
+    await batch.commit()
+    ElMessage.success('品相排序已更新')
+  } catch (error) {
+    ElMessage.error(`排序更新失敗：${error.message}`)
+  }
 }
 
 async function save() {

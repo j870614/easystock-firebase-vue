@@ -28,8 +28,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isScopedUser = computed(() => isScopedRole(role.value))
   const canManageProducts = computed(() => ['owner', 'admin', 'hallLead'].includes(role.value))
   const canSwitchScope = computed(() => isGlobalRole(role.value))
-  const canManageUsers = computed(() => ['owner', 'admin'].includes(role.value))
-  const canManageLocations = computed(() => ['owner', 'admin'].includes(role.value))
+  const canManageUsers = computed(() => role.value === 'owner')
+  const canManageLocations = computed(() => role.value === 'owner')
 
   const isAccountant = computed(() => profile.value?.dutyName === '會計')
   const assignedLocationId = computed(() => profile.value?.assignedLocationId ?? null)

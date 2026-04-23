@@ -4,6 +4,18 @@
       角色、道場、堂口與職稱分開管理；一般人員 / 執事負責人 必須綁堂口。
     </div>
 
+    <div class="card mb-4">
+      <div class="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+        <Search class="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <input
+          v-model.trim="searchKeyword"
+          type="text"
+          class="w-full bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
+          placeholder="搜尋使用者名稱、法名、俗名、電子郵件"
+        />
+      </div>
+    </div>
+
     <div class="card mb-4 space-y-3">
       <div v-for="group in filterGroups" :key="group.key" class="space-y-1.5">
         <div class="flex items-center justify-between">
@@ -30,7 +42,7 @@
       <div class="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
     </div>
 
-    <div v-else class="space-y-3 pb-24">
+    <div v-else-if="filteredUsers.length > 0" class="space-y-3 pb-24">
       <div v-for="u in filteredUsers" :key="u.uid" class="card flex flex-col gap-3">
         <div class="flex items-center gap-3">
           <img :src="u.photoURL || ''" class="w-12 h-12 rounded-full bg-gray-200 flex-shrink-0" :alt="u.displayName" />
@@ -137,6 +149,10 @@
         </div>
       </div>
     </div>
+
+    <div v-else class="card py-10 text-center text-gray-400">
+      找不到符合條件的成員
+    </div>
   </AppLayout>
 </template>
 
@@ -144,6 +160,7 @@
 import { computed, ref } from 'vue'
 import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { ElMessage } from 'element-plus'
+import { Search } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -157,6 +174,7 @@ const loading = ref(false)
 const users = ref([])
 const editingUid = ref(null)
 const editForm = ref({ dharmaName: '', secularName: '' })
+const searchKeyword = ref('')
 
 const selfUid = computed(() => authStore.user?.uid)
 
@@ -212,6 +230,12 @@ const filterGroups = computed(() => [
 
 const filteredUsers = computed(() =>
   users.value.filter((user) => {
+    const keyword = searchKeyword.value.toLowerCase()
+    const searchMatch =
+      keyword.length === 0 ||
+      [user.displayName, user.dharmaName, user.secularName, user.email]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(keyword))
     const roleMatch = selectedRoles.value.includes(user.role)
     const locMatch =
       selectedLocs.value.length === 0 ||
@@ -225,7 +249,7 @@ const filteredUsers = computed(() =>
       selectedDuties.value.length === 0 ||
       (selectedDuties.value.includes('none') && !user.dutyId) ||
       selectedDuties.value.includes(user.dutyId)
-    return roleMatch && locMatch && hallMatch && dutyMatch
+    return searchMatch && roleMatch && locMatch && hallMatch && dutyMatch
   })
 )
 
@@ -266,9 +290,7 @@ function needsScopedAssignment(role) {
 }
 
 function canManageUser(user) {
-  if (authStore.isOwner) return true
-  if (!authStore.isAdmin) return false
-  return user.role !== 'owner'
+  return authStore.isOwner
 }
 
 function roleOptionsForUser(user) {
