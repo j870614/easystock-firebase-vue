@@ -36,7 +36,7 @@
                 <div class="font-bold text-gray-800 line-clamp-2 break-words">{{ group.name }}</div>
                 <div class="flex items-center gap-2 flex-wrap mt-1">
                   <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
-                    {{ group.visibleItems.length }} / {{ group.items.length }} 個規格
+                    {{ group.managedItems.length }} 個規格
                   </span>
                   <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
                     {{ group.scopeLabel }}
@@ -67,7 +67,12 @@
           </div>
 
           <div v-show="!isGroupCollapsed(group.name)" class="divide-y">
-            <div v-for="item in group.visibleItems" :key="item.id" class="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+            <div
+              v-for="item in group.managedItems"
+              :key="item.id"
+              class="flex flex-col gap-3 p-3 sm:flex-row sm:items-center"
+              :class="appStore.isProductVisibleInHall(item) ? '' : 'opacity-50 bg-gray-50/70'"
+            >
               <div class="flex-1 min-w-0">
                 <div class="font-semibold text-gray-800">{{ item.spec || '預設規格' }}</div>
                 <div class="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
@@ -377,15 +382,18 @@ function buildGroups(items) {
   return Array.from(map.values())
     .map((group) => {
       const visibleCount = group.items.reduce((sum, item) => sum + visibleHallIds(item).length, 0)
+      const managedItems = [...group.items]
+        .filter((item) => isManagedInCurrentHall(item))
+        .sort(sortByOrder)
       const visibleItems = [...group.items]
         .filter((item) => appStore.isProductVisibleInHall(item))
         .sort(sortByOrder)
-      const hiddenItems = [...group.items]
-        .filter((item) => appStore.isProductManagedInHall(item) && !appStore.isProductVisibleInHall(item))
-        .sort(sortByOrder)
+      const hiddenItems = managedItems
+        .filter((item) => !appStore.isProductVisibleInHall(item))
       return {
         ...group,
         items: [...group.items].sort(sortByOrder),
+        managedItems,
         visibleItems,
         hiddenItems,
         isShared: group.items.some((item) => isSharedProduct(item)),
@@ -395,9 +403,9 @@ function buildGroups(items) {
     .sort((a, b) => sortByOrder(a.items[0], b.items[0]))
 }
 
-const allGroups = computed(() => buildGroups(appStore.products.filter((product) => product.isActive !== false)))
-const visibleGroups = computed(() => allGroups.value.filter((group) => group.visibleItems.length > 0))
-const hiddenGroups = computed(() => allGroups.value.filter((group) => group.hiddenItems.length > 0))
+const allGroups = computed(() => buildGroups(appStore.products))
+const visibleGroups = computed(() => allGroups.value.filter((group) => group.managedItems.length > 0 && group.visibleItems.length > 0))
+const hiddenGroups = computed(() => allGroups.value.filter((group) => group.managedItems.length > 0 && group.visibleItems.length === 0 && group.hiddenItems.length > 0))
 
 watch(
   visibleGroups,
@@ -443,6 +451,11 @@ function visibleHallIds(product) {
     .filter((hallId) => appStore.isProductVisibleInHall(product, hallId))
 }
 
+function isManagedInCurrentHall(product) {
+  if (!product || !appStore.selectedHallId) return false
+  return appStore.getManagedHallIds(product).includes(appStore.selectedHallId)
+}
+
 function isSharedProduct(product) {
   const visibleIds = visibleHallIds(product)
   return product.placementMode === 'all' || visibleIds.some((hallId) => hallId !== appStore.selectedHallId)
@@ -471,7 +484,7 @@ function openForm(group = null) {
 
   if (group) {
     const editableItems = localVisibilityOnly
-      ? group.items.filter((item) => appStore.isProductManagedInHall(item))
+      ? group.items.filter((item) => isManagedInCurrentHall(item))
       : group.items
     const hallIds = Array.from(
       new Set(editableItems.flatMap((item) => appStore.getManagedHallIds(item)))
