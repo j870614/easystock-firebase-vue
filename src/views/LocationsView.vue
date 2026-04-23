@@ -6,74 +6,90 @@
       </button>
     </div>
 
-    <div class="space-y-4 pb-24">
-      <div
-        v-for="loc in sortedLocations"
-        :key="loc.id"
-        class="card border-2"
-        :class="loc.isActive !== false ? 'border-transparent' : 'border-gray-200 opacity-60'"
-      >
-        <div class="flex items-start gap-3">
-          <Building2 class="w-8 h-8 text-brand-400 flex-shrink-0 mt-1" />
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <div class="font-semibold text-gray-800">{{ loc.name }}</div>
-              <span class="text-xs px-2 py-0.5 rounded-full" :class="loc.isActive !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'">
-                {{ loc.isActive !== false ? '啟用' : '停用' }}
-              </span>
-            </div>
-            <div v-if="loc.address" class="text-sm text-gray-500 mt-1">{{ loc.address }}</div>
-            <div class="text-xs text-gray-400 mt-1">國度：{{ loc.country || '台灣' }}</div>
-          </div>
-          <div class="flex items-center gap-2">
-            <el-switch :model-value="loc.isActive !== false" @change="(val) => toggleLocationActive(loc, val)" />
-            <button class="p-2 rounded-xl hover:bg-gray-100" @click="openLocationForm(loc)">
-              <Pencil class="w-5 h-5 text-gray-500" />
+    <draggable
+      :list="locationList"
+      item-key="id"
+      handle=".drag-handle-location"
+      class="space-y-4 pb-24"
+      @end="persistLocationOrder"
+    >
+      <template #item="{ element: loc }">
+        <div
+          class="card border-2"
+          :class="loc.isActive !== false ? 'border-transparent' : 'border-gray-200 opacity-60'"
+        >
+          <div class="flex items-start gap-3">
+            <button class="drag-handle-location p-2 -m-2 rounded-xl text-gray-300 hover:text-gray-500 active:cursor-grabbing cursor-grab">
+              <GripVertical class="w-5 h-5" />
             </button>
-          </div>
-        </div>
-
-        <div class="mt-4 pt-4 border-t border-gray-100">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <div class="text-sm font-semibold text-gray-700">堂口</div>
-              <div class="text-xs text-gray-400">知客為系統預設堂口</div>
-            </div>
-            <button class="btn-ghost px-4 py-2 text-sm" @click="openHallForm(loc)">
-              <Plus class="w-4 h-4" /> 新增堂口
-            </button>
-          </div>
-
-          <div class="space-y-2">
-            <div
-              v-for="hall in getLocationHalls(loc.id)"
-              :key="hall.id"
-              class="flex items-center gap-3 rounded-xl border border-gray-200 p-3 bg-gray-50"
-            >
-              <Store class="w-5 h-5 text-gray-400 flex-shrink-0" />
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <div class="font-medium text-gray-800">{{ hall.name }}</div>
-                  <span v-if="hall.isSystem" class="text-[11px] px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-100">系統預設</span>
-                  <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
-                    {{ financeLabel(hall.financeMode) }}
-                  </span>
-                </div>
-                <div class="text-xs text-gray-400 mt-1">{{ hall.isActive !== false ? '啟用中' : '停用中' }}</div>
+            <Building2 class="w-8 h-8 text-brand-400 flex-shrink-0 mt-1" />
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <div class="font-semibold text-gray-800">{{ loc.name }}</div>
+                <span class="text-xs px-2 py-0.5 rounded-full" :class="loc.isActive !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'">
+                  {{ loc.isActive !== false ? '啟用' : '停用' }}
+                </span>
               </div>
-              <el-switch
-                :model-value="hall.isActive !== false"
-                :disabled="hall.isSystem"
-                @change="(val) => toggleHallActive(hall, val)"
-              />
-              <button class="p-2 rounded-xl hover:bg-white" @click="openHallForm(loc, hall)">
-                <Pencil class="w-4 h-4 text-gray-500" />
+              <div v-if="loc.address" class="text-sm text-gray-500 mt-1">{{ loc.address }}</div>
+              <div class="text-xs text-gray-400 mt-1">國度：{{ loc.country || '台灣' }}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <el-switch :model-value="loc.isActive !== false" @change="(val) => toggleLocationActive(loc, val)" />
+              <button class="p-2 rounded-xl hover:bg-gray-100" @click="openLocationForm(loc)">
+                <Pencil class="w-5 h-5 text-gray-500" />
               </button>
             </div>
           </div>
+
+          <div class="mt-4 pt-4 border-t border-gray-100">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <div class="text-sm font-semibold text-gray-700">堂口</div>
+                <div class="text-xs text-gray-400">知客為系統預設堂口，可拖曳調整順序</div>
+              </div>
+              <button class="btn-ghost px-4 py-2 text-sm" @click="openHallForm(loc)">
+                <Plus class="w-4 h-4" /> 新增堂口
+              </button>
+            </div>
+
+            <draggable
+              :list="hallLists[loc.id]"
+              item-key="id"
+              handle=".drag-handle-hall"
+              class="space-y-2"
+              @end="() => persistHallOrder(loc.id)"
+            >
+              <template #item="{ element: hall }">
+                <div class="flex items-center gap-3 rounded-xl border border-gray-200 p-3 bg-gray-50">
+                  <button class="drag-handle-hall p-2 -m-2 rounded-xl text-gray-300 hover:text-gray-500 active:cursor-grabbing cursor-grab">
+                    <GripVertical class="w-4 h-4" />
+                  </button>
+                  <Store class="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <div class="font-medium text-gray-800">{{ hall.name }}</div>
+                      <span v-if="hall.isSystem" class="text-[11px] px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-100">系統預設</span>
+                      <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500">
+                        {{ financeLabel(hall.financeMode) }}
+                      </span>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-1">{{ hall.isActive !== false ? '啟用中' : '停用中' }}</div>
+                  </div>
+                  <el-switch
+                    :model-value="hall.isActive !== false"
+                    :disabled="hall.isSystem"
+                    @change="(val) => toggleHallActive(hall, val)"
+                  />
+                  <button class="p-2 rounded-xl hover:bg-white" @click="openHallForm(loc, hall)">
+                    <Pencil class="w-4 h-4 text-gray-500" />
+                  </button>
+                </div>
+              </template>
+            </draggable>
+          </div>
         </div>
-      </div>
-    </div>
+      </template>
+    </draggable>
 
     <el-dialog v-model="locationDialogVisible" :title="editingLocationId ? '編輯道場' : '新增道場'" width="92%" align-center>
       <div class="space-y-4 py-2">
@@ -147,7 +163,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   addDoc,
   collection,
@@ -160,7 +176,8 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Building2, Pencil, Plus, Store } from 'lucide-vue-next'
+import draggable from 'vuedraggable'
+import { Building2, GripVertical, Pencil, Plus, Store } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
@@ -174,6 +191,8 @@ const savingLocation = ref(false)
 const savingHall = ref(false)
 const editingLocationId = ref(null)
 const editingHallId = ref(null)
+const locationList = ref([])
+const hallLists = ref({})
 
 const sortedLocations = computed(() => [...appStore.locations].sort(sortByOrder))
 
@@ -200,7 +219,55 @@ function financeLabel(mode) {
 }
 
 function getLocationHalls(locationId) {
-  return [...appStore.getHallsForLocation(locationId)].sort(sortByOrder)
+  return hallLists.value[locationId] ?? []
+}
+
+watch(
+  () => appStore.locations,
+  (list) => {
+    locationList.value = [...list].sort(sortByOrder)
+  },
+  { immediate: true, deep: true }
+)
+
+watch(
+  () => appStore.halls,
+  (list) => {
+    const next = {}
+    sortedLocations.value.forEach((loc) => {
+      next[loc.id] = list
+        .filter((hall) => hall.locationId === loc.id)
+        .sort(sortByOrder)
+    })
+    hallLists.value = next
+  },
+  { immediate: true, deep: true }
+)
+
+async function persistLocationOrder() {
+  try {
+    const batch = writeBatch(db)
+    locationList.value.forEach((loc, index) => {
+      batch.update(doc(db, 'locations', loc.id), { order: (index + 1) * 10 })
+    })
+    await batch.commit()
+    ElMessage.success('道場排序已更新')
+  } catch (error) {
+    ElMessage.error(`排序更新失敗：${error.message}`)
+  }
+}
+
+async function persistHallOrder(locationId) {
+  try {
+    const batch = writeBatch(db)
+    getLocationHalls(locationId).forEach((hall, index) => {
+      batch.update(doc(db, 'halls', hall.id), { order: (index + 1) * 10 })
+    })
+    await batch.commit()
+    ElMessage.success('堂口排序已更新')
+  } catch (error) {
+    ElMessage.error(`排序更新失敗：${error.message}`)
+  }
 }
 
 function openLocationForm(location = null) {

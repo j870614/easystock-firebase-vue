@@ -97,7 +97,7 @@
             @change="() => changeLocation(u)"
           >
             <el-option
-              v-for="loc in appStore.locations"
+              v-for="loc in sortedLocations"
               :key="loc.id"
               :label="loc.name"
               :value="loc.id"
@@ -148,7 +148,7 @@ import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
-import { ROLE_MAP } from '@/utils/multiDept'
+import { ROLE_MAP, sortByOrder } from '@/utils/multiDept'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -164,6 +164,7 @@ const selectedRoles = ref(Object.keys(ROLE_MAP))
 const selectedLocs = ref([])
 const selectedHalls = ref([])
 const selectedDuties = ref([])
+const sortedLocations = computed(() => [...appStore.locations].sort(sortByOrder))
 
 const hallFilterOptions = computed(() => {
   const scopedLocationIds =
@@ -171,15 +172,15 @@ const hallFilterOptions = computed(() => {
       ? new Set(selectedLocs.value)
       : null
 
-  return appStore.halls
-    .filter((hall) => !scopedLocationIds || scopedLocationIds.has(hall.locationId))
-    .map((hall) => {
-      const location = appStore.locations.find((loc) => loc.id === hall.locationId)
-      return {
+  return sortedLocations.value.flatMap((location) =>
+    appStore
+      .getHallsForLocation(location.id)
+      .filter((hall) => !scopedLocationIds || scopedLocationIds.has(hall.locationId))
+      .map((hall) => ({
         value: hall.id,
-        label: location ? `${location.name} / ${hall.name}` : hall.name,
-      }
-    })
+        label: `${location.name} / ${hall.name}`,
+      }))
+  )
 })
 
 const filterGroups = computed(() => [
@@ -193,7 +194,7 @@ const filterGroups = computed(() => [
     key: 'loc',
     label: '所屬道場',
     selected: selectedLocs,
-    options: [{ value: 'none', label: '未指派' }, ...appStore.locations.map((loc) => ({ value: loc.id, label: loc.name }))],
+    options: [{ value: 'none', label: '未指派' }, ...sortedLocations.value.map((loc) => ({ value: loc.id, label: loc.name }))],
   },
   {
     key: 'hall',
