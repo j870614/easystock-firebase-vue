@@ -8,7 +8,7 @@
 :root {
   --fs-main: 1.1rem;
   --fs-name: 1.25rem;
-  --top-nav-height: calc(3.5rem + env(safe-area-inset-top));
+  --top-nav-height: calc(3.75rem + env(safe-area-inset-top));
   --bottom-nav-height: calc(4.5rem + env(safe-area-inset-bottom));
 }
 

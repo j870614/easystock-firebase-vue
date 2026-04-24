@@ -5,8 +5,8 @@
     :data-fs="appStore.fontScale"
   >
     <header class="top-nav" :class="appStore.isReplenishMode ? 'bg-green-100 shadow-green-200/50' : ''">
-      <div class="grid grid-cols-[2.25rem,minmax(0,1fr),auto] items-center gap-2 sm:gap-3 flex-1 w-full max-w-[960px] mx-auto">
-        <div class="flex items-center justify-start w-9 sm:w-10">
+      <div class="grid flex-1 grid-cols-[auto,minmax(0,1fr),auto] items-center gap-2 sm:gap-3 w-full max-w-[960px] mx-auto">
+        <div class="flex items-center justify-start" :class="showBack ? 'w-9 sm:w-10' : 'w-0'">
           <slot name="header-left">
             <button
               v-if="showBack"
@@ -18,7 +18,7 @@
           </slot>
         </div>
 
-        <h1 class="min-w-0 truncate px-1 text-center text-base font-bold text-gray-800 sm:px-2 sm:text-lg">
+        <h1 class="min-w-0 truncate whitespace-nowrap text-left text-base font-bold text-gray-800 sm:text-center sm:text-lg">
           {{ title }}
         </h1>
 
@@ -26,11 +26,11 @@
           <slot name="header-right">
             <button
               v-if="showLocationPicker && authStore.canSwitchScope && appStore.activeLocations.length > 0"
-              class="flex max-w-[42vw] items-center gap-1.5 rounded-xl bg-gray-100 px-2 py-1.5 text-xs font-medium text-gray-700 transition-colors flex-shrink sm:max-w-none sm:gap-2 sm:px-3 sm:text-sm"
+              class="flex max-w-[7.5rem] items-center gap-1 rounded-xl bg-gray-100 px-2 py-1.5 text-xs font-medium text-gray-700 transition-colors flex-shrink sm:max-w-none sm:gap-2 sm:px-3 sm:text-sm"
               @click="openScopeDialog"
             >
               <MapPin class="w-4 h-4 flex-shrink-0" />
-              <span class="max-w-[72px] truncate sm:max-w-[110px]">
+              <span class="max-w-[3.75rem] truncate sm:max-w-[110px]">
                 {{ appStore.selectedLocation?.name ?? '選擇道場' }}
               </span>
               <span
@@ -44,35 +44,49 @@
 
             <div
               v-else-if="showLocationPicker && appStore.selectedLocation && appStore.selectedHall"
-              class="flex max-w-[40vw] items-center gap-1.5 rounded-xl bg-gray-100 px-2 py-1.5 text-xs font-medium text-gray-700 sm:max-w-none sm:gap-2 sm:px-3 sm:text-sm"
+              class="flex max-w-[7.5rem] items-center gap-1 rounded-xl bg-gray-100 px-2 py-1.5 text-xs font-medium text-gray-700 sm:max-w-none sm:gap-2 sm:px-3 sm:text-sm"
             >
               <MapPin class="w-4 h-4 flex-shrink-0" />
-              <span class="max-w-[72px] truncate sm:max-w-[80px]">{{ appStore.selectedLocation.name }}</span>
+              <span class="max-w-[3.75rem] truncate sm:max-w-[80px]">{{ appStore.selectedLocation.name }}</span>
               <span class="hidden md:inline-flex px-2 py-0.5 rounded-full text-[11px] bg-white border border-gray-200 text-emerald-600">
                 {{ appStore.selectedHall.name }}
               </span>
             </div>
 
-            <button
-              class="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-red-100 px-2 text-xs font-medium text-red-500 transition-all hover:bg-red-50 sm:gap-1.5 sm:px-3"
-              @click="handleLogout"
-            >
-              <LogOut class="h-4 w-4 flex-shrink-0" />
-              <span class="hidden min-[381px]:inline">登出</span>
-            </button>
+            <div class="relative flex-shrink-0">
+              <button
+                class="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gray-200 transition-all hover:ring-2 hover:ring-brand-300"
+                @click="accountMenuOpen = !accountMenuOpen"
+              >
+                <img
+                  v-if="authStore.user?.photoURL"
+                  :src="authStore.user.photoURL"
+                  class="block w-full h-full object-cover"
+                  :alt="authStore.user.displayName"
+                />
+                <User v-else class="w-5 h-5 flex-shrink-0 text-gray-500" />
+              </button>
 
-            <router-link
-              to="/profile"
-              class="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-200 transition-all hover:ring-2 hover:ring-brand-300"
-            >
-              <img
-                v-if="authStore.user?.photoURL"
-                :src="authStore.user.photoURL"
-                class="block w-full h-full object-cover"
-                :alt="authStore.user.displayName"
-              />
-              <User v-else class="w-5 h-5 flex-shrink-0 text-gray-500" />
-            </router-link>
+              <div
+                v-if="accountMenuOpen"
+                class="absolute right-0 top-11 z-[60] w-36 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg shadow-gray-200/70"
+              >
+                <button
+                  class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  @click="goProfile"
+                >
+                  <User class="h-4 w-4" />
+                  我的帳號
+                </button>
+                <button
+                  class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-red-500 hover:bg-red-50"
+                  @click="handleLogout"
+                >
+                  <LogOut class="h-4 w-4" />
+                  登出
+                </button>
+              </div>
+            </div>
           </slot>
         </div>
       </div>
@@ -263,6 +277,7 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 
 const showScopeDialog = ref(false)
+const accountMenuOpen = ref(false)
 const scopeLocationId = ref(null)
 const isLocationLocked = ref(false)
 let geofenceInterval = null
@@ -340,9 +355,15 @@ function checkGeofence() {
 }
 
 async function handleLogout() {
+  accountMenuOpen.value = false
   await authStore.signOut()
   appStore.stop()
   router.push('/login')
+}
+
+function goProfile() {
+  accountMenuOpen.value = false
+  router.push('/profile')
 }
 
 const IDLE_EVENTS = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click']
