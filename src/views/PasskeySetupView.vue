@@ -145,7 +145,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -155,13 +155,17 @@ import {
 } from '@/services/passkey'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const saving = ref(false)
 const errorMsg = ref('')
 const supportsPasskey = browserSupportsPasskey()
 const deviceLabel = ref(authStore.user?.displayName ? `${authStore.user.displayName} 的裝置` : '')
 const canSkip = computed(() => !authStore.isPasskeyEnrollmentRequired)
-const deviceType = ref('')
+const initialDeviceType = ['ownMobile', 'ownComputer', 'sharedComputer'].includes(String(route.query.device ?? ''))
+  ? String(route.query.device)
+  : ''
+const deviceType = ref(initialDeviceType)
 const forceSharedFlow = ref(false)
 const deviceOptions = [
   {

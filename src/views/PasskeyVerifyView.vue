@@ -33,8 +33,18 @@
 
       <div class="bg-sky-50 border border-sky-200 rounded-2xl p-4">
         <p class="text-sm text-sky-800 leading-relaxed">
-          若你本來就已綁定 Passkey，按下方按鈕後，瀏覽器會自動決定是直接叫起本機 Face ID / 指紋，或在共用電腦上顯示跨裝置驗證流程。
+          若這支手機尚未綁定 Passkey，直接按驗證可能會出現 QR Code。請先綁定這支手機，之後就能直接用 Face ID、指紋或裝置密碼登入。
         </p>
+      </div>
+
+      <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 space-y-3">
+        <h2 class="text-lg font-bold text-emerald-800">這是你第一次用這支手機登入？</h2>
+        <p class="text-sm text-emerald-700 leading-relaxed">
+          同一個 Google 帳號可以綁定多個 Passkey。若你之前只在 MacBook 綁定過，請先把這支手機也加入，避免被導去掃 QR Code。
+        </p>
+        <button class="btn-primary w-full text-base" @click="bindThisDevice">
+          綁定這支手機
+        </button>
       </div>
 
       <div
@@ -106,5 +116,12 @@ async function verifyPasskey() {
 
 function backToSetup() {
   router.push('/passkey/setup')
+}
+
+function bindThisDevice() {
+  router.push({
+    path: '/passkey/setup',
+    query: { device: 'ownMobile' },
+  })
 }
 </script>
