@@ -17,12 +17,6 @@
     </div>
 
     <div class="relative flex-1 bg-white rounded-t-3xl px-6 pt-8 pb-12 flex flex-col gap-4">
-      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-        <p class="text-sm text-amber-800 leading-relaxed">
-          這一版先把導流與安全狀態接好，真正的 WebAuthn 綁定流程下一步會接上 Cloud Functions 挑戰驗證。
-        </p>
-      </div>
-
       <div class="rounded-2xl border border-gray-200 p-5 space-y-3">
         <h2 class="text-lg font-bold text-gray-800">你之後會怎麼用</h2>
         <div class="text-sm text-gray-600 leading-relaxed space-y-2">
@@ -32,11 +26,46 @@
         </div>
       </div>
 
-      <button class="btn-primary w-full text-lg" @click="goVerify">
-        查看驗證流程
+      <div class="rounded-2xl border border-gray-200 p-5 space-y-3">
+        <label class="block text-sm font-semibold text-gray-700" for="deviceLabel">裝置名稱</label>
+        <input
+          id="deviceLabel"
+          v-model.trim="deviceLabel"
+          type="text"
+          class="input"
+          placeholder="例如：王小明的 iPhone"
+        />
+        <p class="text-xs text-gray-400">
+          這個名稱只用來辨識你的 Passkey，例如未來要移除舊裝置時比較好分辨。
+        </p>
+      </div>
+
+      <div
+        v-if="!supportsPasskey"
+        class="bg-red-50 border border-red-200 rounded-2xl p-4"
+      >
+        <p class="text-sm text-red-700 leading-relaxed">
+          目前裝置或瀏覽器不支援 Passkey。請改用較新的 Safari、Chrome 或 Edge。
+        </p>
+      </div>
+
+      <div
+        v-if="errorMsg"
+        class="bg-red-50 border border-red-200 rounded-2xl p-4"
+      >
+        <p class="text-sm text-red-700 leading-relaxed">{{ errorMsg }}</p>
+      </div>
+
+      <button
+        class="btn-primary w-full text-lg"
+        :disabled="saving || !supportsPasskey"
+        @click="registerPasskey"
+      >
+        {{ saving ? '綁定中…' : '立即綁定 Passkey' }}
       </button>
 
       <button
+        v-if="canSkip"
         class="btn-ghost w-full border-2 border-gray-200 text-base"
         :disabled="saving"
         @click="remindLater"
@@ -44,29 +73,66 @@
         {{ saving ? '設定中…' : '14 天後再提醒我' }}
       </button>
 
-      <button class="text-sm text-gray-400 hover:text-gray-600 transition-colors" @click="backHome">
+      <button
+        v-if="canSkip"
+        class="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+        @click="backHome"
+      >
         先回系統
+      </button>
+
+      <button class="text-sm text-brand-600 hover:text-brand-700 transition-colors" @click="goVerify">
+        已經綁定過 Passkey？改走驗證流程
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import {
+  beginPasskeyRegistration,
+  browserSupportsPasskey,
+  getPasskeyErrorMessage,
+} from '@/services/passkey'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const saving = ref(false)
+const errorMsg = ref('')
+const supportsPasskey = browserSupportsPasskey()
+const deviceLabel = ref(authStore.user?.displayName ? `${authStore.user.displayName} 的裝置` : '')
+const canSkip = computed(() => !authStore.isPasskeyEnrollmentRequired)
 
 function goVerify() {
   router.push('/passkey/verify')
 }
 
+async function registerPasskey() {
+  saving.value = true
+  errorMsg.value = ''
+
+  try {
+    const result = await beginPasskeyRegistration(deviceLabel.value || '未命名裝置')
+    if (!result?.verified) {
+      throw new Error('Passkey 綁定失敗')
+    }
+    authStore.markPasskeyVerified()
+    ElMessage.success('Passkey 綁定完成，之後可用手機或本機生物辨識快速驗證。')
+    router.push('/')
+  } catch (e) {
+    errorMsg.value = getPasskeyErrorMessage(e)
+  } finally {
+    saving.value = false
+  }
+}
+
 async function remindLater() {
   saving.value = true
+  errorMsg.value = ''
   try {
     await authStore.deferPasskeyEnrollment()
     ElMessage.success('已延後提醒，14 天後再提示你綁定 Passkey。')

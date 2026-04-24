@@ -44,9 +44,16 @@ service cloud.firestore {
       allow create: if isAuth() && request.auth.uid == uid
                     && request.resource.data.role == 'pending';
 
-      // 自己更新自己的個人資料（僅限 profileSubmitted 流程欄位）
+      // 自己只能更新個人資料，不可自行調整 security / role 等安全欄位
       allow update: if isAuth() && request.auth.uid == uid
-                    && request.resource.data.role == resource.data.role;
+                    && request.resource.data.role == resource.data.role
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                      'dharmaName',
+                      'secularName',
+                      'dutyId',
+                      'dutyName',
+                      'profileSubmitted',
+                    ]);
 
       // owner 可更新任何欄位（包含 role）
       allow update: if isOwner();

@@ -143,6 +143,14 @@ router.beforeEach(async (to) => {
     return { name: 'passkey-setup' }
   }
 
+  if (
+    authStore.isAuthenticated &&
+    authStore.needsPasskeyVerification &&
+    !['passkey-verify', 'passkey-setup', 'pending'].includes(String(to.name ?? ''))
+  ) {
+    return { name: 'passkey-verify' }
+  }
+
   // 已登入要去登入頁 → 導向首頁
   if (isPublic && authStore.isAuthenticated && to.name === 'login') {
     return { path: authStore.getPostLoginRoute() }

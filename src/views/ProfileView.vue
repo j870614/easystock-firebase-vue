@@ -82,17 +82,62 @@
         <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0">已連結</span>
       </div>
     </div>
+
+    <div class="card mb-4">
+      <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+        <Shield class="w-5 h-5 text-gray-400" /> Passkey 驗證
+      </h2>
+
+      <div
+        class="rounded-2xl border p-4"
+        :class="authStore.hasPasskey ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="font-semibold" :class="authStore.hasPasskey ? 'text-emerald-800' : 'text-amber-800'">
+              {{ authStore.hasPasskey ? '已綁定 Passkey' : '尚未綁定 Passkey' }}
+            </p>
+            <p class="mt-1 text-sm leading-relaxed" :class="authStore.hasPasskey ? 'text-emerald-700/90' : 'text-amber-800/90'">
+              {{ authStore.hasPasskey
+                ? '之後可直接用自己的手機、平板或本機生物辨識完成驗證。'
+                : '建議先綁定，尤其在共用電腦登入時可改用自己的手機驗證。' }}
+            </p>
+          </div>
+          <span
+            class="text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0"
+            :class="authStore.hasPasskey ? 'bg-white text-emerald-700 border border-emerald-200' : 'bg-white text-amber-700 border border-amber-200'"
+          >
+            {{ authStore.hasPasskey ? '已啟用' : '待設定' }}
+          </span>
+        </div>
+
+        <div class="mt-4 flex gap-2">
+          <button class="btn-primary flex-1" @click="router.push('/passkey/setup')">
+            {{ authStore.hasPasskey ? '新增或重綁 Passkey' : '立即綁定' }}
+          </button>
+          <button
+            v-if="authStore.hasPasskey"
+            class="btn-ghost flex-1 border border-gray-200"
+            @click="router.push('/passkey/verify')"
+          >
+            立即驗證
+          </button>
+        </div>
+      </div>
+    </div>
   </AppLayout>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { Link, ALargeSmall } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Link, ALargeSmall, Shield } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
 import { ROLE_MAP } from '@/utils/multiDept'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 

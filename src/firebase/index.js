@@ -38,5 +38,6 @@ export const db = initializeFirestore(app, {
     tabManager: persistentMultipleTabManager(),
   }),
 })
+export const functions = getFunctions(app, 'asia-east1')
 
 export default app

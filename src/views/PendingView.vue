@@ -155,7 +155,7 @@ async function submitProfile() {
 // 即時監控：如果角色變更為非 pending，自動導回首頁
 watch(() => authStore.isPending, (isPending) => {
   if (!isPending && authStore.isAuthenticated) {
-    router.push('/')
+    router.push(authStore.getPostLoginRoute())
   }
 }, { immediate: true })
 </script>

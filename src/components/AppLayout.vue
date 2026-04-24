@@ -80,6 +80,26 @@
 
     <main class="page-content px-4 py-4">
       <div class="max-w-[960px] mx-auto">
+        <div
+          v-if="authStore.shouldShowPasskeyReminder && route.path !== '/passkey/setup' && route.path !== '/passkey/verify'"
+          class="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm"
+        >
+          <div class="flex items-start gap-3">
+            <Shield class="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold">建議先綁定 Passkey</p>
+              <p class="mt-1 text-sm leading-relaxed text-amber-800/90">
+                共用電腦登入時可改用你自己的手機驗證；若你現在就是用自己的手機或平板，通常可直接用 Face ID、指紋或裝置密碼完成。
+              </p>
+            </div>
+            <button
+              class="rounded-xl bg-white px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100"
+              @click="router.push('/passkey/setup')"
+            >
+              立即綁定
+            </button>
+          </div>
+        </div>
         <slot />
       </div>
     </main>

@@ -33,11 +33,35 @@
 
       <div class="bg-sky-50 border border-sky-200 rounded-2xl p-4">
         <p class="text-sm text-sky-800 leading-relaxed">
-          下一步會把這個頁面接成真正的 WebAuthn 綁定與驗證入口，現在先完成登入後導流與資料欄位準備。
+          若你本來就已綁定 Passkey，按下方按鈕後，瀏覽器會自動決定是直接叫起本機 Face ID / 指紋，或在共用電腦上顯示跨裝置驗證流程。
         </p>
       </div>
 
-      <button class="btn-primary w-full text-lg" @click="backToSetup">
+      <div
+        v-if="!supportsPasskey"
+        class="bg-red-50 border border-red-200 rounded-2xl p-4"
+      >
+        <p class="text-sm text-red-700 leading-relaxed">
+          目前裝置或瀏覽器不支援 Passkey。請改用較新的 Safari、Chrome 或 Edge。
+        </p>
+      </div>
+
+      <div
+        v-if="errorMsg"
+        class="bg-red-50 border border-red-200 rounded-2xl p-4"
+      >
+        <p class="text-sm text-red-700 leading-relaxed">{{ errorMsg }}</p>
+      </div>
+
+      <button
+        class="btn-primary w-full text-lg"
+        :disabled="verifying || !supportsPasskey"
+        @click="verifyPasskey"
+      >
+        {{ verifying ? '驗證中…' : '立即驗證 Passkey' }}
+      </button>
+
+      <button class="btn-ghost w-full border-2 border-gray-200 text-base" @click="backToSetup">
         返回綁定說明
       </button>
     </div>
@@ -45,9 +69,40 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { useAuthStore } from '@/stores/auth'
+import {
+  beginPasskeyAuthentication,
+  browserSupportsPasskey,
+  getPasskeyErrorMessage,
+} from '@/services/passkey'
 
 const router = useRouter()
+const authStore = useAuthStore()
+const verifying = ref(false)
+const errorMsg = ref('')
+const supportsPasskey = browserSupportsPasskey()
+
+async function verifyPasskey() {
+  verifying.value = true
+  errorMsg.value = ''
+
+  try {
+    const result = await beginPasskeyAuthentication()
+    if (!result?.verified) {
+      throw new Error('Passkey 驗證失敗')
+    }
+    authStore.markPasskeyVerified()
+    ElMessage.success('Passkey 驗證完成。')
+    router.push('/')
+  } catch (e) {
+    errorMsg.value = getPasskeyErrorMessage(e)
+  } finally {
+    verifying.value = false
+  }
+}
 
 function backToSetup() {
   router.push('/passkey/setup')
