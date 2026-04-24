@@ -411,7 +411,7 @@ watch(
       return
     }
     stopIdleTimer()
-    if (route.path !== '/login' && route.path !== '/pending') {
+    if (!['/login', '/pending', '/passkey/setup', '/passkey/verify'].includes(route.path)) {
       router.push('/login')
     }
   },

@@ -7,9 +7,26 @@ import {
   setPersistence,
   browserSessionPersistence,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot, updateDoc } from 'firebase/firestore'
 import { auth, googleProvider, db } from '@/firebase'
 import { isGlobalRole, isOperationalRole, isScopedRole } from '@/utils/multiDept'
+
+const PASSKEY_REMINDER_DAYS = 14
+
+function addDays(days) {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+}
+
+function normalizeSecurity(security = {}) {
+  return {
+    passkeyEnrolled: security.passkeyEnrolled === true,
+    passkeyEnrolledAt: security.passkeyEnrolledAt ?? null,
+    passkeyRequiredFrom: security.passkeyRequiredFrom ?? null,
+    passkeyGraceUntil: security.passkeyGraceUntil ?? null,
+    passkeyLastVerifiedAt: security.passkeyLastVerifiedAt ?? null,
+    passkeyRecoveryRequired: security.passkeyRecoveryRequired === true,
+  }
+}
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -35,6 +52,22 @@ export const useAuthStore = defineStore('auth', () => {
   const isAccountant = computed(() => profile.value?.dutyName === '會計')
   const assignedLocationId = computed(() => profile.value?.assignedLocationId ?? null)
   const assignedHallId = computed(() => profile.value?.assignedHallId ?? null)
+  const security = computed(() => normalizeSecurity(profile.value?.security))
+  const hasPasskey = computed(() => security.value.passkeyEnrolled)
+  const isPasskeyRecoveryRequired = computed(() => security.value.passkeyRecoveryRequired)
+  const isPasskeyGraceActive = computed(() => {
+    const graceUntil = security.value.passkeyGraceUntil
+    if (!graceUntil) return false
+    const value =
+      typeof graceUntil?.toDate === 'function' ? graceUntil.toDate() : new Date(graceUntil)
+    return value.getTime() > Date.now()
+  })
+  const shouldPromptPasskeySetup = computed(() =>
+    isAuthenticated.value &&
+    !isPending.value &&
+    !hasPasskey.value &&
+    !isPasskeyGraceActive.value
+  )
 
   let initPromise = null
   let unsubscribeProfile = null
@@ -66,15 +99,24 @@ export const useAuthStore = defineStore('auth', () => {
         assignedLocationId: null,
         assignedHallId: null,
         createdAt: serverTimestamp(),
+        security: normalizeSecurity(),
       }
       await setDoc(userRef, newProfile)
       profile.value = newProfile
     } else {
-      profile.value = initialSnap.data()
+      profile.value = {
+        ...initialSnap.data(),
+        security: normalizeSecurity(initialSnap.data()?.security),
+      }
     }
 
     unsubscribeProfile = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) profile.value = snap.data()
+      if (snap.exists()) {
+        profile.value = {
+          ...snap.data(),
+          security: normalizeSecurity(snap.data()?.security),
+        }
+      }
     })
   }
 
@@ -130,6 +172,20 @@ export const useAuthStore = defineStore('auth', () => {
     profile.value = null
   }
 
+  async function deferPasskeyEnrollment(days = PASSKEY_REMINDER_DAYS) {
+    if (!user.value) return
+    const nextReminderAt = addDays(days)
+    await updateDoc(doc(db, 'users', user.value.uid), {
+      'security.passkeyGraceUntil': nextReminderAt,
+    })
+  }
+
+  function getPostLoginRoute() {
+    if (isPending.value) return '/pending'
+    if (shouldPromptPasskeySetup.value || isPasskeyRecoveryRequired.value) return '/passkey/setup'
+    return '/'
+  }
+
   return {
     user,
     profile,
@@ -151,8 +207,15 @@ export const useAuthStore = defineStore('auth', () => {
     canManageLocations,
     assignedLocationId,
     assignedHallId,
+    security,
+    hasPasskey,
+    isPasskeyGraceActive,
+    isPasskeyRecoveryRequired,
+    shouldPromptPasskeySetup,
     init,
     loginWithGoogle,
     signOut,
+    deferPasskeyEnrollment,
+    getPostLoginRoute,
   }
 })

@@ -16,6 +16,18 @@ const routes = [
     meta: { public: false },
   },
   {
+    path: '/passkey/setup',
+    name: 'passkey-setup',
+    component: () => import('@/views/PasskeySetupView.vue'),
+    meta: { requiresAuth: true, requiredRole: 'staff' },
+  },
+  {
+    path: '/passkey/verify',
+    name: 'passkey-verify',
+    component: () => import('@/views/PasskeyVerifyView.vue'),
+    meta: { requiresAuth: true, requiredRole: 'staff' },
+  },
+  {
     path: '/',
     name: 'offering',
     component: () => import('@/views/InventoryView.vue'),
@@ -115,9 +127,25 @@ router.beforeEach(async (to) => {
     return { name: 'pending' }
   }
 
+  if (
+    authStore.isAuthenticated &&
+    authStore.isPasskeyRecoveryRequired &&
+    to.name !== 'passkey-setup'
+  ) {
+    return { name: 'passkey-setup' }
+  }
+
+  if (
+    authStore.isAuthenticated &&
+    authStore.shouldPromptPasskeySetup &&
+    !['passkey-setup', 'passkey-verify', 'pending'].includes(String(to.name ?? ''))
+  ) {
+    return { name: 'passkey-setup' }
+  }
+
   // 已登入要去登入頁 → 導向首頁
   if (isPublic && authStore.isAuthenticated && to.name === 'login') {
-    return { path: '/' }
+    return { path: authStore.getPostLoginRoute() }
   }
 
   // 角色不足 → 導向首頁

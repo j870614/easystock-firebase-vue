@@ -21,6 +21,7 @@
       <h2 class="text-2xl font-bold text-gray-800 mb-2">歡迎登入</h2>
       <p class="text-gray-500 mb-4 leading-relaxed">
         使用以下帳號登入系統，初次登入需等候管理員開通權限。
+        後續將逐步導入 Passkey 驗證，提升共用裝置使用安全。
       </p>
 
       <!-- Google 登入 -->
@@ -73,7 +74,7 @@ async function handleGoogle() {
   loading.value = true
   try {
     await authStore.loginWithGoogle()
-    router.push('/')
+    router.push(authStore.getPostLoginRoute())
   } catch (e) {
     errorMsg.value = '登入失敗，請稍後再試。'
   } finally {
