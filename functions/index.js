@@ -17,6 +17,9 @@ const REGION = 'asia-east1'
 const RP_NAME = '彌陀之家東林寺庫存管理系統'
 const PASSKEY_REMINDER_DAYS = 14
 const PASSKEY_SESSION_COLLECTION = 'webauthnSessions'
+const CUSTOM_PASSKEY_ORIGINS = [
+  'https://stock.donglinsys.org',
+]
 
 function getProjectId() {
   return process.env.GCLOUD_PROJECT || process.env.PROJECT_ID || 'easystock-firebase-vue'
@@ -34,6 +37,7 @@ function getAllowedOrigins() {
   return new Set([
     `https://${projectId}.firebaseapp.com`,
     `https://${projectId}.web.app`,
+    ...CUSTOM_PASSKEY_ORIGINS,
     'http://localhost',
     'http://localhost:4173',
     'http://localhost:5173',
