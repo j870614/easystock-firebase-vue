@@ -22,6 +22,13 @@ function getProjectId() {
   return process.env.GCLOUD_PROJECT || process.env.PROJECT_ID || 'easystock-firebase-vue'
 }
 
+function getFunctionOptions() {
+  return {
+    region: REGION,
+    serviceAccount: `${getProjectId()}@appspot.gserviceaccount.com`,
+  }
+}
+
 function getAllowedOrigins() {
   const projectId = getProjectId()
   return new Set([
@@ -106,7 +113,7 @@ async function clearChallenge(uid) {
   await db.collection(PASSKEY_SESSION_COLLECTION).doc(uid).delete().catch(() => {})
 }
 
-exports.createPasskeyRegistrationOptions = onCall({ region: REGION }, async (request) => {
+exports.createPasskeyRegistrationOptions = onCall(getFunctionOptions(), async (request) => {
   const uid = assertAuth(request)
   const origin = resolveOrigin(request.data?.origin)
   const rpID = resolveRpID(origin)
@@ -140,7 +147,7 @@ exports.createPasskeyRegistrationOptions = onCall({ region: REGION }, async (req
   return options
 })
 
-exports.verifyPasskeyRegistration = onCall({ region: REGION }, async (request) => {
+exports.verifyPasskeyRegistration = onCall(getFunctionOptions(), async (request) => {
   const uid = assertAuth(request)
   const challenge = await readChallenge(uid, 'registration')
   const response = request.data?.response
@@ -193,7 +200,7 @@ exports.verifyPasskeyRegistration = onCall({ region: REGION }, async (request) =
   return { verified: true }
 })
 
-exports.createPasskeyAuthenticationOptions = onCall({ region: REGION }, async (request) => {
+exports.createPasskeyAuthenticationOptions = onCall(getFunctionOptions(), async (request) => {
   const uid = assertAuth(request)
   const origin = resolveOrigin(request.data?.origin)
   const rpID = resolveRpID(origin)
@@ -222,7 +229,7 @@ exports.createPasskeyAuthenticationOptions = onCall({ region: REGION }, async (r
   return options
 })
 
-exports.verifyPasskeyAuthentication = onCall({ region: REGION }, async (request) => {
+exports.verifyPasskeyAuthentication = onCall(getFunctionOptions(), async (request) => {
   const uid = assertAuth(request)
   const challenge = await readChallenge(uid, 'authentication')
   const response = request.data?.response
@@ -280,7 +287,7 @@ exports.verifyPasskeyAuthentication = onCall({ region: REGION }, async (request)
   return { verified: true }
 })
 
-exports.deferPasskeyEnrollment = onCall({ region: REGION }, async (request) => {
+exports.deferPasskeyEnrollment = onCall(getFunctionOptions(), async (request) => {
   const uid = assertAuth(request)
   const days = Math.max(1, Math.min(30, Number(request.data?.days || PASSKEY_REMINDER_DAYS)))
   const { ref: userRef, data: user } = await getUserRecord(uid)
