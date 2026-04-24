@@ -62,6 +62,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /{path=**}/passkeyDeviceRequests/{requestId} {
+      allow read: if isAuth() && (resource.data.uid == request.auth.uid || isOwner());
+      allow write: if false;
+    }
+
+    match /users/{uid}/passkeys/{passkeyId} {
+      allow read: if isAuth() && (request.auth.uid == uid || isOwner());
+      allow write: if false;
+    }
+
     // ── locations 集合 ────────────────────────────────────────
     match /locations/{locationId} {
       allow read:   if isStaff();

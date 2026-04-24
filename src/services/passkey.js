@@ -7,6 +7,8 @@ const verifyPasskeyRegistration = httpsCallable(functions, 'verifyPasskeyRegistr
 const createPasskeyAuthenticationOptions = httpsCallable(functions, 'createPasskeyAuthenticationOptions')
 const verifyPasskeyAuthentication = httpsCallable(functions, 'verifyPasskeyAuthentication')
 const deferPasskeyEnrollmentCallable = httpsCallable(functions, 'deferPasskeyEnrollment')
+const createPasskeyDeviceRequestCallable = httpsCallable(functions, 'createPasskeyDeviceRequest')
+const reviewPasskeyDeviceRequestCallable = httpsCallable(functions, 'reviewPasskeyDeviceRequest')
 
 function getOrigin() {
   return window.location.origin
@@ -16,9 +18,10 @@ export function browserSupportsPasskey() {
   return typeof window !== 'undefined' && 'PublicKeyCredential' in window
 }
 
-export async function beginPasskeyRegistration(deviceLabel) {
+export async function beginPasskeyRegistration(deviceLabel, deviceRequestId = null) {
   const optionsResult = await createPasskeyRegistrationOptions({
     origin: getOrigin(),
+    deviceRequestId,
   })
   const registrationResponse = await startRegistration({
     optionsJSON: optionsResult.data,
@@ -31,6 +34,16 @@ export async function beginPasskeyRegistration(deviceLabel) {
   })
 
   return verifyResult.data
+}
+
+export async function createPasskeyDeviceRequest(deviceLabel, deviceType) {
+  const result = await createPasskeyDeviceRequestCallable({ deviceLabel, deviceType })
+  return result.data
+}
+
+export async function reviewPasskeyDeviceRequest(uid, requestId, action) {
+  const result = await reviewPasskeyDeviceRequestCallable({ uid, requestId, action })
+  return result.data
 }
 
 export async function beginPasskeyAuthentication() {
@@ -72,6 +85,9 @@ export function getPasskeyErrorMessage(error) {
   }
   if (message.includes('already registered')) {
     return '這個裝置可能已綁定過 Passkey，可直接使用驗證流程登入。'
+  }
+  if (message.includes('尚未核准') || message.includes('已核准的裝置申請')) {
+    return '這台新裝置尚未核准，請先送出申請並等待 owner 處理。'
   }
   return message || 'Passkey 流程失敗，請稍後再試。'
 }

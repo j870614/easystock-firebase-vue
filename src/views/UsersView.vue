@@ -16,6 +16,37 @@
       </div>
     </div>
 
+    <div v-if="pendingDeviceRequests.length > 0" class="card mb-4 space-y-3">
+      <div>
+        <h2 class="text-base font-bold text-gray-800">Passkey 新裝置申請</h2>
+        <p class="mt-1 text-sm text-gray-500">第二組以上 Passkey 必須核准後才能綁定。</p>
+      </div>
+
+      <div
+        v-for="request in pendingDeviceRequests"
+        :key="`${request.uid}-${request.id}`"
+        class="rounded-xl border border-amber-200 bg-amber-50 p-3"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="font-semibold text-gray-800 truncate">
+              {{ request.userDisplayName || request.email || '未命名使用者' }}
+            </div>
+            <div class="mt-1 text-sm text-gray-600 truncate">{{ request.deviceLabel }}</div>
+            <div class="mt-1 text-xs text-gray-400">{{ deviceTypeLabel(request.deviceType) }} · {{ formatRequestTime(request.createdAt) }}</div>
+          </div>
+          <div class="flex flex-col gap-2 flex-shrink-0">
+            <button class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700" @click="reviewDeviceRequest(request, 'approve')">
+              核准
+            </button>
+            <button class="text-xs px-3 py-1.5 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50" @click="reviewDeviceRequest(request, 'reject')">
+              拒絕
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="card mb-4 space-y-3">
       <div v-for="group in filterGroups" :key="group.key" class="space-y-1.5">
         <div class="flex items-center justify-between">
@@ -158,13 +189,14 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { collection, collectionGroup, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
 import { ElMessage } from 'element-plus'
 import { Search } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
+import { reviewPasskeyDeviceRequest } from '@/services/passkey'
 import { ROLE_MAP, sortByOrder } from '@/utils/multiDept'
 
 const authStore = useAuthStore()
@@ -172,6 +204,7 @@ const appStore = useAppStore()
 
 const loading = ref(false)
 const users = ref([])
+const deviceRequests = ref([])
 const editingUid = ref(null)
 const editForm = ref({ dharmaName: '', secularName: '' })
 const searchKeyword = ref('')
@@ -183,6 +216,9 @@ const selectedLocs = ref([])
 const selectedHalls = ref([])
 const selectedDuties = ref([])
 const sortedLocations = computed(() => [...appStore.locations].sort(sortByOrder))
+const pendingDeviceRequests = computed(() =>
+  [...deviceRequests.value].sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
+)
 
 const hallFilterOptions = computed(() => {
   const scopedLocationIds =
@@ -312,6 +348,32 @@ function getFallbackHallId(locationId) {
   return appStore.getDefaultHallForLocation(locationId)?.id ?? null
 }
 
+function toMillis(value) {
+  if (!value) return 0
+  if (typeof value.toMillis === 'function') return value.toMillis()
+  if (typeof value.toDate === 'function') return value.toDate().getTime()
+  return new Date(value).getTime()
+}
+
+function formatRequestTime(value) {
+  const millis = toMillis(value)
+  if (!millis) return '剛剛'
+  return new Intl.DateTimeFormat('zh-TW', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(millis))
+}
+
+function deviceTypeLabel(value) {
+  return {
+    ownMobile: '手機 / 平板',
+    ownComputer: '個人電腦',
+    sharedComputer: '共用電腦',
+  }[value] ?? '未知裝置'
+}
+
 function startEditNames(user) {
   editingUid.value = user.uid
   editForm.value = {
@@ -382,9 +444,24 @@ async function changeDuty(user) {
   ElMessage.success(dutyName ? `職稱已更新為「${dutyName}」` : '已清除職稱')
 }
 
+async function reviewDeviceRequest(request, action) {
+  try {
+    await reviewPasskeyDeviceRequest(request.uid, request.id, action)
+    ElMessage.success(action === 'approve' ? '已核准裝置申請' : '已拒絕裝置申請')
+  } catch (e) {
+    ElMessage.error(e?.message || '處理裝置申請失敗')
+  }
+}
+
 loading.value = true
 onSnapshot(collection(db, 'users'), (snap) => {
   users.value = snap.docs.map((item) => ({ uid: item.id, ...item.data() }))
   loading.value = false
 })
+
+if (authStore.isOwner) {
+  onSnapshot(query(collectionGroup(db, 'passkeyDeviceRequests'), where('status', '==', 'pending')), (snap) => {
+    deviceRequests.value = snap.docs.map((item) => ({ id: item.id, ...item.data() }))
+  })
+}
 </script>

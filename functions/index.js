@@ -78,6 +78,13 @@ function assertAuth(request) {
   return request.auth.uid
 }
 
+async function assertOwner(uid) {
+  const { data: user } = await getUserRecord(uid)
+  if (user.role !== 'owner') {
+    throw new HttpsError('permission-denied', '只有 owner 可以處理裝置申請。')
+  }
+}
+
 async function getUserRecord(uid) {
   const userRef = db.collection('users').doc(uid)
   const userSnap = await userRef.get()
@@ -117,12 +124,108 @@ async function clearChallenge(uid) {
   await db.collection(PASSKEY_SESSION_COLLECTION).doc(uid).delete().catch(() => {})
 }
 
+function getDisplayName(user) {
+  return user.dharmaName || user.secularName || user.displayName || '未命名使用者'
+}
+
+function normalizeDeviceLabel(value) {
+  return String(value || '').trim().slice(0, 80) || '未命名裝置'
+}
+
+async function getApprovedDeviceRequest(uid, requestId) {
+  if (!requestId) return null
+
+  const requestRef = db
+    .collection('users')
+    .doc(uid)
+    .collection('passkeyDeviceRequests')
+    .doc(String(requestId))
+  const requestSnap = await requestRef.get()
+  if (!requestSnap.exists) {
+    throw new HttpsError('failed-precondition', '找不到已核准的裝置申請。')
+  }
+
+  const data = requestSnap.data()
+  if (data.status !== 'approved') {
+    throw new HttpsError('failed-precondition', '此裝置申請尚未核准。')
+  }
+
+  return { ref: requestRef, data }
+}
+
+exports.createPasskeyDeviceRequest = onCall(getFunctionOptions(), async (request) => {
+  const uid = assertAuth(request)
+  const { data: user } = await getUserRecord(uid)
+  const passkeys = await listActivePasskeys(uid)
+
+  if (!passkeys.length) {
+    return { ok: true, directEligible: true }
+  }
+
+  const deviceLabel = normalizeDeviceLabel(request.data?.deviceLabel)
+  const deviceType = String(request.data?.deviceType || 'unknown').slice(0, 40)
+  const requestRef = db.collection('users').doc(uid).collection('passkeyDeviceRequests').doc()
+
+  await requestRef.set({
+    uid,
+    userDisplayName: getDisplayName(user),
+    email: user.email || '',
+    photoURL: user.photoURL || '',
+    deviceLabel,
+    deviceType,
+    status: 'pending',
+    createdAt: FieldValue.serverTimestamp(),
+    decidedAt: null,
+    decidedBy: null,
+    usedAt: null,
+  })
+
+  return { ok: true, directEligible: false, requestId: requestRef.id }
+})
+
+exports.reviewPasskeyDeviceRequest = onCall(getFunctionOptions(), async (request) => {
+  const ownerUid = assertAuth(request)
+  await assertOwner(ownerUid)
+
+  const uid = String(request.data?.uid || '')
+  const requestId = String(request.data?.requestId || '')
+  const action = String(request.data?.action || '')
+
+  if (!uid || !requestId || !['approve', 'reject'].includes(action)) {
+    throw new HttpsError('invalid-argument', '裝置申請參數不完整。')
+  }
+
+  const requestRef = db.collection('users').doc(uid).collection('passkeyDeviceRequests').doc(requestId)
+  await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(requestRef)
+    if (!snap.exists) {
+      throw new HttpsError('not-found', '找不到裝置申請。')
+    }
+    if (snap.data().status !== 'pending') {
+      throw new HttpsError('failed-precondition', '此裝置申請已處理。')
+    }
+
+    transaction.set(requestRef, {
+      status: action === 'approve' ? 'approved' : 'rejected',
+      decidedAt: FieldValue.serverTimestamp(),
+      decidedBy: ownerUid,
+    }, { merge: true })
+  })
+
+  return { ok: true }
+})
+
 exports.createPasskeyRegistrationOptions = onCall(getFunctionOptions(), async (request) => {
   const uid = assertAuth(request)
   const origin = resolveOrigin(request.data?.origin)
   const rpID = resolveRpID(origin)
   const { data: user } = await getUserRecord(uid)
   const passkeys = await listActivePasskeys(uid)
+  const deviceRequestId = String(request.data?.deviceRequestId || '')
+
+  if (passkeys.length > 0) {
+    await getApprovedDeviceRequest(uid, deviceRequestId)
+  }
 
   const options = await generateRegistrationOptions({
     rpName: RP_NAME,
@@ -146,6 +249,7 @@ exports.createPasskeyRegistrationOptions = onCall(getFunctionOptions(), async (r
     challenge: options.challenge,
     origin,
     rpID,
+    deviceRequestId: deviceRequestId || null,
   })
 
   return options
@@ -155,8 +259,13 @@ exports.verifyPasskeyRegistration = onCall(getFunctionOptions(), async (request)
   const uid = assertAuth(request)
   const challenge = await readChallenge(uid, 'registration')
   const response = request.data?.response
-  const deviceLabel = String(request.data?.deviceLabel || '').trim() || '未命名裝置'
+  const requestedDeviceLabel = normalizeDeviceLabel(request.data?.deviceLabel)
   const { ref: userRef } = await getUserRecord(uid)
+  const passkeys = await listActivePasskeys(uid)
+  const deviceRequest = passkeys.length > 0
+    ? await getApprovedDeviceRequest(uid, challenge.deviceRequestId)
+    : null
+  const deviceLabel = deviceRequest?.data?.deviceLabel || requestedDeviceLabel
 
   let verification
   try {
@@ -177,7 +286,7 @@ exports.verifyPasskeyRegistration = onCall(getFunctionOptions(), async (request)
   }
 
   const passkeyRef = userRef.collection('passkeys').doc(registrationInfo.credential.id)
-  await passkeyRef.set({
+  const passkeyPayload = {
     credentialId: registrationInfo.credential.id,
     publicKey: registrationInfo.credential.publicKey,
     counter: registrationInfo.credential.counter,
@@ -188,9 +297,8 @@ exports.verifyPasskeyRegistration = onCall(getFunctionOptions(), async (request)
     createdAt: FieldValue.serverTimestamp(),
     lastUsedAt: FieldValue.serverTimestamp(),
     revokedAt: null,
-  })
-
-  await userRef.set({
+  }
+  const userSecurityPayload = {
     security: {
       passkeyEnrolled: true,
       passkeyEnrolledAt: FieldValue.serverTimestamp(),
@@ -198,10 +306,31 @@ exports.verifyPasskeyRegistration = onCall(getFunctionOptions(), async (request)
       passkeyLastVerifiedAt: FieldValue.serverTimestamp(),
       passkeyRecoveryRequired: false,
     },
-  }, { merge: true })
+  }
+
+  if (deviceRequest) {
+    await db.runTransaction(async (transaction) => {
+      const requestSnap = await transaction.get(deviceRequest.ref)
+      if (!requestSnap.exists || requestSnap.data().status !== 'approved') {
+        throw new HttpsError('failed-precondition', '此裝置申請已被使用或尚未核准。')
+      }
+
+      transaction.set(passkeyRef, passkeyPayload)
+      transaction.set(userRef, userSecurityPayload, { merge: true })
+      transaction.set(deviceRequest.ref, {
+        status: 'used',
+        usedAt: FieldValue.serverTimestamp(),
+      }, { merge: true })
+    })
+  } else {
+    const batch = db.batch()
+    batch.set(passkeyRef, passkeyPayload)
+    batch.set(userRef, userSecurityPayload, { merge: true })
+    await batch.commit()
+  }
 
   await clearChallenge(uid)
-  return { verified: true }
+  return { verified: true, deviceRequestUsed: !!deviceRequest }
 })
 
 exports.createPasskeyAuthenticationOptions = onCall(getFunctionOptions(), async (request) => {

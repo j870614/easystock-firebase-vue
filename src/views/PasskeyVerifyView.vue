@@ -10,42 +10,40 @@
       <div class="w-24 h-24 bg-white rounded-3xl shadow-2xl flex items-center justify-center mb-6">
         <span class="text-4xl">📱</span>
       </div>
-      <h1 class="text-3xl font-bold text-white tracking-tight">驗證流程說明</h1>
+      <h1 class="text-3xl font-bold text-white tracking-tight">Passkey 驗證</h1>
       <p class="text-white/70 text-base mt-3 leading-relaxed max-w-sm">
-        先把使用情境講清楚，避免上線後大家一頭霧水。
+        已綁定裝置走驗證；新裝置先申請加入，核准後才能綁定。
       </p>
     </div>
 
     <div class="relative flex-1 bg-white rounded-t-3xl px-6 pt-8 pb-12 flex flex-col gap-4">
-      <div class="rounded-2xl border border-gray-200 p-5 space-y-3">
-        <h2 class="text-lg font-bold text-gray-800">自己的手機或平板</h2>
-        <p class="text-sm text-gray-600 leading-relaxed">
-          若你本來就是用自己的手機或平板登入，通常會直接叫起 Face ID、指紋或裝置密碼，不需要再掃 QR Code。
-        </p>
-      </div>
-
-      <div class="rounded-2xl border border-gray-200 p-5 space-y-3">
-        <h2 class="text-lg font-bold text-gray-800">共用電腦</h2>
-        <p class="text-sm text-gray-600 leading-relaxed">
-          若你是在共用電腦登入，系統可改用跨裝置 Passkey，必要時畫面會出現 QR Code，讓你拿自己的手機確認。
-        </p>
-      </div>
-
-      <div class="bg-sky-50 border border-sky-200 rounded-2xl p-4">
-        <p class="text-sm text-sky-800 leading-relaxed">
-          若這支手機尚未綁定 Passkey，直接按驗證可能會出現 QR Code。請先綁定這支手機，之後就能直接用 Face ID、指紋或裝置密碼登入。
-        </p>
-      </div>
-
-      <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 space-y-3">
-        <h2 class="text-lg font-bold text-emerald-800">這是你第一次用這支手機登入？</h2>
-        <p class="text-sm text-emerald-700 leading-relaxed">
-          同一個 Google 帳號可以綁定多個 Passkey。若你之前只在 MacBook 綁定過，請先把這支手機也加入，避免被導去掃 QR Code。
-        </p>
-        <button class="btn-primary w-full text-base" @click="bindThisDevice">
-          綁定這支手機
+      <section class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 space-y-4">
+        <div>
+          <h2 class="text-lg font-bold text-emerald-900">用已綁定 Passkey 驗證</h2>
+          <p class="mt-1 text-sm text-emerald-800 leading-relaxed">
+            適用已綁定的手機、電腦，或在共用電腦用已綁定手機跨裝置驗證。
+          </p>
+        </div>
+        <button
+          class="btn-primary w-full text-lg"
+          :disabled="verifying || !supportsPasskey"
+          @click="verifyPasskey"
+        >
+          {{ verifying ? '驗證中…' : '用已綁定 Passkey 驗證' }}
         </button>
-      </div>
+      </section>
+
+      <section class="rounded-2xl border border-sky-200 bg-sky-50 p-5 space-y-4">
+        <div>
+          <h2 class="text-lg font-bold text-sky-900">申請加入此裝置</h2>
+          <p class="mt-1 text-sm text-sky-800 leading-relaxed">
+            這台裝置尚未綁定時，先送 owner 核准；核准後再回來完成 Passkey 綁定。
+          </p>
+        </div>
+        <button class="btn-ghost w-full border-2 border-sky-200 text-sky-700 text-base" @click="bindThisDevice">
+          申請加入此裝置
+        </button>
+      </section>
 
       <div
         v-if="!supportsPasskey"
@@ -63,16 +61,8 @@
         <p class="text-sm text-red-700 leading-relaxed">{{ errorMsg }}</p>
       </div>
 
-      <button
-        class="btn-primary w-full text-lg"
-        :disabled="verifying || !supportsPasskey"
-        @click="verifyPasskey"
-      >
-        {{ verifying ? '驗證中…' : '立即驗證 Passkey' }}
-      </button>
-
       <button class="btn-ghost w-full border-2 border-gray-200 text-base" @click="backToSetup">
-        返回綁定說明
+        返回 Passkey 設定
       </button>
     </div>
   </div>
