@@ -286,7 +286,7 @@ function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
 }
 
 function checkGeofence() {
-  if (authStore.canSwitchScope) {
+  if (!authStore.shouldEnforceGeofence) {
     isLocationLocked.value = false
     return
   }

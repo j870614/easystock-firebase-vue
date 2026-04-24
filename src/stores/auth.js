@@ -26,6 +26,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isPending = computed(() => role.value === 'pending')
   const isStaff = computed(() => isOperationalRole(role.value))
   const isScopedUser = computed(() => isScopedRole(role.value))
+  const shouldEnforceGeofence = computed(() => role.value === 'staff')
   const canManageProducts = computed(() => ['owner', 'admin', 'hallLead'].includes(role.value))
   const canSwitchScope = computed(() => isGlobalRole(role.value))
   const canManageUsers = computed(() => role.value === 'owner')
@@ -143,6 +144,7 @@ export const useAuthStore = defineStore('auth', () => {
     isScopedUser,
     isPending,
     isAccountant,
+    shouldEnforceGeofence,
     canManageProducts,
     canSwitchScope,
     canManageUsers,
