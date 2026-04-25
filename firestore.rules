@@ -44,16 +44,29 @@ service cloud.firestore {
       allow create: if isAuth() && request.auth.uid == uid
                     && request.resource.data.role == 'pending';
 
-      // 自己只能更新個人資料，不可自行調整 security / role 等安全欄位
+      // 自己只能更新個人資料，不可自行調整 security / role 等安全欄位。
+      // pending 首次送出審核資料時，可一併提交 dutyId / dutyName；審核後不可自行更改職稱。
       allow update: if isAuth() && request.auth.uid == uid
                     && request.resource.data.role == resource.data.role
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                      'dharmaName',
-                      'secularName',
-                      'dutyId',
-                      'dutyName',
-                      'profileSubmitted',
-                    ]);
+                    && (
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                        'dharmaName',
+                        'secularName',
+                        'profileSubmitted',
+                      ])
+                      || (
+                        resource.data.role == 'pending'
+                        && resource.data.get('profileSubmitted', false) != true
+                        && request.resource.data.get('profileSubmitted', false) == true
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                          'dharmaName',
+                          'secularName',
+                          'dutyId',
+                          'dutyName',
+                          'profileSubmitted',
+                        ])
+                      )
+                    );
 
       // owner 可更新任何欄位（包含 role）
       allow update: if isOwner();
@@ -115,13 +128,11 @@ service cloud.firestore {
     // ── transactions 集合 ─────────────────────────────────────
     match /transactions/{txId} {
       allow read:   if isStaff();
-      // Staff 只能新增，不能更新/刪除
+      // Staff 可以新增、修改、刪除交易紀錄
       allow create: if isStaff()
                     && request.resource.data.operator.uid == request.auth.uid;
-      // Admin 可以更新和刪除（補帳/正帳）
-      // 會計可以更新（為了標記收款日期）
-      allow update: if isAdmin() || isAccountant();
-      allow delete: if isAdmin();
+      allow update: if isStaff();
+      allow delete: if isStaff();
     }
 
     // ── settings 集合（系統設定）─────────────────────────────

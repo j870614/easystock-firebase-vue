@@ -132,7 +132,7 @@
                 <CalendarCheck class="w-4 h-4" />
                 {{ tx.accountantReceivedDate ? '修改收款日期' : '標記收款日期' }}
               </button>
-              <template v-if="authStore.canManageProducts">
+              <template v-if="authStore.isStaff">
                 <button class="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-brand-600 active:scale-95 transition-all" @click="openEdit(tx)">
                   <Edit2 class="w-4 h-4"/> 編輯
                 </button>
