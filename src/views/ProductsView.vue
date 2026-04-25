@@ -57,7 +57,7 @@
                 <Pencil class="w-4 h-4" />
               </button>
               <button
-                v-if="authStore.isOwner"
+                v-if="authStore.canDeleteProducts"
                 class="p-2 rounded-xl border border-red-100 text-red-500 hover:bg-red-50"
                 @click="confirmDeleteGroup(group)"
               >
@@ -234,7 +234,7 @@
                 </div>
                 <div v-if="!form.localVisibilityOnly" class="absolute top-3 right-3 flex gap-1">
                   <button
-                    v-if="item.id && authStore.isOwner"
+                    v-if="item.id && authStore.canDeleteProducts"
                     class="bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 shadow-sm"
                     @click="item.isMarkedForDeletion = true"
                   >

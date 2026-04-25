@@ -412,20 +412,33 @@ function isNavActive(to) {
 }
 
 const navItems = computed(() => {
-  const items = [
-    { to: '/', label: '認供結緣', icon: ArrowLeftRight },
-    { to: '/dashboard', label: '總覽', icon: LayoutDashboard },
-    { to: '/transactions', label: '出入庫', icon: History },
-  ]
+  const items = []
 
-  if (authStore.isStaff) {
+  if (authStore.canWriteInventory) {
+    items.push({ to: '/', label: '認供結緣', icon: ArrowLeftRight })
+  }
+
+  if (authStore.canViewDashboard) {
+    items.push({ to: '/dashboard', label: '總覽', icon: LayoutDashboard })
+  }
+
+  if (authStore.canViewTransactions) {
+    items.push({ to: '/transactions', label: '出入庫', icon: History })
+  }
+
+  if (authStore.canViewReports) {
     items.push({ to: '/reports', label: '報表', icon: FileBarChart2 })
   }
 
-  if (authStore.canManageProducts) {
-    const ownerManagementNav = authStore.isOwner
+  if (authStore.canManageProducts || authStore.canImportData || authStore.canManageLocations || authStore.isOwner) {
+    const ownerManagementNav = authStore.isOwner || authStore.canManageLocations
+    const managementTarget = ownerManagementNav
+      ? '/admin'
+      : authStore.canManageProducts
+        ? '/products'
+        : '/import'
     items.push({
-      to: ownerManagementNav ? '/admin' : '/products',
+      to: managementTarget,
       label: ownerManagementNav ? '管理' : '品項',
       icon: ownerManagementNav ? LayoutGrid : Package,
     })

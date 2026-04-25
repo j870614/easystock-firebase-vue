@@ -97,7 +97,7 @@ export function getPasskeyErrorMessage(error) {
     return '這個裝置可能已綁定過 Passkey，可直接使用驗證流程登入。'
   }
   if (message.includes('尚未核准') || message.includes('已核准的裝置申請')) {
-    return '這台新裝置尚未核准，請先送出申請並等待 owner 處理。'
+    return '這台新裝置尚未核准，請先送出申請並等待系統總管處理。'
   }
   return message || 'Passkey 流程失敗，請稍後再試。'
 }

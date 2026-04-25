@@ -25,12 +25,17 @@ import AppLayout from '@/components/AppLayout.vue'
 const authStore = useAuthStore()
 
 const adminItems = computed(() => {
-  const items = [
-    { to: '/products', label: '品項管理', icon: Package, bg: 'bg-green-50', color: 'text-green-500' },
-  ]
+  const items = []
+
+  if (authStore.canManageProducts) {
+    items.push({ to: '/products', label: '品項管理', icon: Package, bg: 'bg-green-50', color: 'text-green-500' })
+  }
+
+  if (authStore.canManageLocations) {
+    items.unshift({ to: '/locations', label: '道場管理', icon: Building2, bg: 'bg-blue-50', color: 'text-blue-500' })
+  }
 
   if (authStore.isOwner) {
-    items.unshift({ to: '/locations', label: '道場管理', icon: Building2, bg: 'bg-blue-50', color: 'text-blue-500' })
     items.push({ to: '/users', label: '成員管理', icon: Users, bg: 'bg-purple-50', color: 'text-purple-500' })
     items.push({ to: '/settings', label: '系統設定', icon: Settings, bg: 'bg-amber-50', color: 'text-amber-500' })
   }

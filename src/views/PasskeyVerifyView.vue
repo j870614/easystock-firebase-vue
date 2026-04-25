@@ -37,7 +37,7 @@
         <div>
           <h2 class="text-lg font-bold text-sky-900">申請加入此裝置</h2>
           <p class="mt-1 text-sm text-sky-800 leading-relaxed">
-            這台裝置尚未綁定時，先送 owner 核准；核准後再回來完成 Passkey 綁定。
+            這台裝置尚未綁定時，先送系統總管核准；核准後再回來完成 Passkey 綁定。
           </p>
         </div>
         <button class="btn-ghost w-full border-2 border-sky-200 text-sky-700 text-base" @click="bindThisDevice">

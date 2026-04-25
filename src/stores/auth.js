@@ -10,6 +10,7 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
 import { auth, googleProvider, db } from '@/firebase'
 import { isGlobalRole, isOperationalRole, isScopedRole } from '@/utils/multiDept'
+import { normalizePermissionRoles, roleHasPermission } from '@/utils/permissions'
 import { deferPasskeyEnrollment as deferPasskeyEnrollmentRequest } from '@/services/passkey'
 
 const PASSKEY_REMINDER_DAYS = 14
@@ -47,6 +48,7 @@ function normalizeSecurity(security = {}) {
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
   const profile = ref(null)
+  const permissionRoles = ref(normalizePermissionRoles())
   const loading = ref(true)
   const error = ref(null)
 
@@ -60,10 +62,20 @@ export const useAuthStore = defineStore('auth', () => {
   const isStaff = computed(() => isOperationalRole(role.value))
   const isScopedUser = computed(() => isScopedRole(role.value))
   const shouldEnforceGeofence = computed(() => role.value === 'staff')
-  const canManageProducts = computed(() => ['owner', 'admin', 'hallLead'].includes(role.value))
+  const canAccess = (permissionKey) =>
+    roleHasPermission(role.value, permissionKey, permissionRoles.value)
+
+  const canManageProducts = computed(() => canAccess('products.write'))
+  const canDeleteProducts = computed(() => canAccess('products.delete'))
   const canSwitchScope = computed(() => isGlobalRole(role.value))
   const canManageUsers = computed(() => role.value === 'owner')
-  const canManageLocations = computed(() => role.value === 'owner')
+  const canManageLocations = computed(() => canAccess('locations.write'))
+  const canImportData = computed(() => canAccess('import.data'))
+  const canViewReports = computed(() => canAccess('reports.view'))
+  const canViewDashboard = computed(() => canAccess('dashboard.view'))
+  const canViewTransactions = computed(() => canAccess('transactions.view'))
+  const canWriteInventory = computed(() => canAccess('inventory.write'))
+  const canWriteTransactions = computed(() => canAccess('transactions.write'))
 
   const isAccountant = computed(() => profile.value?.dutyName === '會計')
   const assignedLocationId = computed(() => profile.value?.assignedLocationId ?? null)
@@ -108,11 +120,37 @@ export const useAuthStore = defineStore('auth', () => {
 
   let initPromise = null
   let unsubscribeProfile = null
+  let unsubscribePermissions = null
 
   function stopProfileListener() {
     if (unsubscribeProfile) {
       unsubscribeProfile()
       unsubscribeProfile = null
+    }
+  }
+
+  function stopPermissionsListener() {
+    if (unsubscribePermissions) {
+      unsubscribePermissions()
+      unsubscribePermissions = null
+    }
+  }
+
+  function startPermissionsListener() {
+    if (unsubscribePermissions) return
+    unsubscribePermissions = onSnapshot(doc(db, 'settings', 'permissions'), (snap) => {
+      permissionRoles.value = normalizePermissionRoles(snap.data()?.roles)
+    }, () => {
+      permissionRoles.value = normalizePermissionRoles()
+    })
+  }
+
+  async function loadPermissionsOnce() {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'permissions'))
+      permissionRoles.value = normalizePermissionRoles(snap.data()?.roles)
+    } catch {
+      permissionRoles.value = normalizePermissionRoles()
     }
   }
 
@@ -173,9 +211,13 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = firebaseUser
         if (firebaseUser) {
           await loadProfile(firebaseUser)
+          await loadPermissionsOnce()
+          startPermissionsListener()
         } else {
           profile.value = null
           stopProfileListener()
+          stopPermissionsListener()
+          permissionRoles.value = normalizePermissionRoles()
         }
         loading.value = false
         resolve()
@@ -210,9 +252,11 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function signOut() {
     stopProfileListener()
+    stopPermissionsListener()
     await firebaseSignOut(auth)
     user.value = null
     profile.value = null
+    permissionRoles.value = normalizePermissionRoles()
     clearPasskeyVerification()
   }
 
@@ -245,6 +289,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     profile,
+    permissionRoles,
     loading,
     error,
     isAuthenticated,
@@ -258,9 +303,17 @@ export const useAuthStore = defineStore('auth', () => {
     isAccountant,
     shouldEnforceGeofence,
     canManageProducts,
+    canDeleteProducts,
     canSwitchScope,
     canManageUsers,
     canManageLocations,
+    canImportData,
+    canViewReports,
+    canViewDashboard,
+    canViewTransactions,
+    canWriteInventory,
+    canWriteTransactions,
+    canAccess,
     assignedLocationId,
     assignedHallId,
     security,

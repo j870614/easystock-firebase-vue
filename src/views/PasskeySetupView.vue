@@ -12,7 +12,7 @@
       </div>
       <h1 class="text-3xl font-bold text-white tracking-tight">綁定 Passkey</h1>
       <p class="text-white/70 text-base mt-3 leading-relaxed max-w-sm">
-        第一組 Passkey 可直接綁定；新增第二組以上裝置，需先送 owner 核准。
+        第一組 Passkey 可直接綁定；新增第二組以上裝置，需先送系統總管核准。
       </p>
     </div>
 
@@ -41,7 +41,7 @@
       >
         <h2 class="text-lg font-bold text-red-800">請不要把 Passkey 儲存在共用電腦</h2>
         <p class="text-sm leading-relaxed text-red-700">
-          共用電腦請改用「已綁定 Passkey 驗證」；若真的要新增這台裝置，也必須先送 owner 核准。
+          共用電腦請改用「已綁定 Passkey 驗證」。請先用自己的手機或裝置完成綁定，再回共用電腦驗證登入。
         </p>
       </div>
 
@@ -55,7 +55,7 @@
           placeholder="例如：普中的 iPhone"
         />
         <p class="text-xs text-gray-400">
-          預設用法名 / 俗名加裝置類型。owner 會用這個名稱判斷是否核准。
+          預設用法名 / 俗名加裝置類型。系統總管會用這個名稱判斷是否核准。
         </p>
       </div>
 
@@ -65,7 +65,7 @@
       >
         <h2 class="text-lg font-bold text-amber-900">新增裝置需核准</h2>
         <p class="text-sm leading-relaxed text-amber-800">
-          你的帳號已經有 Passkey。這台新裝置送出申請後，owner 核准才會開放綁定。
+          你的帳號已經有 Passkey。這台新裝置送出申請後，系統總管核准才會開放綁定。
         </p>
         <div v-if="latestRequest" class="rounded-xl bg-white/80 border border-amber-100 p-3 text-sm">
           <div class="font-semibold text-gray-800">{{ latestRequest.deviceLabel }}</div>
@@ -139,6 +139,42 @@
         先回系統
       </button>
     </div>
+
+    <el-dialog
+      v-model="sharedDeviceDialog"
+      title="請改用自己的手機綁定 Passkey"
+      width="92%"
+      align-center
+    >
+      <div class="space-y-4 text-center">
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
+          <h2 class="font-bold text-amber-900">共用電腦不建議儲存 Passkey</h2>
+          <p class="mt-2 text-sm leading-relaxed text-amber-800">
+            請用自己的手機或個人裝置掃描 QR code 登入，進入 Passkey 設定並完成綁定。完成後再回到共用電腦，按「用已綁定 Passkey 驗證」。
+          </p>
+        </div>
+
+        <div class="mx-auto flex w-fit rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+          <img v-if="qrCodeUrl" :src="qrCodeUrl" alt="手機登入 QR code" class="h-56 w-56" />
+          <div v-else class="flex h-56 w-56 items-center justify-center text-sm text-gray-400">
+            QR code 產生中...
+          </div>
+        </div>
+
+        <div class="break-all rounded-2xl bg-gray-50 p-3 text-left text-xs text-gray-500">
+          {{ qrTargetUrl }}
+        </div>
+
+        <div class="grid gap-2 sm:grid-cols-2">
+          <button class="btn-ghost border-2 border-gray-200" @click="copyQrTarget">
+            複製連結
+          </button>
+          <button class="btn-primary" @click="goVerify">
+            用已綁定 Passkey 驗證
+          </button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -147,6 +183,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { collection, getDocs, onSnapshot } from 'firebase/firestore'
 import { ElMessage } from 'element-plus'
+import QRCode from 'qrcode'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -163,6 +200,9 @@ const saving = ref(false)
 const checkingRequests = ref(false)
 const errorMsg = ref('')
 const ownRequests = ref([])
+const sharedDeviceDialog = ref(false)
+const qrCodeUrl = ref('')
+const qrTargetUrl = ref('')
 const supportsPasskey = browserSupportsPasskey()
 const canSkip = computed(() => !authStore.isPasskeyEnrollmentRequired)
 const initialDeviceType = ['ownMobile', 'ownComputer', 'sharedComputer'].includes(String(route.query.device ?? ''))
@@ -184,7 +224,7 @@ const deviceOptions = [
   {
     value: 'sharedComputer',
     title: '共用電腦',
-    description: '不建議儲存 Passkey；新增需 owner 核准。',
+    description: '不建議儲存 Passkey；請改用自己的手機或裝置綁定。',
   },
 ]
 
@@ -236,6 +276,16 @@ watch(
   }
 )
 
+watch(
+  deviceType,
+  (value) => {
+    if (value === 'sharedComputer') {
+      openSharedDeviceGuide()
+    }
+  },
+  { immediate: true }
+)
+
 onUnmounted(() => {
   if (unsubscribeRequests) unsubscribeRequests()
   stopRequestPolling()
@@ -271,7 +321,7 @@ function detectDesktopName() {
 
 function getPersonName() {
   const profile = authStore.profile ?? {}
-  return profile.dharmaName || profile.secularName || authStore.user?.displayName || '我的'
+  return profile.dharmaName || profile.secularName || authStore.user?.displayName || '我'
 }
 
 function buildDefaultDeviceLabel(type) {
@@ -284,9 +334,50 @@ function selectDeviceType(value) {
   errorMsg.value = ''
 }
 
+function buildOwnDeviceSetupUrl() {
+  const current = new URL(window.location.href)
+  const baseOrigin = ['localhost', '127.0.0.1'].includes(current.hostname)
+    ? 'https://stock.donglinsys.org'
+    : current.origin
+  const url = new URL('/login', baseOrigin)
+  url.searchParams.set('next', '/passkey/setup?device=ownMobile')
+  return url.toString()
+}
+
+async function openSharedDeviceGuide() {
+  if (qrTargetUrl.value) {
+    sharedDeviceDialog.value = true
+    return
+  }
+
+  qrTargetUrl.value = buildOwnDeviceSetupUrl()
+  sharedDeviceDialog.value = true
+  try {
+    qrCodeUrl.value = await QRCode.toDataURL(qrTargetUrl.value, {
+      width: 256,
+      margin: 1,
+      color: {
+        dark: '#111827',
+        light: '#ffffff',
+      },
+    })
+  } catch {
+    errorMsg.value = 'QR code 產生失敗，請直接複製連結到自己的手機開啟。'
+  }
+}
+
+async function copyQrTarget() {
+  try {
+    await navigator.clipboard.writeText(qrTargetUrl.value)
+    ElMessage.success('已複製連結。')
+  } catch {
+    ElMessage.error('複製失敗，請手動選取連結。')
+  }
+}
+
 function requestStatusLabel(status) {
   return {
-    pending: '待 owner 核准',
+    pending: '待系統總管核准',
     approved: '已核准，可綁定',
     rejected: '已拒絕',
     used: '已完成綁定',
@@ -350,7 +441,7 @@ async function requestDeviceApproval() {
       })
       await refreshOwnRequests()
     }
-    ElMessage.success('已送出裝置申請，請等待 owner 核准。')
+    ElMessage.success('已送出裝置申請，請等待系統總管核准。')
   } catch (e) {
     errorMsg.value = getPasskeyErrorMessage(e)
   } finally {

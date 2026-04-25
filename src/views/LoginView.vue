@@ -60,11 +60,12 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { AlertCircle } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const loading = ref(false)
 const errorMsg = ref('')
@@ -74,11 +75,18 @@ async function handleGoogle() {
   loading.value = true
   try {
     await authStore.loginWithGoogle()
-    router.push(authStore.getPostLoginRoute())
+    router.push(getNextRoute() ?? authStore.getPostLoginRoute())
   } catch (e) {
     errorMsg.value = '登入失敗，請稍後再試。'
   } finally {
     loading.value = false
   }
+}
+
+function getNextRoute() {
+  const next = route.query.next
+  if (typeof next !== 'string') return null
+  if (!next.startsWith('/') || next.startsWith('//')) return null
+  return next
 }
 </script>

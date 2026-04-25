@@ -57,7 +57,7 @@
             <label class="text-sm font-medium text-gray-700 block mb-1">
               閒置自動登出時間（分鐘）
             </label>
-            <p class="text-xs text-gray-400 mb-2">設定為 0 表示停用此功能，最少 5 分鐘，最多 480 分鐘（桉8小時）。</p>
+            <p class="text-xs text-gray-400 mb-2">設定為 0 表示停用此功能，最少 5 分鐘，最多 480 分鐘（8 小時）。</p>
             <div class="flex items-center gap-3">
               <input
                 v-model.number="idleTimeoutInput"
@@ -70,7 +70,7 @@
               />
               <span class="text-gray-500 text-sm">分鐘</span>
               <span v-if="idleTimeoutInput === 0" class="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">️ 功能已停用</span>
-              <span v-else class="text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-1 rounded-lg">✓ {{ idleTimeoutInput }} 分鐘無操作応自動登出</span>
+              <span v-else class="text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-1 rounded-lg">✓ {{ idleTimeoutInput }} 分鐘無操作會自動登出</span>
             </div>
           </div>
           <button
@@ -81,6 +81,59 @@
             {{ savingIdleTimeout ? '儲存中…' : '儲存安全設定' }}
           </button>
         </div>
+      </div>
+
+      <!-- 權限設定 -->
+      <div class="card">
+        <h2 class="font-semibold text-gray-800 text-lg mb-4 flex items-center gap-2">
+          <ShieldCheck class="w-5 h-5 text-gray-500" /> 權限設定
+        </h2>
+        <div class="overflow-x-auto rounded-xl border border-gray-200">
+          <table class="min-w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500">
+              <tr>
+                <th class="px-3 py-3 text-left font-semibold">功能</th>
+                <th
+                  v-for="role in PERMISSION_ROLE_OPTIONS"
+                  :key="role.value"
+                  class="px-3 py-3 text-center font-semibold whitespace-nowrap"
+                >
+                  {{ role.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <tr v-for="permission in BUSINESS_PERMISSIONS" :key="permission.key">
+                <td class="px-3 py-3 align-top">
+                  <div class="font-semibold text-gray-800">{{ permission.label }}</div>
+                  <div class="mt-1 text-xs leading-relaxed text-gray-400">{{ permission.description }}</div>
+                </td>
+                <td
+                  v-for="role in PERMISSION_ROLE_OPTIONS"
+                  :key="`${permission.key}-${role.value}`"
+                  class="px-3 py-3 text-center align-middle"
+                >
+                  <input
+                    type="checkbox"
+                    class="h-5 w-5 rounded border-gray-300 text-brand-600"
+                    :checked="permissionForm[permission.key]?.includes(role.value)"
+                    @change="togglePermissionRole(permission.key, role.value)"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-3 text-xs leading-relaxed text-gray-400">
+          系統總管永遠保留所有權限；成員管理、系統設定、Passkey 審核不開放動態調整。
+        </p>
+        <button
+          class="btn-primary mt-4 w-full"
+          :disabled="savingPermissions"
+          @click="savePermissions"
+        >
+          {{ savingPermissions ? '儲存中…' : '儲存權限設定' }}
+        </button>
       </div>
 
       <!-- 系統執行環境 -->
@@ -160,6 +213,12 @@ import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
+import {
+  BUSINESS_PERMISSIONS,
+  PERMISSION_ROLE_OPTIONS,
+  normalizePermissionRoles,
+} from '@/utils/permissions'
+import { ROLE_MAP } from '@/utils/multiDept'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -174,6 +233,40 @@ const savingIdleTimeout = ref(false)
 watch(() => appStore.idleTimeout, (val) => {
   idleTimeoutInput.value = val
 }, { immediate: true })
+
+// ── 權限設定 ────────────────────────────────────────────
+const permissionForm = ref(normalizePermissionRoles())
+const savingPermissions = ref(false)
+
+watch(() => authStore.permissionRoles, (val) => {
+  permissionForm.value = normalizePermissionRoles(val)
+}, { immediate: true, deep: true })
+
+function togglePermissionRole(permissionKey, role) {
+  const roles = new Set(permissionForm.value[permissionKey] ?? [])
+  if (roles.has(role)) roles.delete(role)
+  else roles.add(role)
+  permissionForm.value = {
+    ...permissionForm.value,
+    [permissionKey]: [...roles],
+  }
+}
+
+async function savePermissions() {
+  savingPermissions.value = true
+  try {
+    await setDoc(doc(db, 'settings', 'permissions'), {
+      roles: normalizePermissionRoles(permissionForm.value),
+      updatedAt: serverTimestamp(),
+      updatedBy: authStore.user?.uid ?? null,
+    }, { merge: true })
+    ElMessage.success('權限設定已更新')
+  } catch (e) {
+    ElMessage.error('儲存失敗：' + (e.code || e.message))
+  } finally {
+    savingPermissions.value = false
+  }
+}
 
 async function saveIdleTimeout() {
   const val = idleTimeoutInput.value
@@ -233,7 +326,7 @@ async function saveDuty() {
     dutyDialog.value = false
   } catch (e) {
     console.error('[SettingsView] saveDuty error:', e)
-    ElMessage.error(`儲存失敗：${e.code || e.message} (目前角色: ${authStore.role})`)
+    ElMessage.error(`儲存失敗：${e.code || e.message} (目前角色: ${ROLE_MAP[authStore.role] ?? '未知角色'})`)
   } finally {
     savingDuty.value = false
   }

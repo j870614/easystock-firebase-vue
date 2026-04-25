@@ -515,21 +515,135 @@ async function buildReportData(locId) {
 
 async function exportExcel() {
   if (selectedProductIds.value.length === 0) {
-    alert('請先選擇品項名稱'); return
+    alert('請先選擇品項名稱')
+    return
   }
+
   exporting.value = true
   try {
-    const { rows } = await buildReportData(appStore.selectedLocationId)
+    const { products, rows } = await buildReportData(appStore.selectedLocationId)
     const wb = new ExcelJS.Workbook()
+    wb.creator = '彌陀之家東林寺庫存管理系統'
+    wb.created = new Date()
+
     const ws = wb.addWorksheet('出入庫明細')
-    // 原有 Excel 匯出邏輯... (略，維持現狀)
-    // 這裡為了節省空間，使用者如果之後有細微調整再說
-    exporting.value = false
-    alert('Excel 匯出中...') // 實際開發環境會放入完整的 ExcelJS 邏輯
+    const totalColumns = 2 + products.length * 3
+    const lastColumn = Math.max(totalColumns, 2)
+
+    ws.mergeCells(1, 1, 1, lastColumn)
+    ws.getCell(1, 1).value = reportTitle.value
+    ws.getCell(1, 1).font = { bold: true, size: 16 }
+    ws.getCell(1, 1).alignment = { horizontal: 'center', vertical: 'middle' }
+    ws.getRow(1).height = 26
+
+    ws.mergeCells(2, 1, 2, lastColumn)
+    ws.getCell(2, 1).value = `匯出時間：${new Date().toLocaleString('zh-TW')}`
+    ws.getCell(2, 1).font = { color: { argb: 'FF6B7280' } }
+    ws.getCell(2, 1).alignment = { horizontal: 'right' }
+
+    ws.getCell(4, 1).value = '日期'
+    ws.getCell(4, 2).value = '摘要'
+    ws.mergeCells(4, 1, 5, 1)
+    ws.mergeCells(4, 2, 5, 2)
+
+    products.forEach((product, index) => {
+      const startCol = 3 + index * 3
+      const productLabel = `${product.name}${product.spec ? `（${product.spec}）` : ''}`
+      ws.mergeCells(4, startCol, 4, startCol + 2)
+      ws.getCell(4, startCol).value = productLabel
+      ws.getCell(5, startCol).value = '入庫'
+      ws.getCell(5, startCol + 1).value = '出庫'
+      ws.getCell(5, startCol + 2).value = '結存'
+    })
+
+    for (let rowIndex = 4; rowIndex <= 5; rowIndex += 1) {
+      ws.getRow(rowIndex).eachCell((cell) => {
+        cell.font = { bold: true }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowIndex === 4 ? 'FFE5E7EB' : 'FFF3F4F6' } }
+        cell.alignment = { horizontal: 'center', vertical: 'middle' }
+        cell.border = buildThinBorder()
+      })
+    }
+
+    rows.forEach((row) => {
+      const values = [row.date, row.note || '']
+      products.forEach((product) => {
+        const item = row.items[product.id] ?? {}
+        values.push(item.in || '', item.out || '', item.stock ?? '')
+      })
+      ws.addRow(values)
+    })
+
+    const totalRowValues = ['合計', '']
+    products.forEach((product) => {
+      const inTotal = rows.reduce((sum, row) => sum + (row.items[product.id]?.in || 0), 0)
+      const outTotal = rows.reduce((sum, row) => sum + (row.items[product.id]?.out || 0), 0)
+      const lastStock = [...rows].reverse().find((row) => row.items[product.id])?.items[product.id]?.stock ?? ''
+      totalRowValues.push(inTotal || '', outTotal || '', lastStock)
+    })
+    const totalRow = ws.addRow(totalRowValues)
+    totalRow.font = { bold: true }
+    totalRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } }
+      cell.border = buildThinBorder()
+    })
+
+    ws.columns = [
+      { key: 'date', width: 14 },
+      { key: 'note', width: 28 },
+      ...products.flatMap(() => [
+        { width: 10 },
+        { width: 10 },
+        { width: 10 },
+      ]),
+    ]
+
+    ws.eachRow((row, rowNumber) => {
+      row.eachCell((cell) => {
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: rowNumber <= 5 || cell.col !== 2 ? 'center' : 'left',
+          wrapText: true,
+        }
+        cell.border = cell.border ?? buildThinBorder()
+      })
+    })
+    ws.views = [{ state: 'frozen', ySplit: 5 }]
+
+    const buffer = await wb.xlsx.writeBuffer()
+    downloadWorkbook(buffer, `${sanitizeFileName(reportTitle.value || '出入庫明細表')}.xlsx`)
   } catch (e) {
     alert(e.message)
+  } finally {
     exporting.value = false
   }
+}
+
+function buildThinBorder() {
+  return {
+    top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+    left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+    bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+    right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+  }
+}
+
+function sanitizeFileName(name) {
+  return String(name).replace(/[\\/:*?"<>|]/g, '-').trim()
+}
+
+function downloadWorkbook(buffer, filename) {
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 // ──────────────────────────────────────────────────────

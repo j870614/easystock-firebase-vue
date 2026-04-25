@@ -81,7 +81,7 @@ function assertAuth(request) {
 async function assertOwner(uid) {
   const { data: user } = await getUserRecord(uid)
   if (user.role !== 'owner') {
-    throw new HttpsError('permission-denied', '只有 owner 可以處理裝置申請。')
+    throw new HttpsError('permission-denied', '只有系統總管可以處理裝置申請。')
   }
 }
 

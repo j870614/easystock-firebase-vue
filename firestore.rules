@@ -11,6 +11,10 @@ service cloud.firestore {
       return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
     }
 
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
     function isAdmin() {
       return isAuth() && (
         request.auth.uid == 'j1LNiIEkZY61JDVytWFuQWfogB3' ||
@@ -18,25 +22,47 @@ service cloud.firestore {
       );
     }
 
-    function isHallLead() {
-      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'hallLead';
-    }
-
     function isStaff() {
       return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'hallLead', 'staff'];
     }
 
-    function canManageProducts() {
-      return isAdmin() || isHallLead();
+    function permissionsPath() {
+      return /databases/$(database)/documents/settings/permissions;
     }
 
-    function isAccountant() {
-      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.dutyName == '會計';
+    function defaultPermissionRoles(permissionKey) {
+      return permissionKey == 'inventory.write' ? ['owner', 'admin', 'hallLead', 'staff']
+        : permissionKey == 'dashboard.view' ? ['owner', 'admin', 'hallLead', 'staff']
+        : permissionKey == 'transactions.view' ? ['owner', 'admin', 'hallLead', 'staff']
+        : permissionKey == 'transactions.write' ? ['owner', 'admin', 'hallLead', 'staff']
+        : permissionKey == 'reports.view' ? ['owner', 'admin', 'hallLead', 'staff']
+        : permissionKey == 'products.write' ? ['owner', 'admin', 'hallLead']
+        : permissionKey == 'products.delete' ? ['owner']
+        : permissionKey == 'import.data' ? ['owner', 'admin', 'hallLead']
+        : permissionKey == 'locations.write' ? ['owner', 'admin']
+        : ['owner'];
+    }
+
+    function hasPermission(permissionKey) {
+      return isOwner()
+        || (
+          isAuth()
+          && (
+            (
+              exists(permissionsPath())
+              && userRole() in get(permissionsPath()).data.roles.get(permissionKey, defaultPermissionRoles(permissionKey))
+            )
+            || (
+              !exists(permissionsPath())
+              && userRole() in defaultPermissionRoles(permissionKey)
+            )
+          )
+        );
     }
 
     // ── users 集合 ────────────────────────────────────────────
     // - 任何已登入使用者可讀取自己的文件
-    // - 只有 owner 可以寫入或變更 role 欄位
+    // - 只有系統總管可以寫入或變更 role 欄位
     match /users/{uid} {
       allow read: if isAuth() && (request.auth.uid == uid || isAdmin());
 
@@ -68,7 +94,7 @@ service cloud.firestore {
                       )
                     );
 
-      // owner 可更新任何欄位（包含 role）
+      // 系統總管可更新任何欄位（包含 role）
       allow update: if isOwner();
 
       // 禁止任何人刪除使用者文件
@@ -88,33 +114,33 @@ service cloud.firestore {
     // ── locations 集合 ────────────────────────────────────────
     match /locations/{locationId} {
       allow read:   if isStaff();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
+      allow create: if hasPermission('locations.write');
+      allow update: if hasPermission('locations.write');
       allow delete: if isOwner();
     }
 
     // ── halls 集合 ────────────────────────────────────────────
     match /halls/{hallId} {
       allow read:   if isStaff();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
+      allow create: if hasPermission('locations.write');
+      allow update: if hasPermission('locations.write');
       allow delete: if isOwner();
     }
 
     // ── products 集合 ─────────────────────────────────────────
     match /products/{productId} {
       allow read:   if isStaff();
-      allow create: if canManageProducts();
-      allow update: if canManageProducts();
-      allow delete: if isOwner();
+      allow create: if hasPermission('products.write');
+      allow update: if hasPermission('products.write');
+      allow delete: if hasPermission('products.delete');
     }
 
     // ── productPlacements 集合 ───────────────────────────────
     match /productPlacements/{placementId} {
       allow read:   if isStaff();
-      allow create: if canManageProducts();
-      allow update: if canManageProducts();
-      allow delete: if isOwner();
+      allow create: if hasPermission('products.write');
+      allow update: if hasPermission('products.write');
+      allow delete: if hasPermission('products.delete');
     }
 
     // ── stocks 集合（庫存快取）────────────────────────────────
@@ -122,17 +148,17 @@ service cloud.firestore {
     match /stocks/{stockId} {
       allow read:   if isStaff();
       // Staff 可以寫（因為入出庫使用 Client SDK runTransaction）
-      allow write:  if isStaff();
+      allow write:  if hasPermission('inventory.write');
     }
 
     // ── transactions 集合 ─────────────────────────────────────
     match /transactions/{txId} {
       allow read:   if isStaff();
       // Staff 可以新增、修改、刪除交易紀錄
-      allow create: if isStaff()
+      allow create: if hasPermission('inventory.write')
                     && request.resource.data.operator.uid == request.auth.uid;
-      allow update: if isStaff();
-      allow delete: if isStaff();
+      allow update: if hasPermission('transactions.write');
+      allow delete: if hasPermission('transactions.write');
     }
 
     // ── settings 集合（系統設定）─────────────────────────────
@@ -142,10 +168,10 @@ service cloud.firestore {
     }
 
     // ── duties 集合（執事選項）───────────────────────────
-    // 所有已登入用戶可讀（PendingView 需要），只有管理員以上可管理
+    // 所有已登入用戶可讀（PendingView 需要），只有系統總管可管理
     match /duties/{dutyId} {
       allow read:  if isAuth();
-      allow write: if isAdmin();
+      allow write: if isOwner();
     }
 
   }

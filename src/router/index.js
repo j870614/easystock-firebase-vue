@@ -31,37 +31,37 @@ const routes = [
     path: '/',
     name: 'offering',
     component: () => import('@/views/InventoryView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'staff' },
+    meta: { requiresAuth: true, requiredRole: 'staff', requiredPermission: 'inventory.write' },
   },
   {
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/views/DashboardView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'staff' },
+    meta: { requiresAuth: true, requiredRole: 'staff', requiredPermission: 'dashboard.view' },
   },
   {
     path: '/transactions',
     name: 'transactions',
     component: () => import('@/views/TransactionsView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'staff' },
+    meta: { requiresAuth: true, requiredRole: 'staff', requiredPermission: 'transactions.view' },
   },
   {
     path: '/products',
     name: 'products',
     component: () => import('@/views/ProductsView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'hallLead' },
+    meta: { requiresAuth: true, requiredRole: 'staff', requiredPermission: 'products.write' },
   },
   {
     path: '/locations',
     name: 'locations',
     component: () => import('@/views/LocationsView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'owner' },
+    meta: { requiresAuth: true, requiredRole: 'staff', requiredPermission: 'locations.write' },
   },
   {
     path: '/reports',
     name: 'reports',
     component: () => import('@/views/ReportsView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'staff' },
+    meta: { requiresAuth: true, requiredRole: 'staff', requiredPermission: 'reports.view' },
   },
   {
     path: '/settings',
@@ -73,7 +73,7 @@ const routes = [
     path: '/import',
     name: 'import',
     component: () => import('@/views/ImportView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'hallLead' },
+    meta: { requiresAuth: true, requiredRole: 'staff', requiredPermission: 'import.data' },
   },
   {
     path: '/users',
@@ -85,7 +85,7 @@ const routes = [
     path: '/admin',
     name: 'admin',
     component: () => import('@/views/AdminHubView.vue'),
-    meta: { requiresAuth: true, requiredRole: 'admin' },
+    meta: { requiresAuth: true, requiredRole: 'staff' },
   },
   {
     path: '/profile',
@@ -119,7 +119,7 @@ router.beforeEach(async (to) => {
 
   // 未登入 → 強制導向登入頁
   if (!isPublic && !authStore.isAuthenticated) {
-    return { name: 'login' }
+    return { name: 'login', query: { next: to.fullPath } }
   }
 
   // 已登入但帳號待審核 → 導向 pending 頁
@@ -153,7 +153,10 @@ router.beforeEach(async (to) => {
 
   // 已登入要去登入頁 → 導向首頁
   if (isPublic && authStore.isAuthenticated && to.name === 'login') {
-    return { path: authStore.getPostLoginRoute() }
+    const next = typeof to.query.next === 'string' && to.query.next.startsWith('/') && !to.query.next.startsWith('//')
+      ? to.query.next
+      : authStore.getPostLoginRoute()
+    return { path: next }
   }
 
   // 角色不足 → 導向首頁
@@ -164,6 +167,11 @@ router.beforeEach(async (to) => {
     if (userWeight < required) {
       return { path: '/' }
     }
+  }
+
+  const requiredPermission = to.meta.requiredPermission
+  if (requiredPermission && !authStore.canAccess(requiredPermission)) {
+    return { path: '/profile' }
   }
 })
 
