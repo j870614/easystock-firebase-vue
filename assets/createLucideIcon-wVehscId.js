@@ -1,4 +1,4 @@
-import{aM as a}from"./index-Bfjfp_bf.js";/**
+import{aM as a}from"./index-7izBsmxd.js";/**
  * @license lucide-vue-next v0.477.0 - ISC
  *
  * This source code is licensed under the ISC license.
