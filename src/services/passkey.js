@@ -9,6 +9,7 @@ const verifyPasskeyAuthentication = httpsCallable(functions, 'verifyPasskeyAuthe
 const deferPasskeyEnrollmentCallable = httpsCallable(functions, 'deferPasskeyEnrollment')
 const createPasskeyDeviceRequestCallable = httpsCallable(functions, 'createPasskeyDeviceRequest')
 const reviewPasskeyDeviceRequestCallable = httpsCallable(functions, 'reviewPasskeyDeviceRequest')
+const listPendingPasskeyDeviceRequestsCallable = httpsCallable(functions, 'listPendingPasskeyDeviceRequests')
 
 function getOrigin() {
   return window.location.origin
@@ -37,8 +38,17 @@ export async function beginPasskeyRegistration(deviceLabel, deviceRequestId = nu
 }
 
 export async function createPasskeyDeviceRequest(deviceLabel, deviceType) {
-  const result = await createPasskeyDeviceRequestCallable({ deviceLabel, deviceType })
+  const result = await createPasskeyDeviceRequestCallable({
+    deviceLabel,
+    deviceType,
+    origin: getOrigin(),
+  })
   return result.data
+}
+
+export async function listPendingPasskeyDeviceRequests() {
+  const result = await listPendingPasskeyDeviceRequestsCallable()
+  return result.data?.requests ?? []
 }
 
 export async function reviewPasskeyDeviceRequest(uid, requestId, action) {

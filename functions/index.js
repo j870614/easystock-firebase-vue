@@ -132,6 +132,13 @@ function normalizeDeviceLabel(value) {
   return String(value || '').trim().slice(0, 80) || '未命名裝置'
 }
 
+function serializeTimestamp(value) {
+  if (!value) return null
+  if (typeof value.toMillis === 'function') return value.toMillis()
+  if (typeof value.toDate === 'function') return value.toDate().getTime()
+  return value
+}
+
 async function getApprovedDeviceRequest(uid, requestId) {
   if (!requestId) return null
 
@@ -164,6 +171,9 @@ exports.createPasskeyDeviceRequest = onCall(getFunctionOptions(), async (request
 
   const deviceLabel = normalizeDeviceLabel(request.data?.deviceLabel)
   const deviceType = String(request.data?.deviceType || 'unknown').slice(0, 40)
+  const origin = typeof request.data?.origin === 'string'
+    ? request.data.origin.slice(0, 120)
+    : ''
   const requestRef = db.collection('users').doc(uid).collection('passkeyDeviceRequests').doc()
 
   await requestRef.set({
@@ -173,6 +183,7 @@ exports.createPasskeyDeviceRequest = onCall(getFunctionOptions(), async (request
     photoURL: user.photoURL || '',
     deviceLabel,
     deviceType,
+    origin,
     status: 'pending',
     createdAt: FieldValue.serverTimestamp(),
     decidedAt: null,
@@ -181,6 +192,36 @@ exports.createPasskeyDeviceRequest = onCall(getFunctionOptions(), async (request
   })
 
   return { ok: true, directEligible: false, requestId: requestRef.id }
+})
+
+exports.listPendingPasskeyDeviceRequests = onCall(getFunctionOptions(), async (request) => {
+  const ownerUid = assertAuth(request)
+  await assertOwner(ownerUid)
+
+  const snap = await db
+    .collectionGroup('passkeyDeviceRequests')
+    .where('status', '==', 'pending')
+    .get()
+
+  const requests = snap.docs
+    .map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        uid: data.uid || doc.ref.parent.parent?.id || '',
+        userDisplayName: data.userDisplayName || '',
+        email: data.email || '',
+        photoURL: data.photoURL || '',
+        deviceLabel: data.deviceLabel || '',
+        deviceType: data.deviceType || '',
+        origin: data.origin || '',
+        status: data.status || '',
+        createdAt: serializeTimestamp(data.createdAt),
+      }
+    })
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+
+  return { ok: true, requests }
 })
 
 exports.reviewPasskeyDeviceRequest = onCall(getFunctionOptions(), async (request) => {

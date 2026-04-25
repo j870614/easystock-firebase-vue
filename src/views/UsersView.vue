@@ -22,9 +22,23 @@
           <h2 class="text-base font-bold text-gray-800">Passkey 新裝置申請</h2>
           <p class="mt-1 text-sm text-gray-500">第二組以上 Passkey 必須核准後才能綁定。</p>
         </div>
-        <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-amber-100 text-amber-700 border border-amber-200">
-          {{ pendingDeviceRequests.length }} 筆待審
-        </span>
+        <div class="flex flex-shrink-0 items-center gap-2">
+          <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-amber-100 text-amber-700 border border-amber-200">
+            {{ pendingDeviceRequests.length }} 筆待審
+          </span>
+          <button
+            class="rounded-lg border border-gray-200 p-1.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-brand-600"
+            :disabled="deviceRequestsLoading"
+            title="重新整理"
+            @click="loadPendingDeviceRequests"
+          >
+            <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': deviceRequestsLoading }" />
+          </button>
+        </div>
+      </div>
+
+      <div v-if="deviceRequestsError" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ deviceRequestsError }}
       </div>
 
       <template v-if="pendingDeviceRequests.length > 0">
@@ -39,7 +53,11 @@
                 {{ request.userDisplayName || request.email || '未命名使用者' }}
               </div>
               <div class="mt-1 text-sm text-gray-600 truncate">{{ request.deviceLabel }}</div>
-              <div class="mt-1 text-xs text-gray-400">{{ deviceTypeLabel(request.deviceType) }} · {{ formatRequestTime(request.createdAt) }}</div>
+              <div class="mt-1 flex flex-wrap gap-2 text-xs text-gray-400">
+                <span>{{ deviceTypeLabel(request.deviceType) }}</span>
+                <span>{{ formatRequestTime(request.createdAt) }}</span>
+                <span v-if="request.origin">{{ request.origin }}</span>
+              </div>
             </div>
             <div class="flex flex-col gap-2 flex-shrink-0">
               <button class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700" @click="reviewDeviceRequest(request, 'approve')">
@@ -52,6 +70,10 @@
           </div>
         </div>
       </template>
+
+      <div v-else-if="deviceRequestsLoading" class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-400">
+        正在讀取 Passkey 新裝置申請...
+      </div>
 
       <div v-else class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-400">
         目前沒有待審核的 Passkey 新裝置申請。
@@ -199,15 +221,15 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onUnmounted } from 'vue'
-import { collection, collectionGroup, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
+import { computed, ref, watch } from 'vue'
+import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { ElMessage } from 'element-plus'
-import { Search } from 'lucide-vue-next'
+import { RefreshCw, Search } from 'lucide-vue-next'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
-import { reviewPasskeyDeviceRequest } from '@/services/passkey'
+import { listPendingPasskeyDeviceRequests, reviewPasskeyDeviceRequest } from '@/services/passkey'
 import { ROLE_MAP, sortByOrder } from '@/utils/multiDept'
 
 const authStore = useAuthStore()
@@ -216,6 +238,8 @@ const appStore = useAppStore()
 const loading = ref(false)
 const users = ref([])
 const deviceRequests = ref([])
+const deviceRequestsLoading = ref(false)
+const deviceRequestsError = ref('')
 const editingUid = ref(null)
 const editForm = ref({ dharmaName: '', secularName: '' })
 const searchKeyword = ref('')
@@ -361,6 +385,7 @@ function getFallbackHallId(locationId) {
 
 function toMillis(value) {
   if (!value) return 0
+  if (typeof value === 'number') return value
   if (typeof value.toMillis === 'function') return value.toMillis()
   if (typeof value.toDate === 'function') return value.toDate().getTime()
   return new Date(value).getTime()
@@ -459,8 +484,23 @@ async function reviewDeviceRequest(request, action) {
   try {
     await reviewPasskeyDeviceRequest(request.uid, request.id, action)
     ElMessage.success(action === 'approve' ? '已核准裝置申請' : '已拒絕裝置申請')
+    await loadPendingDeviceRequests()
   } catch (e) {
     ElMessage.error(e?.message || '處理裝置申請失敗')
+  }
+}
+
+async function loadPendingDeviceRequests() {
+  if (!authStore.isOwner || deviceRequestsLoading.value) return
+
+  deviceRequestsLoading.value = true
+  deviceRequestsError.value = ''
+  try {
+    deviceRequests.value = await listPendingPasskeyDeviceRequests()
+  } catch (e) {
+    deviceRequestsError.value = e?.message || '讀取 Passkey 新裝置申請失敗'
+  } finally {
+    deviceRequestsLoading.value = false
   }
 }
 
@@ -470,29 +510,13 @@ onSnapshot(collection(db, 'users'), (snap) => {
   loading.value = false
 })
 
-let unsubscribeDeviceRequests = null
 watch(
   () => authStore.isOwner,
   (isOwner) => {
-    if (unsubscribeDeviceRequests) {
-      unsubscribeDeviceRequests()
-      unsubscribeDeviceRequests = null
-    }
-
     deviceRequests.value = []
     if (!isOwner) return
-
-    unsubscribeDeviceRequests = onSnapshot(
-      query(collectionGroup(db, 'passkeyDeviceRequests'), where('status', '==', 'pending')),
-      (snap) => {
-        deviceRequests.value = snap.docs.map((item) => ({ id: item.id, ...item.data() }))
-      }
-    )
+    loadPendingDeviceRequests()
   },
   { immediate: true }
 )
-
-onUnmounted(() => {
-  if (unsubscribeDeviceRequests) unsubscribeDeviceRequests()
-})
 </script>
