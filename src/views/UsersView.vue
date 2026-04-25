@@ -16,34 +16,45 @@
       </div>
     </div>
 
-    <div v-if="pendingDeviceRequests.length > 0" class="card mb-4 space-y-3">
-      <div>
-        <h2 class="text-base font-bold text-gray-800">Passkey 新裝置申請</h2>
-        <p class="mt-1 text-sm text-gray-500">第二組以上 Passkey 必須核准後才能綁定。</p>
+    <div v-if="authStore.isOwner" class="card mb-4 space-y-3">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-gray-800">Passkey 新裝置申請</h2>
+          <p class="mt-1 text-sm text-gray-500">第二組以上 Passkey 必須核准後才能綁定。</p>
+        </div>
+        <span class="text-xs px-2.5 py-1 rounded-full font-medium bg-amber-100 text-amber-700 border border-amber-200">
+          {{ pendingDeviceRequests.length }} 筆待審
+        </span>
       </div>
 
-      <div
-        v-for="request in pendingDeviceRequests"
-        :key="`${request.uid}-${request.id}`"
-        class="rounded-xl border border-amber-200 bg-amber-50 p-3"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <div class="font-semibold text-gray-800 truncate">
-              {{ request.userDisplayName || request.email || '未命名使用者' }}
+      <template v-if="pendingDeviceRequests.length > 0">
+        <div
+          v-for="request in pendingDeviceRequests"
+          :key="`${request.uid}-${request.id}`"
+          class="rounded-xl border border-amber-200 bg-amber-50 p-3"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="font-semibold text-gray-800 truncate">
+                {{ request.userDisplayName || request.email || '未命名使用者' }}
+              </div>
+              <div class="mt-1 text-sm text-gray-600 truncate">{{ request.deviceLabel }}</div>
+              <div class="mt-1 text-xs text-gray-400">{{ deviceTypeLabel(request.deviceType) }} · {{ formatRequestTime(request.createdAt) }}</div>
             </div>
-            <div class="mt-1 text-sm text-gray-600 truncate">{{ request.deviceLabel }}</div>
-            <div class="mt-1 text-xs text-gray-400">{{ deviceTypeLabel(request.deviceType) }} · {{ formatRequestTime(request.createdAt) }}</div>
-          </div>
-          <div class="flex flex-col gap-2 flex-shrink-0">
-            <button class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700" @click="reviewDeviceRequest(request, 'approve')">
-              核准
-            </button>
-            <button class="text-xs px-3 py-1.5 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50" @click="reviewDeviceRequest(request, 'reject')">
-              拒絕
-            </button>
+            <div class="flex flex-col gap-2 flex-shrink-0">
+              <button class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700" @click="reviewDeviceRequest(request, 'approve')">
+                核准
+              </button>
+              <button class="text-xs px-3 py-1.5 rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50" @click="reviewDeviceRequest(request, 'reject')">
+                拒絕
+              </button>
+            </div>
           </div>
         </div>
+      </template>
+
+      <div v-else class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-400">
+        目前沒有待審核的 Passkey 新裝置申請。
       </div>
     </div>
 
@@ -188,7 +199,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { collection, collectionGroup, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
 import { ElMessage } from 'element-plus'
 import { Search } from 'lucide-vue-next'
@@ -459,9 +470,29 @@ onSnapshot(collection(db, 'users'), (snap) => {
   loading.value = false
 })
 
-if (authStore.isOwner) {
-  onSnapshot(query(collectionGroup(db, 'passkeyDeviceRequests'), where('status', '==', 'pending')), (snap) => {
-    deviceRequests.value = snap.docs.map((item) => ({ id: item.id, ...item.data() }))
-  })
-}
+let unsubscribeDeviceRequests = null
+watch(
+  () => authStore.isOwner,
+  (isOwner) => {
+    if (unsubscribeDeviceRequests) {
+      unsubscribeDeviceRequests()
+      unsubscribeDeviceRequests = null
+    }
+
+    deviceRequests.value = []
+    if (!isOwner) return
+
+    unsubscribeDeviceRequests = onSnapshot(
+      query(collectionGroup(db, 'passkeyDeviceRequests'), where('status', '==', 'pending')),
+      (snap) => {
+        deviceRequests.value = snap.docs.map((item) => ({ id: item.id, ...item.data() }))
+      }
+    )
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => {
+  if (unsubscribeDeviceRequests) unsubscribeDeviceRequests()
+})
 </script>
