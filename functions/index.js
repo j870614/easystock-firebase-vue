@@ -198,12 +198,15 @@ exports.listPendingPasskeyDeviceRequests = onCall(getFunctionOptions(), async (r
   const ownerUid = assertAuth(request)
   await assertOwner(ownerUid)
 
-  const snap = await db
-    .collectionGroup('passkeyDeviceRequests')
-    .where('status', '==', 'pending')
-    .get()
+  const usersSnap = await db.collection('users').get()
+  const requestSnaps = await Promise.all(
+    usersSnap.docs.map((userDoc) =>
+      userDoc.ref.collection('passkeyDeviceRequests').where('status', '==', 'pending').get()
+    )
+  )
 
-  const requests = snap.docs
+  const requests = requestSnaps
+    .flatMap((snap) => snap.docs)
     .map((doc) => {
       const data = doc.data()
       return {
