@@ -71,6 +71,14 @@
           <div class="font-semibold text-gray-800">{{ latestRequest.deviceLabel }}</div>
           <div class="mt-1 text-gray-500">狀態：{{ requestStatusLabel(latestRequest.status) }}</div>
         </div>
+        <button
+          v-if="pendingRequest"
+          class="w-full rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+          :disabled="saving || checkingRequests"
+          @click="refreshOwnRequests"
+        >
+          {{ checkingRequests ? '檢查中…' : '重新檢查審核狀態' }}
+        </button>
       </div>
 
       <div
@@ -95,7 +103,7 @@
         :disabled="saving || !supportsPasskey"
         @click="registerPasskey"
       >
-        {{ saving ? '綁定中…' : '立即綁定 Passkey' }}
+        {{ saving ? '綁定中…' : approvedRequest ? '已核准，開始綁定 Passkey' : '立即綁定 Passkey' }}
       </button>
 
       <button
@@ -137,7 +145,7 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { collection, getDocs, onSnapshot } from 'firebase/firestore'
 import { ElMessage } from 'element-plus'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
@@ -152,6 +160,7 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const saving = ref(false)
+const checkingRequests = ref(false)
 const errorMsg = ref('')
 const ownRequests = ref([])
 const supportsPasskey = browserSupportsPasskey()
@@ -189,6 +198,7 @@ const approvedRequest = computed(() => {
 const canRegisterNow = computed(() => !authStore.hasPasskey || !!approvedRequest.value)
 
 let unsubscribeRequests = null
+let requestPollTimer = null
 watch(
   () => authStore.user?.uid,
   (uid) => {
@@ -199,17 +209,36 @@ watch(
     unsubscribeRequests = onSnapshot(
       collection(db, 'users', uid, 'passkeyDeviceRequests'),
       (snap) => {
-        ownRequests.value = snap.docs
-          .map((item) => ({ id: item.id, ...item.data() }))
-          .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
+        applyOwnRequestDocs(snap.docs)
       }
     )
   },
   { immediate: true }
 )
 
+watch(
+  () => pendingRequest.value?.id,
+  (requestId) => {
+    stopRequestPolling()
+    if (!requestId) return
+
+    requestPollTimer = window.setInterval(refreshOwnRequests, 5000)
+  },
+  { immediate: true }
+)
+
+watch(
+  () => approvedRequest.value?.id,
+  (requestId) => {
+    if (!requestId) return
+    stopRequestPolling()
+    ElMessage.success('裝置申請已核准，請點「開始綁定 Passkey」。')
+  }
+)
+
 onUnmounted(() => {
   if (unsubscribeRequests) unsubscribeRequests()
+  stopRequestPolling()
 })
 
 function detectDeviceType() {
@@ -266,9 +295,36 @@ function requestStatusLabel(status) {
 
 function toMillis(value) {
   if (!value) return 0
+  if (typeof value === 'number') return value
   if (typeof value.toMillis === 'function') return value.toMillis()
   if (typeof value.toDate === 'function') return value.toDate().getTime()
   return new Date(value).getTime()
+}
+
+function applyOwnRequestDocs(docs) {
+  ownRequests.value = docs
+    .map((item) => ({ id: item.id, ...item.data() }))
+    .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
+}
+
+function stopRequestPolling() {
+  if (!requestPollTimer) return
+  window.clearInterval(requestPollTimer)
+  requestPollTimer = null
+}
+
+async function refreshOwnRequests() {
+  if (!authStore.user?.uid || checkingRequests.value) return
+
+  checkingRequests.value = true
+  try {
+    const snap = await getDocs(collection(db, 'users', authStore.user.uid, 'passkeyDeviceRequests'))
+    applyOwnRequestDocs(snap.docs)
+  } catch (e) {
+    errorMsg.value = getPasskeyErrorMessage(e)
+  } finally {
+    checkingRequests.value = false
+  }
 }
 
 function goVerify() {
@@ -284,6 +340,15 @@ async function requestDeviceApproval() {
     if (result?.directEligible) {
       await registerPasskey()
       return
+    }
+    if (result?.requestId) {
+      router.replace({
+        query: {
+          ...route.query,
+          requestId: result.requestId,
+        },
+      })
+      await refreshOwnRequests()
     }
     ElMessage.success('已送出裝置申請，請等待 owner 核准。')
   } catch (e) {
