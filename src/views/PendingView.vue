@@ -94,6 +94,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Clock, LogOut, UserPlus } from 'lucide-vue-next'
 import { doc, updateDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore'
+import { ElMessage } from 'element-plus'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -146,7 +147,7 @@ async function submitProfile() {
     })
   } catch (err) {
     console.error('更新個資失敗', err)
-    alert('更新失敗，請再試一次')
+    ElMessage.error('更新失敗，請再試一次')
   } finally {
     submitting.value = false
   }

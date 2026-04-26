@@ -354,25 +354,57 @@ async function toggleMode(mode) {
   if (appStore.systemMode === mode) return
 
   if (mode === 'production') {
-    const confirmText = prompt('【警告】即將切換至「正式上線模式」\n\n系統將會清除「所有出入庫紀錄」並將「所有庫存歸零」！道場與品相設定將會保留。\n\n確認執行請輸入 "PROD"：')
+    let confirmText = ''
+    try {
+      const result = await ElMessageBox.prompt(
+        '即將清除所有出入庫紀錄並將所有庫存歸零。道場與品相設定將會保留。確認執行請輸入 PROD。',
+        '切換正式上線模式',
+        {
+          confirmButtonText: '確認切換',
+          cancelButtonText: '取消',
+          inputPattern: /^PROD$/,
+          inputErrorMessage: '請輸入 PROD',
+          type: 'warning',
+        }
+      )
+      confirmText = result.value
+    } catch (e) {
+      return
+    }
     if (confirmText !== 'PROD') return
 
     try {
       await clearAllData()
       await setDoc(doc(db, 'settings', 'system'), { mode: 'production' }, { merge: true })
-      alert('已成功切換至正式上線模式，並清理所有測試數據。')
+      ElMessage.success('已成功切換至正式上線模式，並清理所有測試數據。')
     } catch (e) {
-      alert('切換失敗：' + e.message)
+      ElMessage.error('切換失敗：' + e.message)
     }
   } else {
-    const confirmText = prompt('【警告】切換回「開發測試模式」不會還原被刪除的資料。\n\n確認切換請輸入 "DEV"：')
+    let confirmText = ''
+    try {
+      const result = await ElMessageBox.prompt(
+        '切換回開發測試模式不會還原被刪除的資料。確認切換請輸入 DEV。',
+        '切換開發測試模式',
+        {
+          confirmButtonText: '確認切換',
+          cancelButtonText: '取消',
+          inputPattern: /^DEV$/,
+          inputErrorMessage: '請輸入 DEV',
+          type: 'warning',
+        }
+      )
+      confirmText = result.value
+    } catch (e) {
+      return
+    }
     if (confirmText !== 'DEV') return
 
     try {
       await setDoc(doc(db, 'settings', 'system'), { mode: 'development' }, { merge: true })
-      alert('已切換回開發測試模式。')
+      ElMessage.success('已切換回開發測試模式。')
     } catch (e) {
-      alert('切換失敗：' + e.message)
+      ElMessage.error('切換失敗：' + e.message)
     }
   }
 }

@@ -118,7 +118,7 @@ import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import AppLayout from '@/components/AppLayout.vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { buildStockDocId } from '@/utils/multiDept'
 
 const authStore = useAuthStore()
@@ -248,7 +248,7 @@ async function doImport() {
 
   const targetLoc = appStore.selectedLocation
   if (!targetLoc || !appStore.selectedHallId) {
-    alert('未選取堂口')
+    ElMessage.warning('未選取堂口')
     return
   }
 
@@ -328,7 +328,7 @@ async function doImport() {
     preview.value = []
     errors.value  = []
   } catch (e) {
-    alert('匯入失敗：' + e.message)
+    ElMessage.error('匯入失敗：' + e.message)
   } finally {
     importing.value = false
   }

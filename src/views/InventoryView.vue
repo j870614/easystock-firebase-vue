@@ -394,7 +394,10 @@ function openProductSelect(name, groupItems) {
     // 只有單一規格，直接加入購物車前先檢查防呆
     if (!appStore.isReplenishMode && getStock(p.id) <= 0) {
       if (navigator.vibrate) navigator.vibrate(200)
-      alert(`【${p.name}${p.spec ? '-' + p.spec : ''}】庫存不足，無法結緣`)
+      ElMessageBox.alert(`【${p.name}${p.spec ? '-' + p.spec : ''}】庫存不足，無法結緣`, '庫存不足', {
+        confirmButtonText: '知道了',
+        type: 'warning',
+      }).catch(() => {})
       return
     }
     addToCart(p)
@@ -608,7 +611,7 @@ async function submitCart() {
 
     setTimeout(() => { successMsg.value = '' }, 3000)
   } catch (e) {
-    alert(e.message || '操作失敗，請重試')
+    ElMessage.error(e.message || '操作失敗，請重試')
   } finally {
     submitting.value = false
   }

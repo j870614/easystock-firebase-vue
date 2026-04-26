@@ -326,6 +326,7 @@
 import { ref, watch, onMounted, computed } from 'vue'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import zhTw from 'element-plus/es/locale/lang/zh-tw'
+import { ElMessage } from 'element-plus'
 import ExcelJS from 'exceljs'
 import { FileDown, Upload, PackageSearch } from 'lucide-vue-next'
 import { db } from '@/firebase'
@@ -515,7 +516,7 @@ async function buildReportData(locId) {
 
 async function exportExcel() {
   if (selectedProductIds.value.length === 0) {
-    alert('請先選擇品項名稱')
+    ElMessage.warning('請先選擇品項名稱')
     return
   }
 
@@ -613,7 +614,7 @@ async function exportExcel() {
     const buffer = await wb.xlsx.writeBuffer()
     downloadWorkbook(buffer, `${sanitizeFileName(reportTitle.value || '出入庫明細表')}.xlsx`)
   } catch (e) {
-    alert(e.message)
+    ElMessage.error(e.message || '匯出失敗')
   } finally {
     exporting.value = false
   }
@@ -736,7 +737,8 @@ async function loadSharedData() {
 
 async function exportSharedExcel() {
   if (commonProds.value.length === 0) {
-    alert('請先選擇品項名稱'); return
+    ElMessage.warning('請先選擇品項名稱')
+    return
   }
   exportingShared.value = true
   try {
@@ -804,7 +806,7 @@ async function exportSharedExcel() {
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${activeTab.value === 'orderDetail' ? '認供結緣明細表' : '認購登記表'}.xlsx`; a.click(); URL.revokeObjectURL(url)
   } catch (e) {
-    alert(e.message)
+    ElMessage.error(e.message || '匯出失敗')
   } finally {
     exportingShared.value = false
   }

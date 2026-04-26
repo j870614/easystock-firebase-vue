@@ -305,6 +305,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { collection, query, where, onSnapshot, orderBy, limit, doc, runTransaction, updateDoc, serverTimestamp, startAfter } from 'firebase/firestore'
 import { Building2, History, ArrowDownCircle, ArrowUpCircle, MoreVertical, Edit2, Trash2, CalendarCheck, CheckCircle2 } from 'lucide-vue-next'
 import zhTw from 'element-plus/es/locale/lang/zh-tw'
+import { ElMessage } from 'element-plus'
 import { db } from '@/firebase'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -562,9 +563,9 @@ async function submitEdit() {
     })
 
     editDialog.value = false
-    alert('修改成功')
+    ElMessage.success('修改成功')
   } catch(e) {
-    alert(e.message || '修改失敗')
+    ElMessage.error(e.message || '修改失敗')
   } finally {
     submitting.value = false
     loading.value = false
@@ -608,9 +609,9 @@ async function confirmDelete() {
       t.delete(txRef)
     })
     deleteDialog.value = false
-    alert('已成功刪除')
+    ElMessage.success('已成功刪除')
   } catch(e) {
-    alert(e.message || '刪除失敗')
+    ElMessage.error(e.message || '刪除失敗')
   } finally {
     submitting.value = false
     loading.value = false
@@ -638,7 +639,7 @@ async function submitAccountantDate() {
     })
     accountantDateDialog.value = false
   } catch (e) {
-    alert(e.message || '標記失敗，請重試')
+    ElMessage.error(e.message || '標記失敗，請重試')
   } finally {
     submitting.value = false
   }
