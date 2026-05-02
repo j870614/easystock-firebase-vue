@@ -280,6 +280,32 @@
                     <el-switch v-else v-model="item.isActive" size="small" />
                   </div>
                 </div>
+
+                <div
+                  v-if="!form.localVisibilityOnly && showSaleFields && uniqueCountries.length > 0"
+                  class="mt-3 border-t border-gray-200 pt-3"
+                  :class="form.localVisibilityOnly ? '' : 'pl-10'"
+                >
+                  <div class="mb-2 text-xs font-bold text-brand-600">各國度單價設定（選填）</div>
+                  <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    <div
+                      v-for="country in uniqueCountries"
+                      :key="country"
+                      class="rounded-lg border border-gray-200 bg-white p-2 shadow-sm"
+                    >
+                      <div class="mb-1 truncate text-xs font-bold text-gray-700" :title="country">{{ country }}</div>
+                      <label class="mb-1 block text-[10px] text-gray-500">單價覆蓋</label>
+                      <input
+                        type="number"
+                        class="input px-2 py-1 text-xs"
+                        :placeholder="`預設：${formatMoney(item.price || 0)}`"
+                        :value="item.overrides?.[country]?.price ?? ''"
+                        min="0"
+                        @input="(event) => updateCountryPriceOverride(item, country, event.target.value)"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </template>
           </draggable>
@@ -383,6 +409,15 @@ const targetHallIds = computed(() => {
   }
   return form.value.hallIds
 })
+
+const uniqueCountries = computed(() =>
+  Array.from(
+    new Set(
+      appStore.locations
+        .map((location) => location.country || '台灣')
+    )
+  )
+)
 
 function buildGroups(items) {
   const map = new Map()
@@ -497,11 +532,24 @@ function addSpecLine() {
     minStock: 0,
     isActive: true,
     isMarkedForDeletion: false,
+    overrides: {},
   })
 }
 
 function removeSpecLine(index) {
   form.value.specs.splice(index, 1)
+}
+
+function cloneOverrides(overrides) {
+  return overrides ? JSON.parse(JSON.stringify(overrides)) : {}
+}
+
+function updateCountryPriceOverride(item, country, value) {
+  if (!item.overrides) item.overrides = {}
+  if (!item.overrides[country]) item.overrides[country] = {}
+
+  const price = Number(value)
+  item.overrides[country].price = value === '' || Number.isNaN(price) ? null : price
 }
 
 function openForm(group = null) {
@@ -532,6 +580,7 @@ function openForm(group = null) {
         isActive: item.isActive !== false,
         hallVisible: appStore.isProductVisibleInHall(item),
         isMarkedForDeletion: false,
+        overrides: cloneOverrides(item.overrides),
       })),
     }
   } else {
@@ -639,6 +688,7 @@ async function save() {
           order: baseOrder + index,
           placementMode,
           selectedHallIds: placementMode === 'selected' ? hallIds : [],
+          overrides: item.overrides || {},
         },
         { merge: true }
       )
